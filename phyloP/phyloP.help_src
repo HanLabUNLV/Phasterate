@@ -1,0 +1,291 @@
+PROGRAM: phyloP
+
+USAGE: phyloP [OPTIONS] tree.mod [alignment] > out
+
+    The phylogenetic model must be in the .mod format produced by the
+    phyloFit program.  The alignment file can be in any of several file
+    formats (see --msa-format).  No alignment is required with the --null
+    option. 
+
+DESCRIPTION:
+
+    Compute conservation or acceleration p-values based on an alignment and
+    a model of neutral evolution.  Will also compute p-values of
+    conservation/acceleration in a subtree and in its complementary
+    supertree given the whole tree (see --subtree).  P-values can be
+    produced for entire input alignments (the default), pre-specified
+    intervals within an alignment (see --features), or individual sites
+    (see --wig-scores and --base-by-base).
+
+    The default behavior is to compute a null distribution for the total
+    number of substitutions from the tree model, an estimate of the number
+    of substitutions that have actually occurred, and the p-value of this
+    estimate wrt the null distribution.  These computations are performed
+    as described by Siepel, Pollard, and Haussler (2006).  In addition to
+    the SPH method, phyloP can compute p-values or
+    conservation/acceleration scores using a likelihood ratio test
+    (--method LRT), a score-based test (--method SCORE), or a procedure
+    similar to that used by GERP (Cooper et al., 2005) (--method GERP).
+    These alternative methods are currently supported only with
+    --base-by-base, --wig-scores, or --features.
+
+    The main advantage of the SPH method is that it can provide a complete
+    and exact description of distributions over numbers of substitutions.
+    However, simulation experiments suggest that the LRT and SCORE methods
+    have somewhat better power than SPH for identifying selection,
+    especially when the expected number of substitutions is small (e.g.,
+    with short branch lengths and/or short intervals/individual sites).
+    These two methods are also faster.  They are generally similar to one
+    another in power, but in many cases SCORE is considerably faster than
+    LRT.  On the other hand, SCORE appears to have slightly less power than
+    LRT at low false positive rates, i.e., for cases of extreme selection.
+    Thus, when using --base-by-base, --wig-scores, or --features, LRT is
+    recommended for most purposes, but SCORE is a good alternative if speed
+    is an issue.
+
+    When computing p-values with the SPH method, the default is to use the
+    posterior expected number of substitutions as an estimate of the actual
+    number.  This is a conservative estimate, because it is biased toward
+    the mean of the null distribution by the prior.  These p-values can be
+    made less conservative with --fit-model and more conservative with
+    --confidence-interval (see below).
+
+EXAMPLES:
+
+    1. Using the SPH method, compute and report p-values of conservation
+    and acceleration for a given alignment with respect to a neutral model
+    of evolution.  Estimated numbers of substitutions are also reported.
+
+        phyloP neutral.mod alignment.fa > report.txt
+
+    The file neutral.mod could be produced by running phyloFit on data from
+    ancestral repeats or fourfold degenerate sites with an appropriate tree
+    topology and substitution model.
+
+    2. Compute and report p-values of conservation and acceleration for a
+    particular subtree of interest (using SPH).
+
+        phyloP --subtree human-mouse_lemur neutral.mod alignment.fa > report.txt
+
+    Here human-mouse_lemur denote the most recent common ancestor of human
+    and mouse_lemur, which is the node that defines the primate clade in
+    this phylogeny.  The tree_doctor program with the --name-ancestors
+    option can be used to assign names to ancestral nodes of the tree.
+
+    3. Describe the complete null distribution over the number of
+    substitutions for a 10bp alignment given the specified neutral model
+    (using SPH).
+
+        phyloP --null 10 neutral.mod > null.txt
+
+    A two-column table is produced with numbers of substitutions and their
+    probabilities, up to an appropriate upper limit.
+
+    4. Describe the complete posterior distribution over the number of
+    substitutions in a given alignment (using SPH).
+
+        phyloP --posterior neutral.mod alignment.fa > posterior.txt
+
+    5. Compute conservation scores (-log p-values) for each site in an
+    alignment and output them in the fixed-step wig format (see
+    http://genome.ucsc.edu/goldenPath/help/wiggle.html).  Use the
+    likelihood ratio test (LRT) method.
+
+        phyloP --wig-scores --method LRT neutral.mod alignment.fa > scores.wig
+
+    The --mode option can be used instead to produce acceleration scores
+    (ACC), scores of nonneutrality (NNEUT), or scores that summarize
+    conservation and acceleration (CONACC).  The --base-by-base option can
+    be used to output additional statistics of interest (estimated scale
+    factors, log likelihood ratios, etc.).  As discussed above, several
+    arguments to --method are possible.
+    
+    6. Similarly, compute scores describing lineage-specific conservation
+    in primates.
+
+        phyloP --wig-scores --method LRT --subtree human-mouse_lemur \
+            neutral.mod alignment.fa > scores.wig
+
+    7. Compute conservation p-values and associated statistics for each
+    element in a BED file.  This time use a score test and allow for
+    acceleration as well as conservation, flagging elements under
+    acceleration by making their p-values negative (CONACC mode).
+
+        phyloP --features elements.bed --method SCORE --mode CONACC \
+            neutral.mod alignment.fa > element-scores.txt
+
+    This option can also be used with --subtree.  The --gff-scores option
+    can be used to output the original features in GFF format with scores
+    equal to -log p.  Note that the input file can be in GFF instead of BED
+    format.
+
+OPTIONS:
+
+    --msa-format, -i FASTA|PHYLIP|MPM|MAF|SS
+        Alignment format (default is to guess format from file contents).
+
+    --method, -m SPH|LRT|SCORE|GERP
+        Method used to compute p-values or conservation/acceleration scores
+        (Default SPH).  The likelihood ratio test (LRT) and score test
+        (SCORE) compare an alternative model having a free scale parameter
+        with the given neutral model, or, if --subtree is used, an
+        alternative model having free scale parameters for the supertree
+        and subtree with a null model having a single free scale parameter.
+        P-values are computed by comparing test statistics with asymptotic
+        chi-square null distributions.  The GERP-like method (GERP)
+        estimates the number of "rejected substitutions" per base by
+        comparing the (per-site) maximum likelihood expected number of
+        substitutions with the expected number under the neutral model.
+        Currently LRT, SCORE, and GERP can be used only with
+        --base-by-base, --wig-scores, or --features.
+
+    --wig-scores, -w
+        Compute separate p-values per site, and then compute site-specific
+        conservation (acceleration) scores as -log(p).  Output base-by-base
+        scores in fixed-step wig format, using the coordinate system of the
+        reference sequence (see --refidx).  In GERP mode, outputs rejected
+        substitutions per site instead of -log p-values.
+
+    --base-by-base, -b
+        Like --wig-scores, but outputs multiple values per site, in a
+        method-dependent way.  With 'SPH', output includes mean and
+        variance of posterior distribution, with LRT and SCORE it
+        includes the estimated scale factor(s) and test statistics, and
+        with GERP it includes the estimated numbers of neutral,
+        observed, and rejected substitutions, along with the number of
+        species available at each site.
+
+    --refidx, -r <refseq_idx>
+        (for use with --wig-scores or --base-by-base) Use coordinate frame
+        of specified sequence in output.  Default value is 1, first
+        sequence in alignment; 0 indicates coordinate frame of entire
+        multiple alignment.
+
+    --mode, -o CON|ACC|NNEUT|CONACC
+        (For use with --wig-scores, --base-by-base, or --features) Whether
+        to compute one-sided p-values so that small p (large -log p)
+        indicates unexpected conservation (CON; the default) or
+        acceleration (ACC); or two-sided p-values such that small p
+        indicates an unexpected departure from neutrality (NNEUT).  The
+        fourth option (CONACC) uses positive values (p-values or scores) to
+        indicate conservation and negative values to indicate acceleration.
+        In GERP mode, CON and CONACC both report the number of rejected
+        substitutions R (which may be negative), while ACC reports -R, and
+        NNEUT reports abs(R).
+
+    --features, -f <file>
+        Read features from <file> (GFF or BED format) and output a
+        table of p-values and related statistics with one row per
+        feature.  The features are assumed to use the coordinate frame
+        of the first sequence in the alignment.  Not for use with
+        --null or --posterior.  See also --gff-scores.
+
+    --gff-scores, -g
+        (For use with features)  Instead of a table, output a GFF and
+        assign each feature a score equal to its -log p-value.
+
+    --subtree, -s <node-name>
+        (Not available in GERP mode) Partition the tree into the subtree
+        beneath the node whose name is given and the complementary
+        supertree, and consider conservation/acceleration in the subtree
+        given the supertree.  The branch above the specified node is
+        included with the subtree.  Thus, given the tree
+        "((human,chimp)primate,(mouse,rat)rodent)", the option "--subtree
+        primate" will create one partition consisting of human, chimp, and
+        the branch leading to them, and another partition consisting of the
+        rest of the tree; "--subtree human" will create one partition
+        consisting only of human and the branch leading to it and another
+        partition consisting of the rest of the tree.  In 'SPH' mode, a
+        reversible substitution model is assumed.
+
+    --branch, -B <node-name(s)>
+        (Not available in GERP or SPH mode).  Like subtree, but partitions
+	the tree into the set of named branches (each named by its child
+	node), and all the remaining branches.  Then tests for conservation/
+	acceleration in the set of named branches relative to the others.
+	The argument is a comma-delimited list of child nodes.
+
+    --chrom, -N <name>
+        (Optionally use with --wig-scores or --base-by-base) Chromosome
+        name for wig output.  Default is root of multiple alignment
+        filename.
+
+    --log, -l <fname>
+        Write log to <fname> describing details of parameter optimization.
+        Useful for debugging.  (Warning: may produce large file.)
+
+    --seed, -d <seed>
+        Provide a random number seed, should be an integer >=1.  Random
+        numbers are used in some cases to generate starting values for
+        optimization.  If not specified will use a seed based on the
+	current time.
+
+    --no-prune,-P
+        Do not prune species from tree which are not in alignment.  Rather,
+        treat these species as having missing data in the alignment.  Missing
+        data does have an effect on the results when --method SPH is used.
+
+    --help, -h
+        Produce this help message.
+
+
+  (Options for SPH mode only)
+
+    --null, -n <nsites>
+        Compute just the null (prior) distribution of the number of
+        substitutions, as defined by the tree model and the given
+        number of sites, and output as a table.  The 'alignment'
+        argument will be ignored.  If used with --subtree, the joint
+        distribution over the number of substitutions in the specified
+        supertree and subtree will be output instead.
+
+    --posterior, -p
+        Compute just the posterior distribution of the number of
+        substitutions, given the alignment and the model, and output
+        as a table.  If used with --subtree, the joint distribution
+        over the number of substitutions in the specified supertree
+        and subtree will be output instead.
+
+    --fit-model, -F
+        Fit model to data before computing posterior distribution, by
+        estimating a scale factor for the whole tree or (if --subtree)
+        separate scale factors for the specified subtree and supertree.
+        Makes p-values less conservative.  This option has no effect with
+        --null and currently cannot be used with --features.  It can be
+        used with --wig-scores and --base-by-base.
+
+    --epsilon, -e <val>
+        (Default 1e-10 or 1e-6 if --wig-scores or --base-by-base) Threshold
+        used in truncating tails of distributions; tail probabilities less
+        than this value are discarded.  To get accurate p-values smaller
+        than 1e-10, this option will need to be used, at some cost in
+        speed.  Note that truncation affects only *right* tails, not left
+        tails, so it should be an issue only with p-values of acceleration.
+
+    --confidence-interval, -c <val>
+        Allow for uncertainty in the estimate of the actual number of
+        substitutions by using a (central) confidence interval about the
+        mean of the specified size (0 < val < 1).  To be conservative, the
+        maximum of this interval is used when computing a p-value of
+        conservation, and the minimum is used when computing a p-value of
+        acceleration.  The variance of the posterior is computed
+        exactly, but the confidence interval is based on the assumption
+        that the combined distribution will be approximately normal (true
+        for large numbers of sites by central limit theorem).
+
+    --quantiles, -q
+        (For use with --null or --posterior) Report quantiles of
+        distribution rather than whole distribution.
+
+
+REFERENCES:
+
+    Cooper GM, Stone EA, Asimenos G, NISC Comparative Sequencing Program,
+      Green ED, Batzoglou S, Sidow A. Distribution and intensity of
+      constraint in mammalian genomic sequence.  Genome Res. 2005
+      15(7):901-13.
+
+    Siepel A, Pollard KS, and Haussler D. New methods for detecting
+      lineage-specific selection. In Proceedings of the 10th International
+      Conference on Research in Computational Molecular Biology (RECOMB
+      2006), pp. 190-205.

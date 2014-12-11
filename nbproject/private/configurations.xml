@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="95">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <df root="." name="0">
+      <df name="dless">
+        <in>bd_phylo_hmm.c</in>
+        <in>dless.c</in>
+        <in>dless.help</in>
+        <in>dlessP.c</in>
+        <in>dlessP.help</in>
+      </df>
+      <df name="exoniphy">
+        <in>exoniphy.c</in>
+        <in>exoniphy.help</in>
+      </df>
+      <df name="lib">
+        <df name="base">
+          <in>complex_matrix.c</in>
+          <in>complex_vector.c</in>
+          <in>eigen.c</in>
+          <in>hashtable.c</in>
+          <in>list_of_lists.c</in>
+          <in>lists.c</in>
+          <in>markov_matrix.c</in>
+          <in>matrix.c</in>
+          <in>memory_handler.c</in>
+          <in>misc.c</in>
+          <in>numerical_opt.c</in>
+          <in>prob_matrix.c</in>
+          <in>prob_vector.c</in>
+          <in>stringsplus.c</in>
+          <in>vector.c</in>
+        </df>
+        <df name="feature">
+          <in>bed.c</in>
+          <in>category_map.c</in>
+          <in>genepred.c</in>
+          <in>gff.c</in>
+          <in>wig.c</in>
+        </df>
+        <df name="hmm">
+          <in>em.c</in>
+          <in>hmm.c</in>
+        </df>
+        <df name="motif">
+          <in>motif.c</in>
+          <in>tfbs.c</in>
+        </df>
+        <df name="msa">
+          <in>local_alignment.c</in>
+          <in>maf.c</in>
+          <in>maf_block.c</in>
+          <in>msa.c</in>
+          <in>multi_msa.c</in>
+          <in>sufficient_stats.c</in>
+        </df>
+        <df name="pcre">
+          <in>config.h</in>
+          <in>pcre.h</in>
+          <in>pcre_chartables.c</in>
+          <in>pcre_compile.c</in>
+          <in>pcre_config.c</in>
+          <in>pcre_dfa_exec.c</in>
+          <in>pcre_exec.c</in>
+          <in>pcre_fullinfo.c</in>
+          <in>pcre_get.c</in>
+          <in>pcre_globals.c</in>
+          <in>pcre_info.c</in>
+          <in>pcre_internal.h</in>
+          <in>pcre_maketables.c</in>
+          <in>pcre_newline.c</in>
+          <in>pcre_ord2utf8.c</in>
+          <in>pcre_refcount.c</in>
+          <in>pcre_study.c</in>
+          <in>pcre_tables.c</in>
+          <in>pcre_try_flipped.c</in>
+          <in>pcre_ucd.c</in>
+          <in>pcre_valid_utf8.c</in>
+          <in>pcre_version.c</in>
+          <in>pcre_xclass.c</in>
+          <in>ucp.h</in>
+        </df>
+        <df name="phylo">
+          <in>bgc_hmm.c</in>
+          <in>dgamma.c</in>
+          <in>fit_column.c</in>
+          <in>fit_em.c</in>
+          <in>fit_feature.c</in>
+          <in>indel_history.c</in>
+          <in>indel_mod.c</in>
+          <in>phast_cons.c</in>
+          <in>phylo_fit.c</in>
+          <in>phylo_p.c</in>
+          <in>phylo_p_print.c</in>
+          <in>subst_distrib.c</in>
+          <in>subst_mods.c</in>
+          <in>tree_likelihoods.c</in>
+          <in>tree_model.c</in>
+          <in>trees.c</in>
+        </df>
+        <df name="phylo_hmm">
+          <in>gap_patterns.c</in>
+          <in>phylo_hmm.c</in>
+        </df>
+      </df>
+      <df name="phastCons">
+        <in>phastCons.c</in>
+        <in>phastCons.help</in>
+      </df>
+      <df name="phastMotif">
+        <in>phastMotif.c</in>
+      </df>
+      <df name="phastOdds">
+        <in>phastOdds.c</in>
+        <in>phastOdds.help</in>
+      </df>
+      <df name="phyloBoot">
+        <in>phyloBoot.c</in>
+        <in>phyloBoot.help</in>
+      </df>
+      <df name="phyloFit">
+        <in>phyloFit.c</in>
+        <in>phyloFit.help</in>
+      </df>
+      <df name="phyloP">
+        <in>phyloP.c</in>
+        <in>phyloP.help</in>
+      </df>
+      <df name="prequel">
+        <in>pbsDecode.c</in>
+        <in>pbsDecode.help</in>
+        <in>pbsEncode.c</in>
+        <in>pbsEncode.help</in>
+        <in>pbsScoreMatrix.c</in>
+        <in>pbsScoreMatrix.help</in>
+        <in>pbsTrain.c</in>
+        <in>pbsTrain.help</in>
+        <in>pbs_code.c</in>
+        <in>prequel.c</in>
+        <in>prequel.help</in>
+        <in>simplex_grid.c</in>
+      </df>
+      <df name="util">
+        <in>all_dists.c</in>
+        <in>base_evolve.c</in>
+        <in>base_evolve.help</in>
+        <in>chooseLines.c</in>
+        <in>clean_genes.c</in>
+        <in>clean_genes.help</in>
+        <in>consEntropy.c</in>
+        <in>consEntropy.help</in>
+        <in>convert_coords.c</in>
+        <in>display_rate_matrix.c</in>
+        <in>draw_tree.c</in>
+        <in>eval_predictions.c</in>
+        <in>hmm_train.c</in>
+        <in>hmm_tweak.c</in>
+        <in>hmm_view.c</in>
+        <in>indelFit.c</in>
+        <in>indelFit.help</in>
+        <in>indelHistory.c</in>
+        <in>indelHistory.help</in>
+        <in>maf_parse.c</in>
+        <in>makeHKY.c</in>
+        <in>makeHKY.help</in>
+        <in>modFreqs.c</in>
+        <in>modFreqs.help</in>
+        <in>msa_diff.c</in>
+        <in>msa_diff.help</in>
+        <in>msa_split.c</in>
+        <in>msa_view.c</in>
+        <in>phast.c</in>
+        <in>phast.help</in>
+        <in>phastBias.c</in>
+        <in>phastBias.help</in>
+        <in>refeature.c</in>
+        <in>stringiphy.c</in>
+        <in>treeGen.c</in>
+        <in>treeGen.help</in>
+        <in>tree_doctor.c</in>
+      </df>
+    </df>
+  </logicalFolder>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <developmentServer>localhost</developmentServer>
+        <platform>2</platform>
+      </toolsSet>
+      <compile>
+        <compiledirpicklist>
+          <compiledirpicklistitem>.</compiledirpicklistitem>
+          <compiledirpicklistitem>${AUTO_FOLDER}</compiledirpicklistitem>
+        </compiledirpicklist>
+        <compiledir>${AUTO_FOLDER}</compiledir>
+        <compilecommandpicklist>
+          <compilecommandpicklistitem>${MAKE} ${ITEM_NAME}.o</compilecommandpicklistitem>
+          <compilecommandpicklistitem>${AUTO_COMPILE}</compilecommandpicklistitem>
+        </compilecommandpicklist>
+        <compilecommand>${AUTO_COMPILE}</compilecommand>
+      </compile>
+      <dbx_gdbdebugger version="1">
+        <gdb_pathmaps>
+        </gdb_pathmaps>
+        <gdb_interceptlist>
+          <gdbinterceptoptions gdb_all="false" gdb_unhandled="true" gdb_unexpected="true"/>
+        </gdb_interceptlist>
+        <gdb_signals>
+        </gdb_signals>
+        <gdb_options>
+          <DebugOptions>
+          </DebugOptions>
+        </gdb_options>
+        <gdb_buildfirst gdb_buildfirst_overriden="false" gdb_buildfirst_old="false"/>
+      </dbx_gdbdebugger>
+      <nativedebugger version="1">
+        <engine>gdb</engine>
+      </nativedebugger>
+      <runprofile version="9">
+        <runcommandpicklist>
+          <runcommandpicklistitem>"${OUTPUT_PATH}"</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" </runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000001607.mod /home/omar/work/ENSGT00390000001607.fa  > SPH.pOut</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00530000063890.mod /home/omar/work/ENSGT00530000063890.fa  > SPH.pOut</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00530000063890.mod /home/omar/work/ENSGT00530000063890.fa</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000001607.mod2 /home/omar/work/ENSGT00390000001607.fa</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000001607.mod /home/omar/work/ENSGT00390000001607.fa</runcommandpicklistitem>
+        </runcommandpicklist>
+        <runcommand>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000001607.mod /home/omar/work/ENSGT00390000001607.fa</runcommand>
+        <rundir>.</rundir>
+        <buildfirst>false</buildfirst>
+        <terminal-type>0</terminal-type>
+        <remove-instrumentation>0</remove-instrumentation>
+        <environment>
+        </environment>
+      </runprofile>
+    </conf>
+  </confs>
+</configurationDescriptor>

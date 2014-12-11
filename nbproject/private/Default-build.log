@@ -1,0 +1,15 @@
+mkdir -p ../bin ../lib
+for dir in lib dless exoniphy phastCons phastOdds phastMotif phyloFit phyloBoot phyloP prequel util  ; do cd /home/omar/$dir && /usr/bin/make ; done	
+/bin/sh: 1: cd: can't cd to /home/omar/lib
+/bin/sh: 1: cd: can't cd to /home/omar/dless
+/bin/sh: 1: cd: can't cd to /home/omar/exoniphy
+/bin/sh: 1: cd: can't cd to /home/omar/phastCons
+/bin/sh: 1: cd: can't cd to /home/omar/phastOdds
+/bin/sh: 1: cd: can't cd to /home/omar/phastMotif
+/bin/sh: 1: cd: can't cd to /home/omar/phyloFit
+/bin/sh: 1: cd: can't cd to /home/omar/phyloBoot
+/bin/sh: 1: cd: can't cd to /home/omar/phyloP
+/bin/sh: 1: cd: can't cd to /home/omar/prequel
+/bin/sh: 1: cd: can't cd to /home/omar/util
+Makefile:8: recipe for target 'all' failed
+make: *** [all] Error 2
