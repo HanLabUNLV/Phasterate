@@ -10,10 +10,14 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/base/prob_vector.c</file>
             <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/phylo/phylo_p.c</file>
-            <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/base/misc.c</file>
+            <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/base/prob_vector.c</file>
             <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/phylo/subst_distrib.c</file>
+            <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/base/misc.c</file>
+            <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/hmm/em.c</file>
+            <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/phylo/fit_column.c</file>
+            <file>file:/home/omar/work/repos/phast/phast-1.3/src/phyloP/phyloP.c</file>
+            <file>file:/home/omar/work/repos/phast/phast-1.3/src/lib/phylo/bgc_hmm.c</file>
         </group>
     </open-files>
 </project-private>

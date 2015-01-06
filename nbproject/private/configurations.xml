@@ -206,8 +206,6 @@
         <gdb_interceptlist>
           <gdbinterceptoptions gdb_all="false" gdb_unhandled="true" gdb_unexpected="true"/>
         </gdb_interceptlist>
-        <gdb_signals>
-        </gdb_signals>
         <gdb_options>
           <DebugOptions>
           </DebugOptions>
@@ -226,8 +224,9 @@
           <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00530000063890.mod /home/omar/work/ENSGT00530000063890.fa</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000001607.mod2 /home/omar/work/ENSGT00390000001607.fa</runcommandpicklistitem>
           <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000001607.mod /home/omar/work/ENSGT00390000001607.fa</runcommandpicklistitem>
+          <runcommandpicklistitem>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000000417.mod /home/omar/work/ENSGT00390000000417.fa</runcommandpicklistitem>
         </runcommandpicklist>
-        <runcommand>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000001607.mod /home/omar/work/ENSGT00390000001607.fa</runcommand>
+        <runcommand>"${OUTPUT_PATH}" -r 0 --wig-scores --mode CONACC /home/omar/work/ENSGT00390000000417.mod /home/omar/work/ENSGT00390000000417.fa</runcommand>
         <rundir>.</rundir>
         <buildfirst>false</buildfirst>
         <terminal-type>0</terminal-type>
