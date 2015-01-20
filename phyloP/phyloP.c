@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
   char c;
   FILE *msa_f = NULL;
   msa_format_type msa_format = UNKNOWN_FORMAT;
-
+  int gapAlphabet = 0;
   /* other variables */
   int opt_idx, seed = -1;
   List *cats_to_do_str=NULL;
@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
     {"no-prune", 0, 0, 'P'},
     {"seed", 1, 0, 'd'},
     {"help", 0, 0, 'h'},
+    {"gap", 0, 0, 'G'},
     {0, 0, 0, 0}
   };
 
@@ -56,7 +57,7 @@ int main(int argc, char *argv[]) {
   srandom(now.tv_usec);
 #endif
 
-  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:h", 
+  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:h:G", 
                           long_opts, &opt_idx)) != -1) {
     switch (c) {
     case 'm':
@@ -151,6 +152,10 @@ int main(int argc, char *argv[]) {
     case 'h':
       printf("%s", HELP);
       exit(0);
+      break;
+    case 'G':
+      gapAlphabet = 1;
+      break;
     case '?':
       die("Bad argument.  Try 'phyloP -h'.\n");
     }
@@ -180,8 +185,11 @@ int main(int argc, char *argv[]) {
 			     p->cats_to_do==NULL ? NULL : p->feats, p->cm, -1, 
 			     (p->feats == NULL && p->base_by_base==0) ? FALSE : TRUE, /* --features requires order */
 			     NULL, NO_STRIP, FALSE, p->cats_to_do); 
-    else 
-      p->msa = msa_new_from_file_define_format(msa_f, msa_format, NULL);
+    else
+      if(!gapAlphabet)
+        p->msa = msa_new_from_file_define_format(msa_f, msa_format, NULL);
+      else
+        p->msa = msa_new_from_file_define_format(msa_f, msa_format, "ACGT-");
     phast_fclose(msa_f);
 
     /* if base_by_base and undefined chrom, use filename root as chrom */

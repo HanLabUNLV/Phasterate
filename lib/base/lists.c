@@ -25,7 +25,9 @@
 #include <math.h>
 #include "lists.h"
 #include "stringsplus.h"
+#include "msa.h"
 #include <misc.h>
+#include "tree_model.h"
 
 List* lst_new(int nelements, int elementsz) {
   List *l = (List*)smalloc(sizeof(List));
@@ -177,7 +179,10 @@ void lst_qsort(List *l, int (*compare)(const void *, const void *)) {
   /* will we need to use max(elementsz, sizeof(void*))? */
   qsort(&l->array[l->lidx], lst_size(l), l->elementsz, compare);
 }
-
+/*Q sort to properly sort MSA and Mod pointer lists.*/
+void lst_qsort2(List *l,int (*compare)(const void*, const void*)){
+    qsort(*(l->array),lst_size(l),l->elementsz,compare);
+}
 /* free the elements of a list of strings */
 void lst_free_strings(List *l) {
   int i;
@@ -244,6 +249,25 @@ void lst_dbl_quantiles(List *l, double *quantiles, int nquantiles,
 /****************************************************************************/
 /*          Comparison functions for use with numeric lists                 */
 /****************************************************************************/
+int lst_msa_compare(const void* ptr1, const void* ptr2){
+    /*Data type of array was a void* that pointed to an MSA object, therefore
+     we must dereference to a void** to gete the adress of the MSA*/
+    /*This was pointer hell to figure out...*/
+    MSA* first =  (MSA*)(*(void**)ptr1);
+    MSA* second = (MSA*)(*(void**)ptr2);
+    char* str1 = first->fileName;
+    char* str2 = second->fileName;
+    return strcmp(str1,str2);
+    
+}
+int lst_mod_compare(const void* ptr1, const void* ptr2){
+    TreeModel* first = (TreeModel*)(*(void**)ptr1);
+    TreeModel* second = (TreeModel*)(*(void**)ptr2);
+    char* str1 = first->fileName;
+    char* str2 = second->fileName;    
+    
+    return strcmp(str1,str2);
+}
 
 int lst_int_compare_asc(const void* ptr1, const void* ptr2) {
   int val1 = *((int*)ptr1);

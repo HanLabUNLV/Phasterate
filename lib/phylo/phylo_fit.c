@@ -34,6 +34,7 @@
 #include <stacks.h>
 #include <trees.h>
 #include <misc.h>
+#include <sys/stat.h>
 
 /* initialize phyloFit options to defaults (slightly different
    for rphast).
@@ -667,6 +668,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   TreeModel *input_mod = pf->input_mod;
   FILE *error_file=NULL;
 
+  /*Error Checking*/
   if (pf->no_freqs)
     pf->init_backgd_from_data = FALSE;
 
@@ -689,11 +691,11 @@ int run_phyloFit(struct phyloFit_struct *pf) {
       subst_mod = pf->input_mod->subst_mod;
     else subst_mod = REV;
   }
-
+  printf("Substitude model is: %d\n",subst_mod);
   if (pf->gaps_as_bases && subst_mod != JC69 && subst_mod != F81 && 
       subst_mod != HKY85G && subst_mod != REV && 
-      subst_mod != UNREST && subst_mod != SSREV)
-    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, HKY85+Gap, REV, SSREV, and UNREST.\n");
+      subst_mod != UNREST && subst_mod != SSREV && subst_mod != INDEL)
+    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, HKY85+Gap, REV, SSREV, and UNREST and INDEL.\n");
                                 /* with HKY, yields undiagonalizable matrix */
   if ((pf->no_freqs || pf->no_rates) && input_mod == NULL)
     die("ERROR: --init-model required with --no-freqs and/or --no-rates.\n");
@@ -746,10 +748,11 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   }
 
 
+
   /* allow for specified ancestor */
   if (pf->root_seqname != NULL) {
     TreeNode *rl;
-    if (tree == NULL || subst_mod_is_reversible(subst_mod)) 
+    if (tree == NULL || subst_mod_is_reversible(subst_mod))
       die("ERROR: --ancestor requires --tree and a non-reversible model.\n");
     rl = tr_get_node(tree, pf->root_seqname);     
     if (rl == NULL || rl->parent != tree) 
@@ -757,6 +760,8 @@ int run_phyloFit(struct phyloFit_struct *pf) {
     root_leaf_id = rl->id;
   }
 
+
+  /*Attempt to label tree*/
   if (pf->label_str != NULL || pf->label_type != NULL) {
     if (pf->label_str == NULL || pf->label_type == NULL ||
 	lst_size(pf->label_str) != lst_size(pf->label_type))
@@ -929,6 +934,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
       int old_nnodes, cat = lst_get_int(cats_to_do, i);
       unsigned int ninf_sites;
 
+      /*First time it's called it will create a new model based on passed matrix model*/
       if (input_mod == NULL) 
         mod = tm_new(tr_create_copy(tree), NULL, NULL, subst_mod, 
                      msa->alphabet, pf->nratecats == -1 ? 1 : pf->nratecats, 
@@ -1263,4 +1269,747 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   if (gc != NULL)
     sfree(gc);
   return 0;
+}
+
+/*A*/
+int run_phyloFit_multi(struct phyloFit_struct *pf) {
+  //FILE *F, *WINDOWF=NULL;
+  int i,j;
+  //String *mod_fname;
+  //MSA *source_msa;
+  String *tmpstr = str_new(STR_SHORT_LEN);
+  List *cats_to_do=NULL;
+  double *gc=NULL;
+  //char tmpchstr[STR_MED_LEN];
+  FILE *parsimony_cost_file = NULL;
+  int free_cm = FALSE, free_cats_to_do_str=FALSE, free_tree=FALSE,
+    free_window_coords = FALSE;
+
+  //copy some heavily used variables directly from pf for easy access
+  //MSA *msa = pf->msa;
+  List *msas = pf->msas;
+  //int subst_mod = pf->subst_mod;
+  //TreeNode *tree = pf->tree;
+  List *trees = pf->trees;
+  GFF_Set *gff = pf->gff;
+  int quiet = pf->quiet;
+  //TreeModel *input_mod = pf->input_mod;
+  List *mods = pf->input_mods;
+  FILE *error_file=NULL;
+
+  if (pf->no_freqs)
+    pf->init_backgd_from_data = FALSE;
+
+  if (pf->parsimony_cost_fname != NULL)
+    parsimony_cost_file = phast_fopen(pf->parsimony_cost_fname, "w");
+
+  if (pf->use_conditionals && pf->use_em) 
+    die("ERROR: Cannot use --markov with --EM.    Type %s for usage.\n",
+	pf->see_for_help);
+  
+  if (pf->likelihood_only )  
+    die("ERROR: --lnl not allowed with multiple input models.  Type '%s' for usage.\n",
+	pf->see_for_help);
+
+  if (mods != NULL && trees != NULL)
+    die("ERROR: --tree is not allowed with --init-model.\n");
+
+  if (pf->subst_mod == UNDEF_MOD) {
+    if (pf->input_mods != NULL)
+      pf->subst_mod = ((TreeModel*)lst_get_ptr(pf->input_mods, 0))->subst_mod;
+    else pf->subst_mod = REV;
+  }
+
+  if (pf->gaps_as_bases && pf->subst_mod != JC69 && pf->subst_mod != F81 && 
+      pf->subst_mod != HKY85G && pf->subst_mod != REV && 
+      pf->subst_mod != UNREST && pf->subst_mod != SSREV && pf->subst_mod != INDEL)
+    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, HKY85+Gap, REV, SSREV, and UNREST and INDEL.\n");
+                                /* with HKY, yields undiagonalizable matrix */
+  if ((pf->no_freqs || pf->no_rates) && mods == NULL)
+    die("ERROR: --init-model required with --no-freqs and/or --no-rates.\n");
+
+  if (pf->no_freqs && pf->estimate_backgd)
+    die("ERROR: can't use both --no-freqs and --estimate-freqs.\n");
+
+  if (gff != NULL && pf->cm == NULL) {
+    pf->cm = cm_new_from_features(gff);
+    free_cm = TRUE;
+  }
+
+  if (pf->subtree_name != NULL && pf->estimate_scale_only == FALSE) {
+    if (!quiet) 
+      fprintf(stderr, "warning: specifying subtree implies scale_only\n");
+    pf->estimate_scale_only = TRUE;
+  }
+
+  if (pf->rate_consts != NULL) {
+    lst_qsort_dbl(pf->rate_consts, ASCENDING);
+    if (lst_size(pf->rate_consts) < 2 || lst_get_dbl(pf->rate_consts, 0) <= 0) 
+      die("ERROR: must be >= 2 rate constants and all must be positive.\n");
+    if (pf->nratecats != lst_size(pf->rate_consts))
+      die("ERROR: rate_consts must have length nratecats");
+  }
+
+  /* internally, --non-overlapping is accomplished via --do-cats */
+  if (pf->nonoverlapping) {
+    if (pf->cats_to_do_str != NULL)
+      die("ERROR: cannot use --do-cats with nonoverlapping");
+    pf->cats_to_do_str = lst_new_ptr(1);
+    lst_push_ptr(pf->cats_to_do_str, str_new_charstr("1"));
+    free_cats_to_do_str = TRUE;
+  }
+
+  if (trees == NULL) {
+    if (mods != NULL) {
+      pf->trees = lst_new_ptr(lst_size(pf->input_mods));
+      for (i=0; i < lst_size(pf->input_mods); i++) {
+        void* tree = lst_get_ptr(pf->input_mods, i);
+        lst_set_ptr(pf->trees, i, tree);  
+      }
+    }
+/*    else if (msa->nseqs == 2) {
+      sprintf(tmpchstr, "(%s,%s)", msa->names[0], msa->names[1]);
+      tree = tr_new_from_string(tmpchstr);
+      free_tree = TRUE;
+    }
+    else if (msa->nseqs == 3 && subst_mod_is_reversible(subst_mod) && pf->alt_mod_str == NULL) {
+      sprintf(tmpchstr, "(%s,(%s,%s))", msa->names[0], msa->names[1], 
+              msa->names[2]);
+      tree = tr_new_from_string(tmpchstr);
+      free_tree = TRUE;
+    }
+    else die("ERROR: --tree required.\n");*/
+  }
+
+
+
+  /* allow for specified ancestor */
+  if (pf->root_seqname != NULL) {
+    /*TreeNode *rl;
+    if (tree == NULL || subst_mod_is_reversible(subst_mod)) 
+      die("ERROR: --ancestor requires --tree and a non-reversible model.\n");
+    rl = tr_get_node(tree, pf->root_seqname);     
+    if (rl == NULL || rl->parent != tree) 
+      die("ERROR: Sequence specified by --ancestor must be a child of the root.\n");
+    root_leaf_id = rl->id;*/
+    die("ERROR: --ancestor not allowed with multiple input models.\n");
+  }
+
+  if (pf->label_str != NULL || pf->label_type != NULL) {
+    /*if (pf->label_str == NULL || pf->label_type == NULL ||
+	lst_size(pf->label_str) != lst_size(pf->label_type))
+      //shouldn't happen unless bug
+      die("label_str and label_type should both be lists of same length\n");
+    for (i=0; i < lst_size(pf->label_str); i++) {
+      String *currstr = (String*)lst_get_ptr(pf->label_str, i), *arg1, *label;
+      List *tmplst = lst_new_ptr(10);
+      String *nodename;
+      str_split(currstr, ":", tmplst);
+      if (lst_size(tmplst) != 2) 
+	die("ERROR: bad argument to --label-branches or --label-subtree.\n");
+      arg1 = lst_get_ptr(tmplst, 0);
+      label = lst_get_ptr(tmplst, 1);
+      lst_clear(tmplst);
+      if (lst_get_int(pf->label_type, i) == BRANCH_TYPE) {
+	str_split(arg1, ",", tmplst);
+	for (j=0; j < lst_size(tmplst); j++) {
+	  nodename = (String*)lst_get_ptr(tmplst, j);
+	  tr_label_node(tree, nodename->chars, label->chars);
+	}
+	lst_free_strings(tmplst);
+      } else if (lst_get_int(pf->label_type, i) == SUBTREE_TYPE) {
+	int include_leading_branch = FALSE;
+	TreeNode *node;
+	nodename = arg1;
+	node = tr_get_node(tree, nodename->chars);
+	if (node == NULL && nodename->chars[nodename->length-1] == '+') {
+	  nodename->chars[--nodename->length] = '\0';
+	  node = tr_get_node(tree, nodename->chars);
+	  include_leading_branch = TRUE;
+	}
+	tr_label_subtree(tree, nodename->chars, include_leading_branch, 
+			 label->chars);
+      } else die("ERROR got label_type %i\n", lst_get_int(pf->label_type, i));
+      str_free(arg1);
+      str_free(label);
+      lst_free(tmplst);
+    }*/
+    die("ERROR: --label-branches or --label-subtree not allowed with multiple input models.\n");
+  }
+
+  for (i=0; i<lst_size(pf->msas); i++) {
+    MSA *msa = lst_get_ptr(pf->msas, i);
+    if (msa_alph_has_lowercase(msa)) msa_toupper(msa); 
+    msa_remove_N_from_alph(msa);    /* for backward compatibility */
+  }
+
+  // setupmsa
+  for (i=0; i<lst_size(pf->msas); i++) {
+    MSA *msa = lst_get_ptr(pf->msas, i);
+    cats_to_do = setupmsa(pf, msa);
+  }
+  if(cats_to_do == NULL)
+      die("Error: No categories to do found, make sure folder has Alignment files?\n");
+  if (pf->error_fname != NULL)
+    error_file = phast_fopen(pf->error_fname, "w");
+  
+  // setupmod
+  List *newmods = lst_new_ptr(1);
+  List * newparams = lst_new_ptr(1);
+  /*It is ugly and unprefered to pass this pointer to setupMod but it's a easier solution than
+   restructuring function...*/
+  List* toSkipList = lst_new_int(100);
+  
+  for (i=0; i<lst_size(pf->input_mods); i++) {
+    TreeModel *input_mod = lst_get_ptr(pf->input_mods, i);
+    MSA *msa = lst_get_ptr(pf->msas, i);
+    TreeNode *tree = lst_get_ptr(pf->trees, i);
+    List* tmpmods = setupmod(pf, input_mod, msa, tree, cats_to_do, newparams,i,toSkipList);
+    
+    for (j=0; j<lst_size(tmpmods); j++) {
+        lst_push_ptr(newmods, lst_get_ptr(tmpmods, j));
+    }
+  }
+  
+  /*Some mods/msas failed and are recorded in toSkipList. Delete these files.
+   *   Then get the index and delete this entries from the 3 lists that are relevant.
+   *   This happens when some of the files in the folder don't have enough information
+   *   to be relevant and PhyloFit says "insufficient statistics" we have to throw this
+   *   files out of the final results:
+   
+   */
+  for(i=0; i < lst_size(toSkipList);i++){
+      int index = lst_get_int(toSkipList,i);
+      MSA* toDelete = ((MSA*)lst_get_ptr(pf->msas,index-i));
+      char deletedFile[100];
+      
+      strcpy(deletedFile,toDelete->fileName);
+      lst_delete_idx(newmods,index);
+      lst_delete_idx(msas,index);
+      lst_delete_idx(newparams,index);
+      printf("Deleted Msa/Mod: %s\n",deletedFile);
+  }
+  
+  List* tofree = pf->input_mods;
+  pf->input_mods = mods = newmods;
+  
+  lst_free(tofree);
+  lst_free(toSkipList);
+  toSkipList = NULL;
+  
+  // fit model
+  tm_fit_multi((TreeModel **)mods->array, lst_size(mods), (MSA **)msas->array, lst_size(msas), newparams, OPT_VERY_HIGH_PREC, NULL, 1);
+  /*Write results to always to this directory.*/
+  /*Maybe should not be hardcoded?*/
+  mkdir("phyloFitResults",S_IRWXU);
+  printf("Printing results to: phyloFitResults/\n");
+  // print model
+  for (i=0; i<lst_size(pf->msas); i++) {
+    MSA *msa = lst_get_ptr(pf->msas, i);
+    TreeModel *mod = lst_get_ptr(mods, i);
+    printmodMulti(pf, mod, msa, cats_to_do,i);
+  }
+
+  // free model
+  
+  
+  if (error_file != NULL) phast_fclose(error_file);
+  if (parsimony_cost_file != NULL) phast_fclose(parsimony_cost_file); 
+  str_free(tmpstr);
+  if (free_cm) {
+    cm_free(pf->cm);
+    pf->cm = NULL;
+  }
+  if (free_cats_to_do_str) {
+    lst_free_strings(pf->cats_to_do_str);
+    lst_free(pf->cats_to_do_str);
+    pf->cats_to_do_str = NULL;
+  }
+  if (free_tree) {
+    for (i=0; i<lst_size(pf->trees); i++) {
+    TreeNode *tree = lst_get_ptr(pf->trees, i);
+    tr_free(tree);
+    }
+    lst_free(pf->trees);
+  }
+  if (cats_to_do != NULL) lst_free(cats_to_do);
+  if (free_window_coords) {
+    lst_free(pf->window_coords);
+    pf->window_coords = NULL;
+  }
+  if (gc != NULL)
+    sfree(gc);
+  return 0;
+}
+
+
+List* setupmsa(struct phyloFit_struct *pf, MSA* msa)
+{
+  int i;
+  GFF_Set *gff = pf->gff;
+  int quiet = pf->quiet;
+  //int subst_mod = pf->subst_mod;
+  List *cats_to_do=NULL;
+  int free_window_coords;
+  FILE *WINDOWF=NULL;
+  
+  /* set up for categories */
+  /* first label sites, if necessary */
+  if (gff != NULL && pf->label_categories) {
+    if (msa->idx_offset > 0) {
+      /* if these's an offset, we'll just subtract it from all features */
+      for (i = 0; i < lst_size(gff->features); i++) {
+        GFF_Feature *f = lst_get_ptr(gff->features, i);
+        f->start -= msa->idx_offset;
+        f->end -= msa->idx_offset;
+      }
+      msa->idx_offset = 0;
+    }
+
+    /* convert GFF to coordinate frame of alignment */
+    msa_map_gff_coords(msa, gff, 1, 0, 0);
+
+    /* reverse complement segments of MSA corresponding to features on
+       reverse strand (if necessary) */
+    if (pf->reverse_group_tag != NULL) {
+      gff_group(gff, pf->reverse_group_tag);
+      msa_reverse_compl_feats(msa, gff, NULL);
+    }
+    
+    /* label categories */
+    if (!quiet) fprintf(stderr, "Labeling alignment sites by category ...\n");
+    msa_label_categories(msa, gff, pf->cm);
+  }
+  else if (pf->nonoverlapping && pf->label_categories) {
+                                /* (already taken care of if MAF) */
+    int cycle_size = tm_order(pf->subst_mod) + 1;
+    if (!(msa->seqs != NULL && msa->ss == NULL))
+      die("ERROR run_phyloFit: need explicit sequences, not sufficient statistics\n");
+    msa->categories = smalloc(msa->length * sizeof(int));
+    for (i = 0; i < msa->length; i++) 
+      msa->categories[i] = (i % cycle_size) + 1;
+    msa->ncats = cycle_size;
+  }
+  /* at this point, we have msa->ncats > 0 iff we intend to do
+     category-by-category estimation */
+
+  /* now set up list of categories to process.    There are several
+     cases to consider */
+  if (msa->ncats < 0) {            
+    if (pf->cats_to_do_str != NULL)
+      fprintf(stderr, "WARNING: ignoring --do-cats; no category information.\n");
+    cats_to_do = lst_new_int(1);
+    lst_push_int(cats_to_do, -1);
+    /* no categories -- pool all sites */
+  }
+  else if (pf->cats_to_do_str == NULL) {
+    cats_to_do = lst_new_int(msa->ncats + 1);
+    for (i = 0; i <= msa->ncats; i++) lst_push_int(cats_to_do, i);
+                                /* have categories but no --do-cats --
+                                   process all categories */
+  }
+  else if (pf->cm != NULL) 
+    cats_to_do = cm_get_category_list(pf->cm, pf->cats_to_do_str, 0);
+                                /* have --do-cats and category map;
+                                   use cm_get_category_list (allows
+                                   use of names as well as numbers) */
+  else if (pf->cats_to_do_str != NULL)
+    cats_to_do = str_list_as_int(pf->cats_to_do_str);
+                                /* have --do-cats but no category map;
+                                   use literal numbers */
+  /* set up windows, if necessary */
+  if (pf->window_size != -1) {
+    if (pf->window_coords != NULL) 
+      die("ERROR: cannot use both --windows and --windows-explicit.\n");
+    pf->window_coords = lst_new_int(msa->length/pf->window_shift + 1);
+    for (i = 1; i < msa->length; i += pf->window_shift) {
+      lst_push_int(pf->window_coords, i);
+      lst_push_int(pf->window_coords, 
+                   min(i + pf->window_size - 1, msa->length));
+    }
+    free_window_coords = TRUE;
+  }
+  if (pf->window_coords != NULL) {
+    /* set up summary file */
+    String *sumfname=NULL;
+    msa_coord_map *map;
+    if (pf->output_fname_root != NULL) {
+      sumfname = str_new_charstr(pf->output_fname_root);
+      str_append_charstr(sumfname, ".win-sum");
+      WINDOWF = phast_fopen(sumfname->chars, "w+");
+      str_free(sumfname);
+    } 
+    print_window_summary(WINDOWF, NULL, 0, 0, NULL, NULL, 0, 0, TRUE);
+    
+    /* map to coord frame of alignment */
+    map = msa_build_coord_map(msa, 1);
+    for (i = 0; i < lst_size(pf->window_coords); i += 2) {
+      lst_set_int(pf->window_coords, i, 
+                  msa_map_seq_to_msa(map, lst_get_int(pf->window_coords, i)));
+      lst_set_int(pf->window_coords, i+1, 
+                  msa_map_seq_to_msa(map, lst_get_int(pf->window_coords, i+1)));
+    }
+    msa_map_free(map);
+  }
+  return cats_to_do;
+}
+
+List* setupmod(struct phyloFit_struct *pf, TreeModel *input_mod, MSA *msa, TreeNode *tree, List* cats_to_do, List* newparams,int toSkip,List* toSkipList) {
+  List * newmods = lst_new_ptr(1);
+  int i, j, win, root_leaf_id = -1;
+  //String *mod_fname;
+  String *tmpstr = str_new(STR_SHORT_LEN);
+  //List *cats_to_do=NULL;
+  FILE *parsimony_cost_file = NULL;
+
+  //int subst_mod = pf->subst_mod;
+  int quiet = pf->quiet;
+
+
+  /* now estimate models (window by window, if necessary) */
+  MSA *source_msa = msa;
+  for (win = 0; 
+       win < (pf->window_coords == NULL ? 1 : lst_size(pf->window_coords)); 
+       win += 2) {
+    int win_beg, win_end;
+
+    if (pf->window_coords != NULL) {
+      win_beg = lst_get_int(pf->window_coords, win);
+      win_end = lst_get_int(pf->window_coords, win+1);
+      if (win_beg < 0 || win_end < 0) continue;
+      
+      /* note: msa_sub_alignment uses a funny indexing system (see docs) */
+      msa = msa_sub_alignment(source_msa, NULL, 0, win_beg-1, win_end);
+    }
+
+    /* process each category */
+    for (i = 0; i < lst_size(cats_to_do); i++) {
+      TreeModel *mod;
+      Vector *params = NULL;
+      List *pruned_names;
+      int old_nnodes, cat = lst_get_int(cats_to_do, i);
+      unsigned int ninf_sites;
+
+      if (input_mod == NULL) 
+        mod = tm_new(tr_create_copy(tree), NULL, NULL, pf->subst_mod, 
+                     msa->alphabet, pf->nratecats == -1 ? 1 : pf->nratecats, 
+		     pf->alpha, pf->rate_consts, root_leaf_id);
+      else if (pf->likelihood_only)
+        mod = input_mod;
+      else {
+	List *rate_consts, *freq;
+	double alpha;
+	int nratecats;
+
+	if (pf->nratecats != -1) {
+	  nratecats = pf->nratecats;
+	  alpha = pf->alpha;
+	  rate_consts = pf->rate_consts;
+	  freq = NULL;
+	} else {
+	  nratecats = input_mod->nratecats;
+	  alpha = input_mod->alpha;
+	  if (input_mod->rK != NULL) {
+	    rate_consts = lst_new_dbl(input_mod->nratecats);
+	    for (j=0; j < input_mod->nratecats; j++)
+	      lst_push_dbl(rate_consts, input_mod->rK[j]);
+	  } else rate_consts = NULL;
+	  if (input_mod->freqK != NULL) {
+	    freq = lst_new_dbl(input_mod->nratecats);
+	    for (j=0; j < input_mod->nratecats; j++)
+	      lst_push_dbl(freq, input_mod->freqK[j]);
+	  } else freq = NULL;
+	}
+        mod = input_mod;
+        tm_reinit(mod, pf->subst_mod, nratecats, alpha, 
+		  rate_consts, freq);
+	if (rate_consts != pf->rate_consts)
+	  lst_free(rate_consts);
+	if (freq != NULL) 
+	  lst_free(freq);
+      }
+
+      if (pf->use_selection) {
+	mod->selection_idx = 0;
+	mod->selection = pf->selection;
+      }
+
+      mod->noopt_arg = pf->nooptstr == NULL ? NULL : str_new_charstr(pf->nooptstr->chars);
+      mod->eqfreq_sym = pf->symfreq || pf->subst_mod == SSREV;
+      if (pf->bound_arg != NULL) {
+	mod->bound_arg = lst_new_ptr(lst_size(pf->bound_arg));
+	for (j=0; j < lst_size(pf->bound_arg); j++) {
+	  String *tmp = lst_get_ptr(pf->bound_arg, j);
+	  lst_push_ptr(mod->bound_arg, str_new_charstr(tmp->chars));
+	}
+      } else mod->bound_arg = NULL;
+
+      mod->use_conditionals = pf->use_conditionals;
+
+      if (pf->estimate_scale_only || 
+	  pf->estimate_backgd || 
+	  pf->no_rates || 
+	  pf->assume_clock) {
+        if (pf->estimate_scale_only) {
+          mod->estimate_branchlens = TM_SCALE_ONLY;
+
+          if (pf->subtree_name != NULL) { /* estimation of subtree scale */
+            String *s1 = str_new_charstr(pf->subtree_name), 
+              *s2 = str_new_charstr(pf->subtree_name);
+            str_root(s1, ':'); str_suffix(s2, ':'); /* parse string */
+            mod->subtree_root = tr_get_node(mod->tree, s1->chars);
+            if (mod->subtree_root == NULL) {
+	      tr_name_ancestors(mod->tree);
+	      mod->subtree_root = tr_get_node(mod->tree, s1->chars);
+	      if (mod->subtree_root == NULL)
+		die("ERROR: no node named '%s'.\n", s1->chars);
+	    }
+            if (s2->length > 0) {
+              if (str_equals_charstr(s2, "loss")) 
+		mod->scale_sub_bound = LB;
+              else if (str_equals_charstr(s2, "gain")) 
+		mod->scale_sub_bound = UB;
+              else die("ERROR: unrecognized suffix '%s'\n", s2->chars);
+            }
+            str_free(s1); str_free(s2);
+          }
+        }
+	
+        else if (pf->assume_clock)
+          mod->estimate_branchlens = TM_BRANCHLENS_CLOCK;
+        
+        if (pf->no_rates)
+          mod->estimate_ratemat = FALSE;
+
+        mod->estimate_backgd = pf->estimate_backgd;
+      }
+      
+      if (pf->no_branchlens)
+	mod->estimate_branchlens = TM_BRANCHLENS_NONE;
+
+      if (pf->ignore_branches != NULL) 
+        tm_set_ignore_branches(mod, pf->ignore_branches);
+
+      old_nnodes = mod->tree->nnodes;
+      pruned_names = lst_new_ptr(msa->nseqs);
+      tm_prune(mod, msa, pruned_names);
+      
+
+        
+      if (lst_size(pruned_names) == (old_nnodes + 1) / 2){
+          printf("Failed at file: %s\n",msa->fileName);
+          die("Error: no match for leaves of tree in alignment (leaf names must match alignment names).\n");
+      }
+      /* So many leafs will be pruned we will not print out the prunned leafs.
+      if (!quiet && lst_size(pruned_names) > 0) {
+        fprintf(stderr, "WARNING: pruned away leaves of tree with no match in alignment (");
+        for (j = 0; j < lst_size(pruned_names); j++)
+          fprintf(stderr, "%s%s", ((String*)lst_get_ptr(pruned_names, j))->chars, 
+                  j < lst_size(pruned_names) - 1 ? ", " : ").\n");
+      }*/
+      
+      lst_free_strings(pruned_names);
+      lst_free(pruned_names);
+
+      if (pf->alt_mod_str != NULL) {
+	for (j = 0 ; j < lst_size(pf->alt_mod_str); j++) 
+	  tm_add_alt_mod(mod, (String*)lst_get_ptr(pf->alt_mod_str, j));
+      }
+
+      str_clear(tmpstr);
+      
+      if  (pf->msa_fname != NULL)
+	str_append_charstr(tmpstr, pf->msa_fname);
+      else str_append_charstr(tmpstr, "alignment");
+      
+      if (cat != -1 || pf->window_coords != NULL) {
+	str_append_charstr(tmpstr, " (");
+	if (cat != -1) {
+	  str_append_charstr(tmpstr, "category ");
+	  str_append_int(tmpstr, cat);
+	}
+	
+	if (pf->window_coords != NULL) {
+	  if (cat != -1) str_append_charstr(tmpstr, ", ");
+	  str_append_charstr(tmpstr, "window ");
+	  str_append_int(tmpstr, win/2 + 1);
+	}
+	
+	str_append_char(tmpstr, ')');
+      }
+
+      
+      ninf_sites = msa_ninformative_sites(msa, cat);
+      if (ninf_sites < pf->nsites_threshold) {
+        if (input_mod == NULL) tm_free(mod);
+        fprintf(stderr, "Skipping %s; insufficient informative sites ...\n",msa->fileName);
+        /*This mod/msa combo has insufficient stastistics. Therfore the model as well as it's MSA
+         *  should be deleted. A list on ints will be created where the indices to be delted will 
+         *  be marked and the msas and mods list will have these elements deleted.
+         */
+        lst_push_int(toSkipList,toSkip);
+      }
+
+      if (pf->init_parsimony) {
+	double parsimony_cost = tm_params_init_branchlens_parsimony(NULL, mod, msa, cat);
+        if (parsimony_cost_file != NULL) 
+           fprintf(parsimony_cost_file, "%f\n", parsimony_cost);
+        if (pf->parsimony_only) continue;
+      }
+      if (msa->ss == NULL) {    /* get sufficient stats if necessary */
+          ss_from_msas(msa, mod->order+1, 0, 
+                       pf->cats_to_do_str != NULL ? cats_to_do : NULL, 
+                       NULL, NULL, -1, subst_mod_is_codon_model(mod->subst_mod));
+          /* (sufficient stats obtained only for categories of interest) */
+      
+          if (msa->length > 1000000) { /* throw out original data if
+                                          very large */
+            for (j = 0; j < msa->nseqs; j++) sfree(msa->seqs[j]);
+            sfree(msa->seqs);
+            msa->seqs = NULL;
+          }
+        }
+      if (pf->random_init) 
+          params = tm_params_init_random(mod);
+        else if (input_mod != NULL) 
+          params = tm_params_new_init_from_model(input_mod);
+	else 
+          params = tm_params_init(mod, .1, 5, pf->alpha);     
+
+	if (pf->init_parsimony)
+	  tm_params_init_branchlens_parsimony(params, mod, msa, cat);
+
+        if (input_mod != NULL && mod->backgd_freqs != NULL && !pf->no_freqs && pf->init_backgd_from_data) {
+          /* in some cases, the eq freqs are needed for
+             initialization, but now they should be re-estimated --
+             UNLESS user specifies --no-freqs */
+	  vec_free(mod->backgd_freqs);
+	  mod->backgd_freqs = NULL;
+        }
+
+
+        if (i == 0) 
+          ss_collapse_missing(msa, !pf->gaps_as_bases);
+                                /* reduce number of tuples as much as
+                                 possible */
+        if (!quiet) {
+          fprintf(stderr, "Fitting tree model to %s using %s%s ...\n\n",
+                  msa->fileName, tm_get_subst_mod_string(pf->subst_mod),
+                  mod->nratecats > 1 ? " (with rate variation)" : "");
+        }
+      //freemod
+      lst_push_ptr(newmods, mod);
+      lst_push_ptr(newparams, params);
+    }
+  }
+  return newmods;
+}
+
+void printmodMulti(struct phyloFit_struct *pf, TreeModel* mod, MSA* msa, List* cats_to_do,int index) {
+  FILE *F, *WINDOWF = NULL;
+  int i, win;
+  String *  mod_fname = str_new(STR_MED_LEN);
+  double *gc = NULL;
+  /*To convert integer to string.*/
+  char* str = (char*)malloc(16*sizeof(char));
+  snprintf(str, 16, "%d", index);
+  char* path = (char*)calloc(200,sizeof(char));
+  int quiet = pf->quiet;
+
+  strcat(path,"phyloFitResults/");
+  strcat(path,mod->fileName);
+
+  //for each window and each category
+  for (win = 0;
+          win < (pf->window_coords == NULL ? 1 : lst_size(pf->window_coords));
+          win += 2) {
+    /* process each category */
+    for (i = 0; i < lst_size(cats_to_do); i++) {
+      //TreeModel *mod;
+      int cat = lst_get_int(cats_to_do, i);
+      unsigned int ninf_sites;
+
+      if (pf->output_fname_root != NULL)
+        str_cpy_charstr(mod_fname, pf->output_fname_root);
+      else str_clear(mod_fname);
+      if (pf->window_coords != NULL) {
+        if (mod_fname->length != 0)
+          str_append_char(mod_fname, '.');
+        str_append_charstr(mod_fname, "win-");
+        str_append_int(mod_fname, win / 2 + 1);
+      }
+      if (cat != -1 && pf->nonoverlapping == FALSE) {
+        if (mod_fname->length != 0)
+          str_append_char(mod_fname, '.');
+        if (pf->cm != NULL)
+          str_append(mod_fname, cm_get_feature_unique(pf->cm, cat));
+        else
+          str_append_int(mod_fname, cat);
+      }
+      if (pf->output_fname_root != NULL)
+        str_append_charstr(mod_fname, ".mod");
+
+      if (pf->output_fname_root != NULL) {
+          F = phast_fopen(path, "w+");
+          tm_print(F, mod);
+          phast_fclose(F);
+      }
+      if (pf->results != NULL)
+        lol_push_treeModel(pf->results, mod, mod_fname->chars);
+
+      /* output posterior probabilities, if necessary */
+      if (pf->do_bases || pf->do_expected_nsubst ||
+              pf->do_expected_nsubst_tot || pf->do_expected_nsubst_col) {
+        print_post_prob_stats(mod, msa, pf->output_fname_root,
+                pf->do_bases, pf->do_expected_nsubst,
+                pf->do_expected_nsubst_tot,
+                pf->do_expected_nsubst_col, 0,
+                cat, quiet, NULL);
+      }
+
+      /* print window summary, if window mode */
+      if (pf->window_coords != NULL) {
+        int i, j, total = 0;
+        char c;
+        if (gc == NULL)
+          gc = smalloc(msa->nseqs * sizeof (double));
+        for (i = 0; i < msa->nseqs; i++) {
+          total = 0;
+          gc[i] = 0;
+          for (j = 0; j < msa->length; j++) {
+            c = msa_get_char(msa, i, j);
+            if ((!msa->is_missing[(int) c]) && c != GAP_CHAR) {
+              total++;
+              if (c == 'C' || c == 'G') gc[i]++;
+            }
+          }
+          gc[i] /= (double) total;
+        }
+        print_window_summary(WINDOWF, pf->window_coords, win, cat, mod, gc,
+                ninf_sites, msa->nseqs, FALSE);
+      }
+    }
+  }
+  str_free(mod_fname);
+  free(str);
+  free(path);
+}
+
+void freemod(struct phyloFit_struct *pf, TreeModel *mod, Vector *params, MSA *msa) {
+  //for each window and each category
+  int i, win;
+  List *cats_to_do=NULL;
+  for (win = 0; 
+       win < (pf->window_coords == NULL ? 1 : lst_size(pf->window_coords)); 
+       win += 2) {
+    /* process each category */
+    for (i = 0; i < lst_size(cats_to_do); i++) {
+      TreeModel *mod;
+      //int cat = lst_get_int(cats_to_do, i);
+      tm_free(mod);
+      if (params != NULL) vec_free(params);
+      if (pf->window_coords != NULL)
+        msa_free(msa);
+    }
+  }
 }

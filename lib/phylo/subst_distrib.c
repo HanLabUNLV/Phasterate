@@ -21,6 +21,7 @@
 #include <prob_vector.h>
 #include <prob_matrix.h>
 #include <fit_column.h>
+#include <msa.h>
 
 /* (used below) compute and return a set of matrices giving p(b, n |
    j), the probability of n substitutions and a final base b given j
@@ -29,7 +30,7 @@
    a), conditional on a starting base a (whose value is given by
    'condition_on'), will be computed.  The return value A will be such
    that A[b]->data[n][j] = p(b, n | j) [or p(b, n | j, a)] */
-Matrix **get_substs_and_bases_given_jumps(JumpProcess *jp, int jmax, 
+Matrix **get_substs_and_bases_given_jumps(JumpProcess *jp, int jmax,
                                           int condition_on) {
   int i, j, k, n;
   int size = jp->R->nrows;
@@ -47,6 +48,7 @@ Matrix **get_substs_and_bases_given_jumps(JumpProcess *jp, int jmax,
   else 
     A[condition_on]->data[0][0] = 1;
 
+  /*For all j, figure out P(n,b|a,j) formula A-6 in paper.*/
   /* recurrence */
   for (j = 1; j < jmax; j++) {
     checkInterrupt();
@@ -58,14 +60,14 @@ Matrix **get_substs_and_bases_given_jumps(JumpProcess *jp, int jmax,
             if (k == i) continue;
             A[i]->data[n][j] += A[k]->data[n-1][j-1] * jp->R->data[k][i];
           }
-      }
+      } 
     }
   }
 
   return A;
 }
 
-/* (used below) find min j such that j >= lambda * t_max and 
+/* (used below) find min j such that j >= lambda * t_max and
    Pois(j | lambda * t_max) < epsilon */
 int get_njumps_max(double lambda, double t_max, double epsilon) {
   int j;
@@ -191,7 +193,7 @@ void sub_recompute_conditionals(JumpProcess *jp) {
    of n substitutions given a branch of length t */
 Vector *sub_distrib_branch(JumpProcess *jp, double t) {
   int n, j;
-  Vector *pois = pv_poisson(jp->lambda * t, jp->epsilon);  
+  Vector *pois = pv_poisson(jp->lambda * t, jp->epsilon);
   Vector *distrib = vec_new(pois->size);
 
   if (jp->njumps_max < pois->size)
@@ -290,13 +292,15 @@ Vector *sub_posterior_distrib_site(JumpProcess *jp, MSA *msa, int tuple_idx) {
 
     if (node->lchild == NULL) {    /* leaf -- base case */
       char c;
-
+      /**
+       * Omar, add code here for posterior calculations with gap.
+       */
       if (jp->mod->msa_seq_idx[node->id] < 0)
         die("ERROR: no match for leaf '%s' in alignment.\n", node->name);
 
       c = ss_get_char_tuple(msa, tuple_idx, 
                                  jp->mod->msa_seq_idx[node->id], 0);
-      if (msa->is_missing[(int)c] || c == GAP_CHAR)
+      if (msa->is_missing[(int)c] /*|| c == GAP_CHAR*/)
         for (a = 0; a < size; a++)
           L[node->id]->data[a][0] = 1;
       else {
@@ -309,44 +313,46 @@ Vector *sub_posterior_distrib_site(JumpProcess *jp, MSA *msa, int tuple_idx) {
     }
     
     else {            /* internal node -- recursive case */
+        /*Omar, change here for other cases.
+         * This is equation (2) in the paper.
+         */
+        Matrix **d_left = jp->branch_distrib[node->lchild->id];
+        Matrix **d_right = jp->branch_distrib[node->rchild->id];
 
-      Matrix **d_left = jp->branch_distrib[node->lchild->id];
-      Matrix **d_right = jp->branch_distrib[node->rchild->id];
+        maxsubst[node->id] = max(maxsubst[node->lchild->id] + d_left[0]->ncols - 1, 
+                maxsubst[node->rchild->id] + d_right[0]->ncols - 1);
 
-      maxsubst[node->id] = max(maxsubst[node->lchild->id] + d_left[0]->ncols - 1, 
-                               maxsubst[node->rchild->id] + d_right[0]->ncols - 1);
+        for (n = 0; n <= maxsubst[node->id]; n++) {
+          checkInterruptN(n, 10);
+          for (j = 0; j <= n; j++) {
+            int min_i, max_i, min_k, max_k;
+            min_i = max(0, j - d_left[0]->ncols + 1);
+            max_i = min(j, maxsubst[node->lchild->id]);
+            min_k = max(0, n - j - d_right[0]->ncols + 1);
+            max_k = min(n - j, maxsubst[node->rchild->id]);
 
-      for (n = 0; n <= maxsubst[node->id]; n++) {
-	checkInterruptN(n, 10);
-        for (j = 0; j <= n; j++) {
-          int min_i, max_i, min_k, max_k;
-          min_i = max(0, j - d_left[0]->ncols + 1);
-          max_i = min(j, maxsubst[node->lchild->id]);
-          min_k = max(0, n - j - d_right[0]->ncols + 1);
-          max_k = min(n - j, maxsubst[node->rchild->id]);
+            for (a = 0; a < size; a++) {
+                  double left = 0, right = 0;
 
-          for (a = 0; a < size; a++) {
-            double left = 0, right = 0;
-	    
-            for (b = 0; b < size; b++) 
-              /* i goes from 0 to j, but we can trim off extreme vals */
-              for (i = min_i; i <= max_i; i++) 
-                left += L[node->lchild->id]->data[b][i] * 
-                  d_left[a]->data[b][j-i];
+                  for (b = 0; b < size; b++) 
+                    /* i goes from 0 to j, but we can trim off extreme vals */
+                    for (i = min_i; i <= max_i; i++) 
+                      left += L[node->lchild->id]->data[b][i] * 
+                              d_left[a]->data[b][j-i];
 
-            for (c = 0; c < size; c++) 
-              /* k goes from 0 to n-j, but we can trim off extreme vals */
-              for (k = min_k; k <= max_k; k++) 
-                right += L[node->rchild->id]->data[c][k] * 
-                  d_right[a]->data[c][n-j-k];
-      
-            L[node->id]->data[a][n] += (left * right);
+                  for (c = 0; c < size; c++) 
+                    /* k goes from 0 to n-j, but we can trim off extreme vals */
+                    for (k = min_k; k <= max_k; k++) 
+                      right += L[node->rchild->id]->data[c][k] * 
+                              d_right[a]->data[c][n-j-k];
+
+                  L[node->id]->data[a][n] += (left * right);
+                }
           }
         }
-      }
     }
   }
-
+  
   retval = vec_new(maxsubst[jp->mod->tree->id] + 1);
   vec_zero(retval);
   for (n = 0; n <= maxsubst[jp->mod->tree->id]; n++)

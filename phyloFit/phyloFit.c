@@ -11,6 +11,8 @@
  
 #include <stdlib.h>
 #include <stdio.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include <lists.h>
 #include <stringsplus.h>
 #include <msa.h>
@@ -28,19 +30,28 @@
 #include <maf.h>
 #include <phylo_fit.h>
 #include "phyloFit.help"
+#include "misc.h"
 
+
+MSA* read_msa(struct phyloFit_struct *pf, char * msa_fname, msa_format_type input_format, char* alph);
+List *msa_from_dir(struct phyloFit_struct *pf, char * dir, msa_format_type input_format, char* alph);
+void printNames(struct phyloFit_struct *pf);
 
 int main(int argc, char *argv[]) {
+  const char* treeToParse;
   char *msa_fname = NULL, *alph = "ACGT";
+  /*Added by Omar to get greater size matrix*/
+  char* indelAlph = "ACGT-";
   msa_format_type input_format = UNKNOWN_FORMAT;
   char c;
   int opt_idx, seed=-1;
   String *optstr;
   List *tmplist = NULL; 
   struct phyloFit_struct *pf;
-  FILE *infile;
   
   struct option long_opts[] = {
+    {"tree-only",1,0,'T'}, /*Tree only model, gets the mod file to get information from
+                           * but only takes the tree model ignoring everything else*/
     {"msa", 1, 0, 'm'},
     {"tree", 1, 0, 't'},
     {"subst-mod", 1, 0, 's'},
@@ -92,14 +103,28 @@ int main(int argc, char *argv[]) {
     {"bound", 1, 0, 'u'},
     {"seed", 1, 0, 'D'},
     {0, 0, 0, 0}
-  };
+   };
 
   // NOTE: remaining shortcuts left: HjQx
 
   pf = phyloFit_struct_new(0);
 
-  while ((c = getopt_long(argc, argv, "m:t:s:g:c:C:i:o:k:a:l:w:v:M:p:A:I:K:S:b:d:O:u:Y:e:D:GVENRqLPXZUBFfnrzhWyJ", long_opts, &opt_idx)) != -1) {
+  while ((c = getopt_long(argc, argv, "T:m:t:s:g:c:C:i:o:k:a:l:w:v:M:p:A:I:K:S:b:d:O:u:Y:e:D:GVENRqLPXZUBFfnrzhWyJ", long_opts, &opt_idx)) != -1) {
     switch(c) {
+    case 'T':
+        if (is_dir(optarg)) {
+            pf->mod_file_names = list_files_in_dir(optarg, ".mod");
+            pf->input_mods = tm_new_from_dir(optarg);
+        }
+        else{
+            treeToParse = tr_only_from_file(optarg);
+            if(treeToParse == NULL){
+                printf("Error: No tree in file/malformed.\n");
+                return 1;
+            }
+            pf->tree = tr_new_from_string(treeToParse);
+        }
+        break;
     case 'm':
       msa_fname = optarg;
       break;
@@ -112,8 +137,12 @@ int main(int argc, char *argv[]) {
       break;
     case 's':
       pf->subst_mod = tm_get_subst_mod_type(optarg);
-      if (pf->subst_mod == UNDEF_MOD) 
+      if (pf->subst_mod == UNDEF_MOD)
         die("ERROR: illegal substitution model.     Type \"phyloFit -h\" for usage.\n");
+      if(pf->subst_mod == INDEL){
+        alph = "ACGT-";
+        pf->gaps_as_bases = TRUE;
+      }
       break;
     case 'g':
       pf->gff = gff_read_set(phast_fopen(optarg, "r"));
@@ -182,7 +211,13 @@ int main(int argc, char *argv[]) {
       else die("ERROR: --precision must be LOW, MED, or HIGH.\n\n");
       break;
     case 'M':
-      pf->input_mod = tm_new_from_file(phast_fopen(optarg, "r"), 1);
+      if (is_dir(optarg)) {
+        pf->mod_file_names = list_files_in_dir(optarg, ".mod");
+        pf->input_mods = tm_new_from_dir(optarg);
+      }
+      else {
+        pf->input_mod = tm_new_from_file(phast_fopen(optarg, "r"), 1);
+      }
       break;
     case 'r':
       pf->random_init = TRUE;
@@ -321,41 +356,119 @@ int main(int argc, char *argv[]) {
     pf->msa_fname = msa_fname;
   }
 
-  infile = phast_fopen(msa_fname, "r");
-
-  if (input_format == UNKNOWN_FORMAT)
-    input_format = msa_format_for_content(infile, 1);
-
-  if (pf->nonoverlapping && (pf->use_conditionals || pf->gff != NULL || 
-			     pf->cats_to_do_str || input_format == SS))
-    die("ERROR: cannot use --non-overlapping with --markov, --features,\n--msa-format SS, or --do-cats.\n");
-
-
-  /* read alignment */
-  if (!pf->quiet) fprintf(stderr, "Reading alignment from %s ...\n", msa_fname);
-  if (input_format == MAF) {
-    pf->msa = maf_read(infile, NULL, 
-		       tm_order(pf->subst_mod) + 1, 
-		       NULL, pf->gff, pf->cm, 
-		       pf->nonoverlapping ? tm_order(pf->subst_mod) + 1 : -1, 
-		       FALSE, pf->reverse_group_tag, NO_STRIP, FALSE);
-    if (pf->gaps_as_bases) 
-      msa_reset_alphabet(pf->msa, alph);
+  if (is_dir(msa_fname)) {
+    pf->msa_file_names = list_files_in_dir(msa_fname, NULL);
+    // check if filenames match between tree and msa
+    
+    pf->msas = msa_from_dir(pf, msa_fname, input_format, alph);
   }
-  else 
-    pf->msa = msa_new_from_file_define_format(infile, 
-				input_format, alph);
-
+  else {
+    pf->msa = read_msa(pf, msa_fname, input_format, alph);
+  }
   /* set up for categories */
   /* first label sites, if necessary */
   pf->label_categories = (input_format != MAF);
-
-  run_phyloFit(pf);
-
+  
+  if (pf->input_mods) {
+      /*
+       List need to be sorted before hand! The get file from directory does not
+       give the information back in any sensible order. It appears to be random...
+       (Note: this could be used to implement a random-pseudo number generator ;)
+       */
+    lst_qsort(pf->msas,lst_msa_compare);
+    lst_qsort(pf->input_mods,lst_mod_compare);
+    run_phyloFit_multi(pf);
+  }
+  else {
+    run_phyloFit(pf);
+  }
   if (pf->logf != NULL && pf->logf != stderr && pf->logf != stdout)
     phast_fclose(pf->logf);
   if (!pf->quiet) fprintf(stderr, "Done.\n");
   sfree(pf);
   
   return 0;
+}
+
+MSA* read_msa(struct phyloFit_struct *pf, char * msa_fname, msa_format_type input_format, char* alph) {
+  
+  FILE* infile = phast_fopen(msa_fname, "r");
+  MSA* msa = NULL;  
+  
+  if (input_format == UNKNOWN_FORMAT)
+    input_format = msa_format_for_content(infile, 1);
+
+  if (pf->nonoverlapping && (pf->use_conditionals || pf->gff != NULL ||
+          pf->cats_to_do_str || input_format == SS))
+    die("ERROR: cannot use --non-overlapping with --markov, --features,\n--msa-format SS, or --do-cats.\n");
+
+
+  /* read alignment */
+  if (!pf->quiet)
+    fprintf(stderr, "Reading alignment from %s ...\n", msa_fname);
+  if (input_format == MAF) {
+    msa = maf_read(infile, NULL,tm_order(pf->subst_mod) + 1,NULL, pf->gff, pf->cm,
+            pf->nonoverlapping ? tm_order(pf->subst_mod) + 1 : -1,FALSE, pf->reverse_group_tag, NO_STRIP, FALSE);
+    if (pf->gaps_as_bases)
+      msa_reset_alphabet(msa, alph);
+  }else
+    msa = msa_new_from_file_define_format(infile,input_format, alph);
+
+  strcpy(msa->fileName,getFileName(msa_fname));
+  /*Close file handle, otherwise too many open handles error :)*/
+  fclose(infile);
+  return msa;
+}
+
+/** Collect msas within a directory: files in fa format */
+List *msa_from_dir(struct phyloFit_struct *pf, char * dir, msa_format_type input_format, char* alph) {
+  struct dirent *dp;
+  DIR *dfd;
+  MSA **tmpmsas = smalloc(MAX_TREE_NUM * sizeof (MSA*));
+  int i, msas_num = 0;
+  
+  if ((dfd = opendir(dir)) == NULL) {
+    fprintf(stderr, "Can't open %s\n", dir);
+    return 0;
+  }
+  char filename_qfd[STR_MED_LEN];
+
+  while ((dp = readdir(dfd)) != NULL) {
+    struct stat stbuf;
+    sprintf(filename_qfd, "%s/%s", dir, dp->d_name);
+    if (stat(filename_qfd, &stbuf) == -1) {
+      printf("Unable to stat file: %s\n", filename_qfd);
+      continue;
+    }
+    if (is_dir(filename_qfd)) {
+      continue;
+      // Skip directories
+    } else {
+      if (strcmp (".fa", &(dp->d_name[strlen (dp->d_name) - 3])) == 0) {
+        MSA *msa = read_msa(pf, filename_qfd, input_format, alph);
+        tmpmsas[msas_num] = msa;
+        msas_num++;
+      }
+    }
+  }
+  List *msas = lst_new_ptr(msas_num);
+  for (i = 0; i < msas_num; i++) lst_push_ptr(msas, tmpmsas[i]);
+  free(tmpmsas);
+  return msas;
+}
+/**
+ * Give a phyloFit_struct prints both list inside for comparison.
+ * @param pf, structure containing MSA and Mod to print.
+ */
+void printNames(struct phyloFit_struct *pf){
+        /*Temporary Printing of lists:*/
+        int i;
+        int sizeMod = lst_size(pf->input_mods);
+        printf("File Comparison:\n");
+        for (i = 0; i < sizeMod; i++){
+            TreeModel* tree = (TreeModel*)lst_get_ptr(pf->input_mods,i);
+            MSA* msa = (MSA*)lst_get_ptr(pf->msas,i);
+            printf("%s\t%s\n",msa->fileName,tree->fileName);
+            fflush(NULL);
+        }
 }

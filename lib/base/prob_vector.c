@@ -10,7 +10,7 @@
 /* $Id: prob_vector.c,v 1.14 2008-11-12 02:07:59 acs Exp $ */
 
 /* Vectors representing discrete probability distributions over
-   non-negative integers.  General idea is element x of vector v (x >=
+   non-negative integers. General idea is element x of vector v (x >=
    0) represents p(x).  With long-tailed distributions (e.g.,
    Poisson), vectors are truncated at size x_max such that p(y) <
    epsilon for y >= x_max, where epsilon is an input parameter. */

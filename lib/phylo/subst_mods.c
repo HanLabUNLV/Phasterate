@@ -40,6 +40,10 @@ void tm_set_GC_matrix(TreeModel *mod, double kappa, int kappa_idx, double alpha)
 void tm_set_HKY_CODON_matrix(TreeModel *mod, double kappa, int kappa_idx);
 void tm_set_REV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx);
 void tm_set_SSREV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx);
+void tm_set_INDEL_matrix(TreeModel *mod,Vector* params, int start_idx);
+
+
+
 void tm_init_mat_REV(TreeModel *mod, Vector *params, int nbranches, 
                      double kappa);
 void tm_init_mat_SSREV(TreeModel *mod, Vector *params, int nbranches,
@@ -139,6 +143,8 @@ subst_mod_type tm_get_subst_mod_type(const char *str) {
     retval = REV_CODON;
   else if (str_equals_nocase_charstr(subst_mod_str, "SSREV_CODON"))
     retval = SSREV_CODON;
+  else if (str_equals_nocase_charstr(subst_mod_str, "INDEL"))
+    retval = INDEL;
   str_free(subst_mod_str);
   return retval;
 }
@@ -186,6 +192,8 @@ char *tm_get_subst_mod_string(subst_mod_type type) {
     return "REV_CODON";
   case SSREV_CODON:
     return "SSREV_CODON";
+  case INDEL:
+    return "INDEL";
   default:
     return "(unknown model)";
   }
@@ -198,8 +206,11 @@ int tm_get_nratematparams(TreeModel *mod) {
   int n;
   switch (mod->subst_mod) {
   case JC69:
-  case F81:
+  case F81: 
+ /*For now our indel model will go here...*/
     return 0;
+  case INDEL:
+      return 3;          
   case K80:
   case HKY85:
     return 1;
@@ -351,6 +362,9 @@ void tm_set_rate_matrix(TreeModel *mod, Vector *params, int i) {
   case SSREV_CODON:
     tm_set_SSREV_CODON_matrix(mod, params, i);
     break;
+  case INDEL:
+    tm_set_INDEL_matrix(mod,params, i);
+    break;
   default:
     die("ERROR tm_set_rate_matrix: unknown substitution model\n");
   }
@@ -377,14 +391,17 @@ void tm_rate_params_init(TreeModel *mod, Vector *params,
   switch(mod->subst_mod) {
   case JC69:
   case F81:
-    break;                      /* do nothing */
+      break;
   case K80:
   case HKY85:
   case HKY_CODON:
     vec_set(params, params_idx, kappa);
     break;      
+  case INDEL:
+      vec_set(params,params_idx+2, kappa);
+      /*Notice if falls through, on purpose!*/
   case HKY85G:
-    vec_set(params, params_idx, kappa);
+      vec_set(params, params_idx, kappa);
     /* sigma often ends up near kappa, so this provides a reasonable
        initial guess. */
     vec_set(params, params_idx+1, kappa);
@@ -450,6 +467,7 @@ void tm_rate_params_init_from_model(TreeModel *mod, Vector *params,
   case K80:
   case HKY85:
   case HKY_CODON:
+  case INDEL:
     /* infer kappa from rate matrix */
     kappa = 
       mm_get(mod->rate_matrix, 
@@ -543,7 +561,9 @@ void tm_rate_params_init_from_model(TreeModel *mod, Vector *params,
 void tm_set_probs_JC69(TreeModel *mod, MarkovMatrix *P, double t) {
   int i, j;
   double scale = mod->rate_matrix->size * 1.0/(mod->rate_matrix->size - 1);
+
   if (t < 0) die("ERROR tm_set_probs_JC69 t should be >=0 but is %f\n", t);
+  
   for (i = 0; i < mod->rate_matrix->size; i++) {
     for (j = 0; j < mod->rate_matrix->size; j++) {
       if (i == j)
@@ -554,6 +574,7 @@ void tm_set_probs_JC69(TreeModel *mod, MarkovMatrix *P, double t) {
                1.0/mod->rate_matrix->size * exp(-t * scale));
     }
   }
+    printf("Printing Matrix P...\n");
 }
 
 void tm_set_probs_F81(Vector *backgd_freqs, MarkovMatrix *P, double scale, 
@@ -622,12 +643,15 @@ void tm_set_K80_matrix(TreeModel *mod, double kappa) {
 
 void tm_set_HKY_matrix(TreeModel *mod, double kappa, int kappa_idx) {
   int i, j;
+  
   int setup_mapping = 
     (kappa_idx >= 0 && mod->rate_matrix_param_row != NULL && 
      lst_size(mod->rate_matrix_param_row[kappa_idx]) == 0);
+
   if (mod->backgd_freqs == NULL)
     die("tm_set_HKY_matrix: mod->backgd_freqs is NULL\n");
-  for (i = 0; i < mod->rate_matrix->size; i++) {
+  
+  for (i = 0; i < mod->rate_matrix->size; i++){
     double rowsum = 0;
     for (j = 0; j < mod->rate_matrix->size; j++) {
       double val;
@@ -648,6 +672,7 @@ void tm_set_HKY_matrix(TreeModel *mod, double kappa, int kappa_idx) {
     }
     mm_set(mod->rate_matrix, i, i, -1 * rowsum);
   }
+  
 }
 
 void tm_set_HKYG_matrix(TreeModel *mod, Vector *params, int start_idx ) {
@@ -1572,6 +1597,106 @@ void tm_set_REV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx) {
   }
 }
 
+/*Main function to set the INDEL matrix. This model was based off the HKY85G
+ * model it also uses the same kappa value for weights between state transitions.
+ * Added two extra parameters that are multiplied by The bottom most row and 
+ * right most columnt, alpha and betta.
+ * _ => A|C|T|G //Insertion.
+ * A|C|T|G => _ //Deletion.
+ * 
+ * Matrix Model description
+ *   ___          ___
+ * A| -(3l+a) l l l a|
+ * C| l -(3l+a) l l a|
+ * G| l l -(3l+a) l a|
+ * T| l l l -(3l+a) a|
+ * _| b  b  b  b  -4b|
+ *  ---            ---
+ * */
+/*Function used in PhyloFit rewriten for clarity and to make it make sense...*/
+void tm_set_INDEL_matrix(TreeModel* model,Vector* parameters,int index){
+        int i,j;
+        int setupMapping;
+        /*We will need at least ?four? free parameters. One kappa as defined by HKY model for is_transition,
+          i.e. if it's a transition with more likelyhood account for this in the model.
+          As well as ?three? more variables for alpha, beta and gamma as explained in the model description.
+        */
+        int kappaIndex = index;
+        int alphaIndex = index+1;
+        int bettaIndex = index+2;
+        double sumArray[4]; /*Array to keep track of sums per row*/
+        
+        /*Get free parameters from Vector*/
+        double kappa = vec_get(parameters, kappaIndex);
+        double alpha  =vec_get(parameters, alphaIndex);
+        double betta = vec_get(parameters, bettaIndex);
+        double currentValue;
+        double rowSum;
+        MarkovMatrix* matrix = model->rate_matrix;
+        char* states = matrix->states;
+        Vector* frequency = model->backgd_freqs;
+
+        /*I actually don't know what this does yet...but it's necessary, program
+         will give awful output if the setupMapping is not set up properly througout
+         the program.*/
+        if(model->rate_matrix_param_row != NULL && lst_size(model->rate_matrix_param_row[index]) == 0)
+                setupMapping = 1;
+        else
+                setupMapping = 0;
+
+        if (frequency == NULL)
+                die("tm_set_INDEL_matrix: mod->backgd_freqs is NULL\n");
+
+        /*Iterate through matrix setting values appropriately*/
+        for(i = 0; i < 4; i++){
+                currentValue = 0;
+                rowSum = 0;
+                for(j = 0; j < 4; j++){
+                        if(i == j) /*The diagonal*/
+                                continue;
+                        currentValue = vec_get(frequency,j);
+                        /*Account by multiplying by Kappa*/
+                        if(is_transition(states[i],states[j])){
+                                currentValue *= kappa;
+                                if(setupMapping){
+                                    lst_push_int(model->rate_matrix_param_row[kappaIndex], i);
+                                    lst_push_int(model->rate_matrix_param_col[kappaIndex], j);
+                                }
+                        }                                
+                        mm_set(matrix,i,j,currentValue);
+                        rowSum += currentValue;
+                }
+                sumArray[i] = rowSum;
+        }
+        /*We have intialized inner (4x4) matrix for non indels, now handle Indels:*/
+        /*For bettas*/
+        rowSum = 0;
+        for(i = 0; i < 4;i++){
+                currentValue = vec_get(frequency,i)*betta;
+                mm_set(matrix,4,i,currentValue);                /*Betas*/
+                rowSum += currentValue;
+
+                if(setupMapping){
+                  lst_push_int(model->rate_matrix_param_row[bettaIndex], 4);
+                  lst_push_int(model->rate_matrix_param_col[bettaIndex], i);
+                }
+        }
+        mm_set(matrix,4,4,-1*rowSum);
+
+        /*For alphas, note frequency should be the same!*/
+        currentValue = vec_get(frequency,4)*alpha;
+        for(i = 0; i < 4; i++){
+                mm_set(matrix,i,4,currentValue);                /*Alphas*/
+                if(setupMapping){
+                  lst_push_int(model->rate_matrix_param_row[alphaIndex], i);
+                  lst_push_int(model->rate_matrix_param_col[alphaIndex], 4);
+                }
+        }
+        /*Take care of diagonal here!*/
+        /*Sorry about so many loops :( It could all be done in one, but this works...*/
+        for(i = 0; i < 4; i++)
+            mm_set(matrix,i,i,-1*(sumArray[i]+currentValue));        
+}
 
 
 void tm_set_SSREV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx) {
@@ -2649,6 +2774,7 @@ int tm_flag_subst_param_pos(TreeModel *mod, int *flag,
   case JC69:  //no named params: return error unless param_name is NULL
   case F81:
     return (param_name == NULL);
+  case INDEL:
   case K80:
   case HKY85:
   case HKY_CODON:
@@ -2876,7 +3002,7 @@ void tm_unapply_selection_bgc(MarkovMatrix *mm, double sel, double bgc) {
 
 
 subst_mod_type tm_codon_version(subst_mod_type subst_mod) {
-  if (subst_mod == HKY85   || subst_mod == HKY_CODON)   return HKY_CODON;
+  if (subst_mod == HKY85   || subst_mod == HKY_CODON || subst_mod == INDEL)   return HKY_CODON;
   if (subst_mod == REV   || subst_mod == REV_CODON)   return REV_CODON;
   if (subst_mod == SSREV || subst_mod == SSREV_CODON) return SSREV_CODON;
   phast_warning("No codon version for substitution model %s\n",
@@ -2886,7 +3012,7 @@ subst_mod_type tm_codon_version(subst_mod_type subst_mod) {
 
 
 subst_mod_type tm_nucleotide_version(subst_mod_type subst_mod) {
-  if (subst_mod == HKY85   || subst_mod == HKY_CODON)   return HKY85;
+  if (subst_mod == HKY85   || subst_mod == HKY_CODON || subst_mod == INDEL)   return HKY85;
   if (subst_mod == REV   || subst_mod == REV_CODON)   return REV;
   if (subst_mod == SSREV || subst_mod == SSREV_CODON) return SSREV;
   if (tm_order(subst_mod) == 0) return subst_mod;

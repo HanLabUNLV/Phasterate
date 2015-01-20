@@ -702,7 +702,7 @@ void bgchmm_estimate_states(TreeModel **mods, int nmod, void *data0, double **E,
   use_nmod = nmod;
   for (i=0; i < nmod; i++) usemods[i] = mods[i];
   
-  tm_fit_multi(usemods, use_nmod, &msa, 1, OPT_VERY_HIGH_PREC, NULL, 1);
+  tm_fit_multi(usemods, use_nmod, &msa, 1, NULL, OPT_VERY_HIGH_PREC, NULL, 1);
   sfree(usemods);
 }
 

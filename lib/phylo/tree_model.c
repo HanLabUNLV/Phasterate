@@ -26,6 +26,8 @@
 #include <dgamma.h>
 #include <math.h>
 #include <misc.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define ALPHABET_TAG "ALPHABET:"
 #define BACKGROUND_TAG "BACKGROUND:"
@@ -76,6 +78,7 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
   else if (backgd_freqs != NULL)
     nstate = backgd_freqs->size;
   else if (alphabet != NULL)
+    /*Size of matrix is picked based on the size of alphabet*/
     nstate = int_pow(strlen(alphabet), tm->order+1);
   else die("ERROR: tm_new needs either alphabet, rate_matrix, or backgd to get number of states\n");
 
@@ -360,6 +363,50 @@ void tm_free_rmp(TreeModel *tm) {
   tm->rate_matrix_param_row = NULL;
   tm->rate_matrix_param_col = NULL;
 }
+
+
+/** Collect input-models within a directory: files in .mod format */
+List *tm_new_from_dir(char *dir) {
+  struct dirent *dp;
+  DIR *dfd;
+  TreeModel **tmpmods = smalloc(MAX_TREE_NUM * sizeof (TreeModel*));
+  int i, mods_num = 0;
+  
+  if ((dfd = opendir(dir)) == NULL) {
+    fprintf(stderr, "Can't open %s\n", dir);
+    return 0;
+  }
+  char filename_qfd[STR_MED_LEN];
+
+  while ((dp = readdir(dfd)) != NULL) {
+    struct stat stbuf;
+    sprintf(filename_qfd, "%s/%s", dir, dp->d_name);
+    if (stat(filename_qfd, &stbuf) == -1) {
+      printf("Unable to stat file: %s\n", filename_qfd);
+      continue;
+    }
+    if (is_dir(filename_qfd)) {
+      continue;
+      // Skip directories
+    } else {
+      if (strcmp (".mod", &(dp->d_name[strlen (dp->d_name) - strlen(".mod")])) == 0) {
+        FILE *f = phast_fopen(filename_qfd, "r");
+        TreeModel *tm = tm_new_from_file(f, 1);
+        
+        strcpy(tm->fileName,getFileName(filename_qfd));
+        
+        tmpmods[mods_num] = tm;
+        mods_num++;
+        fclose(f);
+      }
+    }
+  }
+  List *mods = lst_new_ptr(mods_num);
+  for (i = 0; i < mods_num; i++) lst_push_ptr(mods, tmpmods[i]);
+  free(tmpmods);
+  return mods;
+}
+
 
 
 /* read tree model from file, with simple format specifying background
@@ -1073,7 +1120,6 @@ void tm_set_subst_matrices(TreeModel *tm) {
       else if (subst_mod == F81 && selection == 0.0 && bgc == 0.0)
         tm_set_probs_F81(backgd_freqs, tm->P[i][j], curr_scaling_const, 
                          n->dparent * branch_scale * tm->rK[j]);
-      
       else {                     /* full matrix exponentiation */
         mm_exp(tm->P[i][j], rate_matrix, 
                n->dparent * branch_scale * tm->rK[j]);
@@ -1211,9 +1257,11 @@ void tm_scale_model(TreeModel *mod, Vector *params, int scale_blens,
     }
   }
   if (params != NULL) {
-    for (i=0; i<nrmparams; i++)
+    for (i=0; i<nrmparams; i++){
       vec_set(params, mod->ratematrix_idx + i, 
 	      1.0/scale * vec_get(params, mod->ratematrix_idx + i));
+      printf("Parameter %i is: %F\n",i,vec_get(params,mod->ratematrix_idx +i));
+    }
   }
 
   //reset subst matrices at very end if necessary
@@ -1978,7 +2026,7 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
                                    compute likelihoods */
   mod->category = cat;
 
-  npar=0;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                npar=0;
   for (i=0; i<params->size; i++) {
     vec_set(mod->all_params, i, vec_get(params, i));
     if (mod->param_map[i] >= npar)
@@ -2063,7 +2111,7 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
     OR a single msa with a number of categories = nmod, in which case each category
     will be used for each mod.
  */
-int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa,
+int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_params,
 		 opt_precision_type precision, FILE *logf, int quiet) {
   /* thoughts: what is params?  Probably the vector of parameters to optimize.  Need
      to also send in lower and upper, in that case.  Is there any way to flexibly
@@ -2082,9 +2130,14 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa,
   Vector *lower_bounds, *upper_bounds, *opt_params;
   int i, j, retval = 0, npar, nstate, numeval;
   List *modlist;
-
-  if (nmod != nmsa) {
-    if (nmsa != 1) die("tm_fit_multi: expected one msa or one msa for each mod\n");
+  printf("Number of files in mod Folder: %d\n",nmod);
+  printf("Number of files in msa Folder: %d\n",nmsa);
+  /*Necessary as data seems to be printed in wrong order.*/
+  fflush(NULL);
+  
+  if (nmod != nmsa){
+    if (nmsa != 1)
+      die("tm_fit_multi: expected one msa or one msa for each mod\n");
     if ((msa[0]->categories == NULL && (msa[0]->ss==NULL || msa[0]->ss->cat_counts == NULL)) ||
 	(msa[0]->ncats != nmod))
       die("tm_fit_multi: if only one msa given, should be split into categories for each mod\n");
@@ -2129,10 +2182,19 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa,
       }
     }
   }
+  printf("Nmode Params: %d\n" ,nmod);
+  printf("lst_params->CAPCITY: %d\n",lst_params->CAPACITY);
 
+  /*Note: This seems like it's never necessary after talking to Dr. Han. May.*/
+  /*lst_params->CAPACITY holds different data than expected so this will always fail but I don't know know.
+  if (nmod != lst_params->CAPACITY) {
+  die ("ERROR tmp_fit_multi: number of input params vectors is not the same as number of models\n");
+  }*/
   npar=0;
   for (j=0; j < nmod; j++) {
-    for (i=0; i < mod[j]->all_params->size; i++) {
+    Vector *params = lst_get_ptr(lst_params, j);
+    for (i=0; i < params->size; i++) {
+      vec_set(mod[j]->all_params, i, vec_get(params, i));
       if (mod[j]->param_map[i] >= npar)
 	npar = mod[j]->param_map[i]+1;
     }
@@ -2288,7 +2350,7 @@ int tm_setup_params(TreeModel *mod, int offset) {
     str_split(mod->noopt_arg, ",", noopt);
     pos = lst_find_compare(noopt, BRANCHES_STR, void_str_equals_charstr);
     if (pos >= 0) {
-      //      printf("holding branches const\n");
+      printf("holding branches const\n");
       mod->estimate_branchlens = TM_BRANCHLENS_NONE;
       str_free(lst_get_ptr(noopt, pos));
       lst_delete_idx(noopt, pos);
@@ -2719,12 +2781,14 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
 	more complicated, for consistency's sake.  Set the bl of branches
 	coming from root to half the value in parameter vector if model
 	is reversible*/
-      if ((n == mod->tree->lchild || n == mod->tree->rchild) &&
-	  tm_is_reversible(mod))
-	n->dparent = vec_get(params, mod->bl_idx + i)/2.0;
-      else
-	n->dparent = vec_get(params, mod->bl_idx + i);
-      i++;
+      if(mod->estimate_branchlens != TM_BRANCHLENS_NONE){
+          if ((n == mod->tree->lchild || n == mod->tree->rchild) &&
+                  tm_is_reversible(mod))
+              n->dparent = vec_get(params, mod->bl_idx + i)/2.0;
+          else
+              n->dparent = vec_get(params, mod->bl_idx + i);
+          i++;
+      }
     }
   }
 
@@ -3638,6 +3702,8 @@ void tm_prune(TreeModel *mod,   /* TreeModel whose tree is to be pruned  */
                                    leaves on return.  Must be
                                    pre-allocated */
               ) {
+  printf("Pruning from MSA: %s\n", msa->fileName);
+  printf("Againts from Model: %s\n",mod->fileName);
   int i, j, old_nnodes = mod->tree->nnodes, *id_map = NULL;
 
   if (mod->tree->nnodes < 3)

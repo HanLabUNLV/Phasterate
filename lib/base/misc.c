@@ -18,8 +18,11 @@
 #include <hashtable.h>
 #include <unistd.h>
 #include <assert.h>
+#include <sys/stat.h>
+#include <dirent.h>
 
 #define NCODONS 64
+#define MAX_FILE_NUM 30000
 
 //avoid conflict with R
 #undef choose
@@ -273,6 +276,70 @@ Matrix* read_subst_mat(FILE *F, char *alph) {
   return retval;
 }
 
+int is_file(const char* path) {
+    struct stat buf;
+    stat(path, &buf);
+    return S_ISREG(buf.st_mode);
+}
+
+int is_dir(const char* path) {
+    struct stat buf;
+    stat(path, &buf);
+    return S_ISDIR(buf.st_mode);
+}
+
+char *remove_ext(char* mystr) {
+    char *retstr;
+    char *lastdot = NULL;
+    if (mystr == NULL)
+         return NULL;
+    if ((retstr = malloc (strlen (mystr) + 1)) == NULL)
+        return NULL;
+    strcpy (retstr, mystr);
+    lastdot = strrchr (retstr, '.');
+    if (lastdot != NULL)
+        *lastdot = '\0';
+    return retstr;
+}
+
+List* list_files_in_dir(const char* dirname, const char* extension) {
+
+  struct dirent *dp;
+  DIR *dfd;
+  char **tmpfiles = smalloc(MAX_FILE_NUM * sizeof (String*));
+  int i, files_num = 0;
+  
+  if ((dfd = opendir(dirname)) == NULL) {
+    fprintf(stderr, "Can't open %s\n", dirname);
+    return 0;
+  }
+  char filename_qfd[STR_MED_LEN];
+
+  while ((dp = readdir(dfd)) != NULL) {
+    struct stat stbuf;
+    sprintf(filename_qfd, "%s/%s", dirname, dp->d_name);
+    if (stat(filename_qfd, &stbuf) == -1) {
+      printf("Unable to stat file: %s\n", filename_qfd);
+      continue;
+    }
+    if (is_dir(filename_qfd)) {
+      continue;
+      // Skip directories
+    } else {
+      if (!extension || (strcmp(extension, &(dp->d_name[strlen(dp->d_name) - strlen(extension)])) == 0)) {
+        char* fname_without_ext = remove_ext(dp->d_name);
+        tmpfiles[files_num] = strdup(fname_without_ext);
+        free(fname_without_ext);
+        files_num++;
+      }
+    }
+  }
+  List *files = lst_new_ptr(files_num);
+  for (i = 0; i < files_num; i++) lst_push_ptr(files, tmpfiles[i]);
+  free(tmpfiles);
+
+  return files;
+}
 /* simple wrapper for fopen that opens specified filename or aborts
    with appropriate error message.  Saves typing in mains for
    command-line programs */
@@ -497,7 +564,8 @@ double normalize_probs(double *p, int size) {
   int i;
   double sum = 0;
   for (i = 0; i < size; i++) sum += p[i];
-  if(sum == 0)
+
+  if(sum == 0) /*Avoid divide by zero*/
       return sum;
   for (i = 0; i < size; i++) p[i] /= sum;  
   return sum;
@@ -1263,4 +1331,44 @@ void int_vector_print(int *vect, int D) {
 void dbl_vector_print(double *vect, int D) {
   int i;
   for (i = 0; i < D; i++) printf("%d: %f\n", i, vect[i]);
+}
+
+/**
+ * 
+ * @param path, given a path it will extract just the fileName for comparison purposes.
+ * @return fileName as a char*
+ */
+char* getFileName(char* path){
+        int i;
+    char* fileName = (char*)malloc(sizeof(char)*100);
+    char** strings = (char**)malloc(sizeof(char*)*100);
+
+    for(i=0; i < 100; i++)
+            strings[i] = (char*)malloc(sizeof(char)*100);
+
+    int tokenNum;
+    tokenNum = parseString(path,strings);
+    strcpy(fileName,strings[tokenNum-1]);
+
+    return fileName;
+    /*Free memory*/
+        for(i=0; i < 100; i++)
+            free(strings[i]);
+}
+
+/**
+   Turns char array in buffer into tokenized array of string returns number of
+   words that were tokenized.
+*/
+int parseString(char* buffer,char** strings){
+	char* token = NULL;
+	int i;
+	/*Tokenization*/
+	token = strtok(buffer,"/");
+	for(i=0; token; i++){
+		strcpy(strings[i],token);
+		token = strtok(NULL,"/");
+	}
+	strings[i] =NULL;
+	return i;
 }
