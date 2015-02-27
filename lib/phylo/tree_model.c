@@ -53,6 +53,7 @@
 
 /* internal functions */
 double tm_likelihood_wrapper(Vector *params, void *data);
+double gapAwareLikelihoodWrapper(Vector *params, void *data);
 double tm_multi_likelihood_wrapper(Vector *params, void *data);
 
 
@@ -1121,8 +1122,12 @@ void tm_set_subst_matrices(TreeModel *tm) {
         tm_set_probs_F81(backgd_freqs, tm->P[i][j], curr_scaling_const, 
                          n->dparent * branch_scale * tm->rK[j]);
       else {                     /* full matrix exponentiation */
-        mm_exp(tm->P[i][j], rate_matrix, 
-               n->dparent * branch_scale * tm->rK[j]);
+        /* If our branch length is zero we instead use a tiny value to avoid
+         * zero length branch length...*/
+        double branchLength = n->dparent;
+        if(abs(branchLength) < 0.000001)
+          branchLength = 0.000001;
+        mm_exp(tm->P[i][j], rate_matrix, branchLength * branch_scale * tm->rK[j]);
       }
     }
   }
@@ -1742,8 +1747,14 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
      however, in this case we don't want the eq freqs to go to zero */
   if (mod->estimate_backgd) {
     for (i = 0; i < mod->backgd_freqs->size; i++) {
-      if (mod->param_map[mod->backgd_idx+i] >= 0)
-	vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.001);
+      if (mod->param_map[mod->backgd_idx+i] >= 0){
+        if(mod->extended == 0)
+          vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.001);
+        else /*Else we are using the extended model. Here it is fine for
+              * our rates to go to zero. We are assuming you cannot estimate
+              * frequencies with this model*/
+          vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.000);
+      }
     }
   }
   /* Also do not let rate matrix parameters get too small (this was
@@ -1751,8 +1762,14 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
      errors were ultimately due to not enough data)*/
   if (mod->estimate_ratemat) {
     for (i = 0; i < tm_get_nratematparams(mod); i++) {
-      if (mod->param_map[mod->ratematrix_idx+i] >= 0) 
-	vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0e-6);
+      if (mod->param_map[mod->ratematrix_idx+i] >= 0) {
+         if(mod->extended == 0)
+           vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0e-6);
+         else /*Else we are using the extended model. Here it is fine for
+               * our rates to go to zero. Should not cause problems with
+               * diagonal as these are not taken into account. */
+           vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.000);
+      }
     }
   }
 
@@ -1978,17 +1995,16 @@ void tm_check_boundaries(Vector *opt_params, Vector *lower_bounds,
   }
 }
 
-
 /* Given an MSA, a tree topology, and a substitution model, fit a tree
    model using a multidimensional optimization algorithm (BFGS).
    TreeModel 'mod' must already be allocated, and initialized with
    desired tree topology, substitution model, and (if appropriate)
    background frequencies.  The vector 'params' should define the
-   initial values for the optimization procedure.  Fuction returns 0
+   initial values for the optimization procedure.  Function returns 0
    on success, 1 on failure.  */  
 int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat, 
            opt_precision_type precision, FILE *logf, int quiet,
-	   FILE *error_file) {
+	   FILE *error_file,int extendedFlag) {
   double ll;
   Vector *lower_bounds, *upper_bounds, *opt_params;
   int i, retval = 0, npar, numeval;
@@ -2004,6 +2020,9 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
     tm_init_backgd(mod, msa, cat);
     for (i=0; i<mod->backgd_freqs->size; i++)
       vec_set(params, mod->backgd_idx+i, vec_get(mod->backgd_freqs, i));
+    if(mod->subst_mod == F84E)
+      /*This happens when we want to run F84E without the -x option.*/
+      tm_rate_params_init(mod,params,mod->ratematrix_idx,0);
   }
   if (mod->alt_subst_mods != NULL) {
     AltSubstMod *altmod;
@@ -2039,6 +2058,9 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
     if (mod->param_map[i] >=0)
       vec_set(opt_params, mod->param_map[i], vec_get(params, i));
   
+  if(extendedFlag == 1)
+    mod->extended = 1;
+  
   tm_new_boundaries(&lower_bounds, &upper_bounds, npar, mod, 0);
   tm_check_boundaries(opt_params, lower_bounds, upper_bounds);
   if (mod->estimate_branchlens == TM_BRANCHLENS_NONE ||
@@ -2054,10 +2076,14 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
   }
   
   if (!quiet) fprintf(stderr, "numpar = %i\n", opt_params->size);
-  retval = opt_bfgs(tm_likelihood_wrapper, opt_params, (void*)mod, &ll, 
-                    lower_bounds, upper_bounds, logf, NULL, precision, 
-		    NULL, &numeval);
-
+  
+  if(extendedFlag == 1)
+    retval = opt_bfgs(gapAwareLikelihoodWrapper, opt_params, (void*)mod, &ll,lower_bounds, 
+            upper_bounds, logf, NULL, precision,NULL, &numeval);
+  else
+    retval = opt_bfgs(tm_likelihood_wrapper, opt_params, (void*)mod, &ll, lower_bounds, 
+            upper_bounds, logf, NULL, precision, NULL, &numeval);
+  
   mod->lnL = ll * -1 * log(2);  /* make negative again and convert to
                                    natural log scale */
   if (!quiet) fprintf(stderr, "Done.  log(likelihood) = %f numeval=%i\n", mod->lnL, numeval);
@@ -2096,7 +2122,7 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
     }
   }
   
-  if (lower_bounds != NULL) vec_free(lower_bounds);
+  /*if (lower_bounds != NULL) vec_free(lower_bounds);*/
   if (upper_bounds != NULL) vec_free(upper_bounds);
 
   if (retval != 0) 
@@ -2655,7 +2681,6 @@ int tm_setup_params(TreeModel *mod, int offset) {
   return next_idx;
 }
 
-
 /* Wrapper for computation of likelihood */
 double tm_likelihood_wrapper(Vector *params, void *data) {
   TreeModel *mod = (TreeModel*)data;
@@ -2663,15 +2688,19 @@ double tm_likelihood_wrapper(Vector *params, void *data) {
   tm_unpack_params(mod, params, -1);
   val = -1 * tl_compute_log_likelihood(mod, mod->msa, NULL, NULL, mod->category,
 				       NULL);
-/*  if (1) {
-     int i;
-     printf("val=%f", val);
-     for (i=0; i < params->size; i++) printf("\t%e", vec_get(params, i));
-     printf("\n");
-  }*/
   return val;
 }
 
+/* Wrapper for computation of likelihood for extended model. Needed as BFGS function
+ requires this function type.*/
+double gapAwareLikelihoodWrapper(Vector *params, void *data) {
+  TreeModel *mod = (TreeModel*)data;
+  double val;
+  tm_unpack_params(mod, params, -1);
+  val = -1 * gapAwareLikelihood(mod, mod->msa, NULL, NULL, mod->category, NULL);
+
+  return val;
+}
 
 /*double tm_multi_likelihood_wrapper(Vector *params, void *data) {
   List *modlist = (List*)data;
@@ -2793,12 +2822,13 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
   }
 
   /* backgd freqs */
+  if(mod->estimate_backgd){
   sum = 0;
   for (j = 0; j < mod->backgd_freqs->size; j++) 
     sum += vec_get(params, mod->backgd_idx+j);
   for (j = 0; j < mod->backgd_freqs->size; j++)
     vec_set(mod->backgd_freqs, j, vec_get(params, mod->backgd_idx+j)/sum);
-
+  }
   /* rate variation */
   if (mod->nratecats > 1) {
     if (mod->site_model)  {   /* Nielsen-yang site model parameterization */
@@ -2880,7 +2910,11 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
   mat_copy(oldMatrix, mod->rate_matrix->matrix);
   tm_set_rate_matrix_sel_bgc(mod, params, mod->ratematrix_idx,
 			     mod->selection, 0.0);
-
+  
+  /*This is not necessary for the extended algorithm as we don not
+   use it directly like the other models.*/
+  if(mod->extended == 1)
+    return;
   /* diagonalize, if necessary */
   if ((mod->subst_mod != JC69 && mod->subst_mod != F81) || 
       mod->selection != 0.0) {
@@ -2916,6 +2950,29 @@ double tm_scale_rate_matrix(TreeModel *mod) {
   return scale/(mod->order + 1);
 }
 
+/**
+ * Scale Tree model matrix by a parameter. Similar to function above except this is used
+ * only for F84E since it computes background frequencies differently.
+ * @param mod, Tree model.
+ * @return value (not used by program).
+ */
+double scaleRateMatrixExtended(TreeModel *mod) {
+  /*TODO*/
+  return 0;
+  
+  double scale = 0;
+  int i, j;
+  for (i = 0; i < mod->rate_matrix->size; i++) {
+    double rowsum = 0;
+    for (j = 0; j < mod->rate_matrix->size; j++) {
+      if (j != i) rowsum += mm_get(mod->rate_matrix, i, j);
+    }
+    scale += (vec_get(mod->backgd_freqs, i) * rowsum);
+  }
+
+  mm_scale(mod->rate_matrix, (mod->order + 1)/scale);
+  return scale/(mod->order + 1);
+}
 
 /* scale a parameter vector according to a specified rate matrix scale
    factor.  Branch length params are multiplied by the specified factor
@@ -3040,7 +3097,7 @@ Vector *tm_params_init(TreeModel *mod, double branchlen, double kappa,
 	vec_set(params, mod->ratevar_idx, alpha);
     }
   }
-
+  
   /* initialize rate-matrix parameters */
   tm_rate_params_init(mod, params, mod->ratematrix_idx, kappa);
 

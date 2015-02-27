@@ -255,7 +255,7 @@ MSA *msa_read_fasta(FILE *F, char *alphabet) {
   List *names = lst_new_ptr(10);
   List *seqs = lst_new_ptr(10);
   static Regex *descrip_re = NULL;
-  int maxlen, i, nseqs, j, do_toupper, line_no;
+  int maxlen, i, nseqs, j, do_toupper /*,line_no*/;
   String *line = str_new(STR_MED_LEN);
   List *l = lst_new_ptr(2);
   String *new_str = NULL;
@@ -264,7 +264,7 @@ MSA *msa_read_fasta(FILE *F, char *alphabet) {
   if (descrip_re == NULL) 
     descrip_re = str_re_new("[[:space:]]*>[[:space:]]*([^[:space:]]+)");
 
-  line_no=1;
+  /*line_no=1;*/
   while ((str_readline(line, F)) != EOF) {
     if (str_re_match(line, descrip_re, l, 1) > 0) {
       lst_push_ptr(names, lst_get_ptr(l, 1));

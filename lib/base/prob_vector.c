@@ -115,7 +115,7 @@ void pv_p_values(Vector *distrib, double *x_0, int n, double *pvals,
     hcdf = pv_cdf(distrib, UPPER); /* CDF for upper tail */
   
   /* look up tail probabilities from CDF */
-  int lookup = 0;
+  /*int lookup = 0;*/
   
   for (i = 0; i < n; i++) {
     if (side == LOWER)

@@ -795,7 +795,7 @@ int opt_bfgs(double (*f)(Vector*, void*), Vector *params,
   vec_free(params_new);
   vec_free(xi);
   vec_free(at_bounds);
-  if (inv_Hessian == NULL) mat_free(H);
+  /*if (inv_Hessian == NULL) mat_free(H); This crashes and I'm not sure why...*/
   mat_free(first_frac);
   mat_free(sec_frac);
   mat_free(bfgs_term);

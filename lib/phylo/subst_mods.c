@@ -41,8 +41,11 @@ void tm_set_HKY_CODON_matrix(TreeModel *mod, double kappa, int kappa_idx);
 void tm_set_REV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx);
 void tm_set_SSREV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx);
 void tm_set_INDEL_matrix(TreeModel *mod,Vector* params, int start_idx);
-
-
+void tm_set_F84E_matrix(TreeModel *mod,Vector* params, int start_idx);
+int kronecker(int firstResidue,int secondResidue);
+int epsilonF(int i,int j);
+int isPurines(int i,int j);
+int isPyrimidines(int i,int j);
 
 void tm_init_mat_REV(TreeModel *mod, Vector *params, int nbranches, 
                      double kappa);
@@ -94,6 +97,7 @@ void tm_init_mat_from_model_REV_CODON(TreeModel *mod, Vector *params,
 				      int start_idx);
 void tm_init_mat_from_model_SSREV_CODON(TreeModel *mod, Vector *params,
 					int start_idx);
+void tm_init_mat_F84E(TreeModel* mod,Vector* params,int parms_idx);
 int tm_flag_subst_param_pos(TreeModel *mod, int *flag, 
 			    String *param_name);
 
@@ -145,6 +149,8 @@ subst_mod_type tm_get_subst_mod_type(const char *str) {
     retval = SSREV_CODON;
   else if (str_equals_nocase_charstr(subst_mod_str, "INDEL"))
     retval = INDEL;
+  else if (str_equals_nocase_charstr(subst_mod_str,"F84E"))
+    retval = F84E;
   str_free(subst_mod_str);
   return retval;
 }
@@ -194,6 +200,8 @@ char *tm_get_subst_mod_string(subst_mod_type type) {
     return "SSREV_CODON";
   case INDEL:
     return "INDEL";
+  case F84E:
+    return "F84E";
   default:
     return "(unknown model)";
   }
@@ -262,6 +270,8 @@ int tm_get_nratematparams(TreeModel *mod) {
   case SSREV_CODON:
     n = strlen(mod->rate_matrix->states);
     return (n*n-n)/2 - n/2 - 2*((n/2*2)!=n);
+  case F84E:
+    return 4;
   default:
     die("ERROR: tm_get_nrateparams unknown substitution model\n");
   }
@@ -365,12 +375,18 @@ void tm_set_rate_matrix(TreeModel *mod, Vector *params, int i) {
   case INDEL:
     tm_set_INDEL_matrix(mod,params, i);
     break;
+  case F84E:
+    tm_set_F84E_matrix(mod,params,i);
+    break;
   default:
     die("ERROR tm_set_rate_matrix: unknown substitution model\n");
   }
-
-  if (mod->scale_during_opt && mod->subst_mod!=JC69 && mod->subst_mod != F81)
+  if(mod->scale_during_opt && mod->extended)
+    scaleRateMatrixExtended(mod);
+  else if (mod->scale_during_opt && mod->subst_mod!=JC69 && mod->subst_mod != F81)
     tm_scale_rate_matrix(mod);
+  
+  return;
 }
 
 
@@ -444,6 +460,11 @@ void tm_rate_params_init(TreeModel *mod, Vector *params,
     break;
   case U3S:
     tm_init_mat_U3S(mod, params, params_idx, kappa);
+    break;
+  case F84E:
+    /*We will initialize once we have background frequencies. Skip for now...*/
+    if(!(mod->backgd_freqs == NULL))
+      tm_init_mat_F84E(mod,params,params_idx);
     break;
   default:
     die("ERROR tm_rate_params_init: unknown substitution model\n");
@@ -546,6 +567,8 @@ void tm_rate_params_init_from_model(TreeModel *mod, Vector *params,
   case SSREV_CODON:
     tm_init_mat_from_model_SSREV_CODON(mod, params, params_idx);
     break;
+  case F84E:
+    tm_init_mat_F84E(mod,params,params_idx);
   default:
     die("ERROR tm_rate_params_init_from_model: unknown substitution model\n");
   }
@@ -711,6 +734,9 @@ void tm_set_HKYG_matrix(TreeModel *mod, Vector *params, int start_idx ) {
     }
     mm_set(mod->rate_matrix, i, i, -1 * rowsum);
   }
+  
+    printMatrix(mod->rate_matrix->matrix,5);
+    return;
 }
 
 void tm_set_GC_matrix(TreeModel *mod, double kappa, int kappa_idx, double alpha) {
@@ -1615,90 +1641,205 @@ void tm_set_REV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx) {
  * */
 /*Function used in PhyloFit rewriten for clarity and to make it make sense...*/
 void tm_set_INDEL_matrix(TreeModel* model,Vector* parameters,int index){
-        int i,j;
-        int setupMapping;
-        /*We will need at least ?four? free parameters. One kappa as defined by HKY model for is_transition,
-          i.e. if it's a transition with more likelyhood account for this in the model.
-          As well as ?three? more variables for alpha, beta and gamma as explained in the model description.
-        */
-        int kappaIndex = index;
-        int alphaIndex = index+1;
-        int bettaIndex = index+2;
-        double sumArray[4]; /*Array to keep track of sums per row*/
-        
-        /*Get free parameters from Vector*/
-        double kappa = vec_get(parameters, kappaIndex);
-        double alpha  =vec_get(parameters, alphaIndex);
-        double betta = vec_get(parameters, bettaIndex);
-        double currentValue;
-        double rowSum;
-        MarkovMatrix* matrix = model->rate_matrix;
-        char* states = matrix->states;
-        Vector* frequency = model->backgd_freqs;
-
-        /*I actually don't know what this does yet...but it's necessary, program
-         will give awful output if the setupMapping is not set up properly througout
-         the program.*/
-        if(model->rate_matrix_param_row != NULL && lst_size(model->rate_matrix_param_row[index]) == 0)
-                setupMapping = 1;
-        else
-                setupMapping = 0;
-
-        if (frequency == NULL)
-                die("tm_set_INDEL_matrix: mod->backgd_freqs is NULL\n");
-
-        /*Iterate through matrix setting values appropriately*/
-        for(i = 0; i < 4; i++){
-                currentValue = 0;
-                rowSum = 0;
-                for(j = 0; j < 4; j++){
-                        if(i == j) /*The diagonal*/
-                                continue;
-                        currentValue = vec_get(frequency,j);
-                        /*Account by multiplying by Kappa*/
-                        if(is_transition(states[i],states[j])){
-                                currentValue *= kappa;
-                                if(setupMapping){
-                                    lst_push_int(model->rate_matrix_param_row[kappaIndex], i);
-                                    lst_push_int(model->rate_matrix_param_col[kappaIndex], j);
-                                }
-                        }                                
-                        mm_set(matrix,i,j,currentValue);
-                        rowSum += currentValue;
-                }
-                sumArray[i] = rowSum;
+  int i,j;
+  int setupMapping;
+  /* We will need at least ?four? free parameters. One kappa as defined by HKY model for is_transition,
+   * i.e. if it's a transition with more likelyhood account for this in the model.
+   * As well as ?three? more variables for alpha, beta and gamma as explained in the model description.
+   */
+  int kappaIndex = index;
+  int alphaIndex = index+1;
+  int bettaIndex = index+2;
+  double sumArray[4]; /*Array to keep track of sums per row*/
+  
+  /*Get free parameters from Vector*/
+  double kappa = vec_get(parameters, kappaIndex);
+  double alpha  =vec_get(parameters, alphaIndex);
+  double betta = vec_get(parameters, bettaIndex);
+  double currentValue;
+  double rowSum;
+  MarkovMatrix* matrix = model->rate_matrix;
+  char* states = matrix->states;
+  Vector* frequency = model->backgd_freqs;
+  
+  /*I actually don't know what this does yet...but it's necessary, program
+   *          will give awful output if the setupMapping is not set up properly througout
+   *          the program.*/
+  if(model->rate_matrix_param_row != NULL && lst_size(model->rate_matrix_param_row[index]) == 0)
+    setupMapping = 1;
+  else
+    setupMapping = 0;
+  
+  if (frequency == NULL)
+    die("tm_set_INDEL_matrix: mod->backgd_freqs is NULL\n");
+  
+  /*Iterate through matrix setting values appropriately*/
+  for(i = 0; i < 4; i++){
+    currentValue = 0;
+    rowSum = 0;
+    for(j = 0; j < 4; j++){
+      if(i == j) /*The diagonal*/
+        continue;
+      currentValue = vec_get(frequency,j);
+      /*Account by multiplying by Kappa*/
+      if(is_transition(states[i],states[j])){
+        currentValue *= kappa;
+        if(setupMapping){
+          lst_push_int(model->rate_matrix_param_row[kappaIndex], i);
+          lst_push_int(model->rate_matrix_param_col[kappaIndex], j);
         }
-        /*We have intialized inner (4x4) matrix for non indels, now handle Indels:*/
-        /*For bettas*/
-        rowSum = 0;
-        for(i = 0; i < 4;i++){
-                currentValue = vec_get(frequency,i)*betta;
-                mm_set(matrix,4,i,currentValue);                /*Betas*/
-                rowSum += currentValue;
-
-                if(setupMapping){
-                  lst_push_int(model->rate_matrix_param_row[bettaIndex], 4);
-                  lst_push_int(model->rate_matrix_param_col[bettaIndex], i);
-                }
-        }
-        mm_set(matrix,4,4,-1*rowSum);
-
-        /*For alphas, note frequency should be the same!*/
-        currentValue = vec_get(frequency,4)*alpha;
-        for(i = 0; i < 4; i++){
-                mm_set(matrix,i,4,currentValue);                /*Alphas*/
-                if(setupMapping){
-                  lst_push_int(model->rate_matrix_param_row[alphaIndex], i);
-                  lst_push_int(model->rate_matrix_param_col[alphaIndex], 4);
-                }
-        }
-        /*Take care of diagonal here!*/
-        /*Sorry about so many loops :( It could all be done in one, but this works...*/
-        for(i = 0; i < 4; i++)
-            mm_set(matrix,i,i,-1*(sumArray[i]+currentValue));        
+      }                                
+      mm_set(matrix,i,j,currentValue);
+      rowSum += currentValue;
+    }
+    sumArray[i] = rowSum;
+  }
+  /*We have intialized inner (4x4) matrix for non indels, now handle Indels:*/
+  /*For bettas*/
+  rowSum = 0;
+  for(i = 0; i < 4;i++){
+    currentValue = vec_get(frequency,i)*betta;
+    mm_set(matrix,4,i,currentValue);                /*Betas*/
+    rowSum += currentValue;
+    
+    if(setupMapping){
+      lst_push_int(model->rate_matrix_param_row[bettaIndex], 4);
+      lst_push_int(model->rate_matrix_param_col[bettaIndex], i);
+    }
+  }
+  mm_set(matrix,4,4,-1*rowSum);
+  
+  /*For alphas, note frequency should be the same!*/
+  currentValue = vec_get(frequency,4)*alpha;
+  for(i = 0; i < 4; i++){
+    mm_set(matrix,i,4,currentValue);                /*Alphas*/
+    if(setupMapping){
+      lst_push_int(model->rate_matrix_param_row[alphaIndex], i);
+      lst_push_int(model->rate_matrix_param_col[alphaIndex], 4);
+    }
+  }
+  /*Take care of diagonal here!*/
+  /*Sorry about so many loops :( It could all be done in one, but this works...*/
+  for(i = 0; i < 4; i++)
+    mm_set(matrix,i,i,-1*(sumArray[i]+currentValue));        
 }
 
+/* Actual model to be used as matrix in each iteration of optimization algorithm. Uses
+ * model described by (Felsenstein 84) extended with a gap character as described by
+ * (Rivas E, Eddy SR (2008). Uses 4 parameters to be optimized: insertion rate (lambda),
+ * deletion rate (mu), transition rate (alpha), tranversion rate (betta).
+ * @param mod from file read containing rate matrix.
+ * @param vector of parameters containing all parameters related to our model.
+ * @param start in vector of parameters to be optimized.
+ */
+void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
+  /*Get all necessary information from model and parameter vector.*/
+  int k = startIndex;
+  double lambda = params->data[k];
+  double mu = params->data[k+1];
+  double alpha = params->data[k+2];
+  double betta = params->data[k+3];
+  /*Extract background frequencies from array.*/
+  double* freqArray = model->backgd_freqs->data;
+  double freqA = freqArray[0];
+  double freqC = freqArray[1];
+  double freqG = freqArray[2];
+  double freqT = freqArray[3];
+  int i,j;
+  int matrixSize = 5;
+  
+  /*Base frequencies of pools.*/
+  double purineR = freqA + freqG;
+  double pyrimidinesR = freqC + freqT;
+  double transition; /*Transition rate*/
+  double allRate; /*Transition/None/Transgression Rate.*/
+  double poolDivisor; /*Divisor of purine pool or pyriminides pool*/
+  MarkovMatrix* matrix = model->rate_matrix;
+  /*Sum of the rows for inner matrix to be subtracted at the end.*/
+  double diagonalSum[4] = {0,0,0,0};
+  double val;
+  
+  /*Set values of inner "Original Matrix" based on dnaML erate paper description.
+   * R(i != j) B*pi(j) + alpha*delta(i,j);*/
+  for(i = 0; i < matrixSize-1; i++)
+    for(j=0; j < matrixSize-1; j++){
+      if(kronecker(i,j)) /*Do not worry about diagonal now.*/
+        continue;
+      /*Note if neither, epsiloF will take care of it when calculating transition.*/
+      poolDivisor = isPurines(i,j) ? purineR : pyrimidinesR;
+      allRate = betta * freqArray[j];
+      transition = epsilonF(i,j) * freqArray[j] * alpha / poolDivisor;
+      val = allRate + transition;
+      mm_set(matrix,i,j,val);
+      diagonalSum[i] += val;
+    }
 
+  /*Set matrix values for (K+1) section, i.e. the gap column and row.*/
+  for(i=0;i< matrixSize-1;i++){
+    mm_set(matrix,i,4,mu); /*Last Row*/
+    mm_set(matrix,4,i,freqArray[i] * lambda); /*Last Column*/
+  }
+
+  /*Do matrix at [4][4], by definition:*/
+  mm_set(matrix,4,4, - lambda);
+
+  /*Do diagonal.*/
+  for(i=0;i< matrixSize-1;i++){
+    mm_set(matrix,i,i,-diagonalSum[i] - mu);
+  }
+
+  return;
+}
+//======================================================================================
+/*Used by matrix computation on diagonal, simply return 1 if in diagonal, else 1;*/
+int kronecker(int firstResidue,int secondResidue){
+  if(firstResidue == secondResidue)
+    return 1;
+  return 0;
+}
+//======================================================================================
+/* Returns 1 if both nucleotides are purines or both pyrimidines,
+ * else zero. Used for calculations of instataneous rate of change matrix. Notice it relies
+ * on the order of the matrix. i.e. we assume ACGT- to be the order.*/
+int epsilonF(int i,int j){
+  if(isPurines(i,j) || isPyrimidines(i,j))
+    return 1;
+  /*else*/
+  return 0;
+}
+//======================================================================================
+/*Returns 1 if both nucleotides are purines (Adenine Guanine), else zero.
+ * used for calculations of instataneous rate of change matrix. Notice it relies
+ * on the order of the matrix. i.e. we assume ACGT- to be the order.*/
+int isPurines(int i,int j){
+  /*Purines*/
+  if(i == 0 && j==0)
+    return 1;
+  if(i == 0 && j==2)
+    return 1;
+  if(i == 2 && j==0)
+    return 1;
+  if(i == 2 && j==2)
+    return 1;
+  return 0;
+}
+//======================================================================================
+/*Returns 1 if both nucleotides are both pyrimidines (Thymine, Cytosine), else zero.
+ * used for calculations of instataneous rate of change matrix. Notice it relies
+ * on the order of the matrix. i.e. we assume ACGT- to be the order.*/
+int isPyrimidines(int i,int j){
+  /*Pyrimides*/
+  if(i == 1 && j==1)
+    return 1;
+  if(i == 1 && j==3)
+    return 1;
+  if(i == 3 && j==1)
+    return 1;
+  if(i == 3 && j==3)
+    return 1;
+  return 0;
+}
+//======================================================================================
 void tm_set_SSREV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx) {
   int i, j, k, codi[3], codj[3], ni, nj, whichdif, compi, compj;
   int setup_mapping = (mod->rate_matrix_param_row != NULL && 
@@ -2291,6 +2432,58 @@ void tm_init_mat_U3S(TreeModel *mod, Vector *params,
 	parm_idx, params->size);
 }
 
+
+/**
+ * Initializes model with sensible values for the 4 parameters to be optimized: insertion
+ * rate (lambda), deletion rate (mu), transition rate (alpha), tranversion rate (betta).
+ * Notice this is called through tm_rate_params_init_from_model. Therefore the passed model
+ * isn't HK84 itself but the model containing the branch length that we will hold as constants
+ * as we optimize. The background frequencies should be the same so we will use those to
+ * set initial values.
+ * @param mod from file read containing rate matrix.
+ * @param vector of parameters containing all parameters related to our model.
+ * @param start in vector of parameters to be optimized.
+ */
+void tm_init_mat_F84E(TreeModel* mod,Vector* params,int params_idx){
+  /*Extract background frequencies from array.*/
+  double freqA = mod->backgd_freqs->data[0];
+  double freqC = mod->backgd_freqs->data[1];
+  double freqG = mod->backgd_freqs->data[2];
+  double freqT = mod->backgd_freqs->data[3];
+  double freqGap = mod->backgd_freqs->data[4];
+  
+  double freqR = freqA + freqG;
+  double freqY = freqC + freqT;
+  double freqGR = freqG / freqR;
+  double freqTY = freqT / freqY;
+  /*Transition/Transversion Ratio.*/
+  double ttRatio = 2.0;
+  /*Extract parameters pointers from their vector,these have been arbitrarily set to be
+   *in this order.*/
+  int k = params_idx;
+  double* lambda = &params->data[k];
+  double* mu = &params->data[k+1];
+  double* alpha = &params->data[k+2];
+  double* betta = &params->data[k+3];
+  /*Temporary Computation values.*/
+  double aa, bb;
+
+  /*Compute Values based on background frequencies.*/
+  *lambda = freqGap;
+  *mu = freqGap;
+  /*Taken from dnaML-erate.*/
+  aa = ttRatio * freqR * freqY - freqA * freqG - freqC * freqT;
+  bb = freqA * freqGR + freqC * freqTY;
+  *alpha = aa / (aa + bb);
+  *betta = 1.0 - (*alpha);
+
+  printf("Lambda: %f\n", * lambda);
+  printf("Mu: %f\n", * mu);
+  printf("Alpha: %f\n", * alpha);
+  printf("Betta: %f\n", * betta);
+  
+  return;
+}
 
 void tm_init_mat_GY(TreeModel *mod, double kappa, double omega) {
   int i, j;

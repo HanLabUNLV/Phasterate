@@ -646,7 +646,7 @@ void mm_diagonalize_complex(MarkovMatrix *M) {
     M->evals_z = zvec_new(M->size);
   if (M->evec_matrix_inv_z == NULL)
     M->evec_matrix_inv_z = zmat_new(M->size, M->size);
-  if (mat_diagonalize(M->matrix, M->evals_z, M->evec_matrix_z, M->evec_matrix_inv_z)) {
+  if (mat_diagonalize(M->matrix, M->evals_z, M->evec_matrix_z, M->evec_matrix_inv_z, 0)) {
     zmat_free(M->evec_matrix_z);
     zvec_free(M->evals_z);
     zmat_free(M->evec_matrix_inv_z);
@@ -656,6 +656,61 @@ void mm_diagonalize_complex(MarkovMatrix *M) {
     M->diagonalize_error = 1;
   }
   else M->diagonalize_error = 0;
+} 
+
+void extendedDiagonalize(MarkovMatrix *M) { 
+  /* use existing routines then "cast" complex matrices/vectors as real */
+
+  /* keep temp storage around -- this function will be called many
+     times repeatedly */
+  static Zmatrix *evecs_z = NULL;
+  static Zmatrix *evecs_inv_z = NULL;
+  static Zvector *evals_z = NULL;
+  static int size = -1;
+
+  if (evecs_z == NULL || size != M->size) {
+    if (evecs_z != NULL) {
+      zmat_free(evecs_z);
+      zmat_free(evecs_inv_z);
+      zvec_free(evals_z);
+      evecs_z = NULL;
+    }
+
+    evecs_z = zmat_new(M->size, M->size);
+    set_static_var((void**)&evecs_z);
+    evecs_inv_z = zmat_new(M->size, M->size);
+    evals_z = zvec_new(M->size);
+    size = M->size;
+  }
+
+  if (1 == mat_diagonalize(M->matrix, evals_z, evecs_z, evecs_inv_z,1)) 
+    goto extendedDiagonalize_real_fail;
+
+  M->diagonalize_error = 0;
+  if (M->evec_matrix_r == NULL) {
+    M->evec_matrix_r = mat_new(M->size, M->size);
+    M->evals_r = vec_new(M->size);
+    M->evec_matrix_inv_r = mat_new(M->size, M->size);
+  }
+
+  if (zvec_as_real(M->evals_r, evals_z, FALSE) ||
+      zmat_as_real(M->evec_matrix_r, evecs_z, FALSE) ||
+      zmat_as_real(M->evec_matrix_inv_r, evecs_inv_z, FALSE))
+    goto extendedDiagonalize_real_fail;
+  return;
+  
+ extendedDiagonalize_real_fail:
+  //by setting eigenvalues to NULL, mm_exp will call mm_exp_higham
+  //instead of using eigenvalues.
+  if (M->evec_matrix_r != NULL)
+    mat_free(M->evec_matrix_r);
+  if (M->evals_r != NULL)
+    vec_free(M->evals_r);
+  if (M->evec_matrix_inv_r != NULL)
+    mat_free(M->evec_matrix_inv_r);
+  M->evec_matrix_r = M->evec_matrix_inv_r = NULL;
+  M->evals_r = NULL;
+  M->diagonalize_error = 1;
 } 
 
 void mm_diagonalize_real(MarkovMatrix *M) { 
@@ -683,7 +738,7 @@ void mm_diagonalize_real(MarkovMatrix *M) {
     size = M->size;
   }
 
-  if (1 == mat_diagonalize(M->matrix, evals_z, evecs_z, evecs_inv_z)) 
+  if (1 == mat_diagonalize(M->matrix, evals_z, evecs_z, evecs_inv_z, 0)) 
     goto mm_diagonalize_real_fail;
 
   M->diagonalize_error = 0;
@@ -744,4 +799,90 @@ void mm_renormalize(MarkovMatrix *M) {
 		mat_get(M->matrix, i, j) / rowsum);
                      
   }
+}
+/*Given a 5x5 rate matrix it will find the eigenvalues, U and inverse U matrix and
+ * diagonal matrix for the inside 4x4 residue part as described in dnaml-erate paper.
+ * @param rateMatrix, rateMatrix to get diagonal and eigen vector info about.
+ * @return allocated struct will all the information.
+ */
+DiagonalMatrix* getDiagonalMatrix(MarkovMatrix* rateMatrix){
+  
+  DiagonalMatrix* dMatrix = (DiagonalMatrix*)malloc(1 * sizeof(DiagonalMatrix));
+  /*This matrix is the matrix such that R = U*R_diag*U^(-1)*/
+  Matrix* uMatrix = NULL;
+  Matrix* uInverseMatrix = NULL;
+  Matrix* newRateMatrix = mat_new(5,5);
+  /*Temporary matrix needed when doing matrix multiplication.*/
+  Matrix* diagonalTemp = mat_new(4,4);
+  Matrix* diagonalMatrix = mat_new(4,4);
+  MarkovMatrix* smallRateMatrix = mm_new(4,"ACGT",CONTINUOUS);
+  double* allEigenvalues = NULL;
+  int eigenNumber = 0;
+  int k,l;
+  double mu = mm_get(rateMatrix, 0, 4);
+  
+  smallRateMatrix->eigentype = REAL_NUM;
+  
+  /*Deep copy of actual rate matrix.*/
+  for(k = 0; k < 5; k++)
+    for(l = 0; l < 5; l++)
+      mat_set(newRateMatrix,k,l,mm_get(rateMatrix,k,l));
+  
+  /*Copy 4x4 component of matrix from rate matrix to new matrix.*/
+  for(k = 0; k < 4; k++)
+    for(l = 0; l < 4; l++){
+      if(k == l) /*Diagonal, the R Matrix is defined as - mu.*/
+        mm_set(smallRateMatrix,k,l,mm_get(rateMatrix,k,l) + mu);
+      else
+        mm_set(smallRateMatrix,k,l,mm_get(rateMatrix,k,l));
+    
+    }
+
+  printMatrix(smallRateMatrix->matrix,4);
+  /*Diagonalize our matrix!*/
+  extendedDiagonalize(smallRateMatrix);
+  
+  /*Get all eigenvalues out of matrix and now we have our diagonalize matrix.*/
+  allEigenvalues = smallRateMatrix->evals_r->data;
+  eigenNumber = smallRateMatrix->evals_r->size;
+  
+  /*Get our U and inverse(U) (i.e. U^(-1)) matrices.*/
+  uMatrix = smallRateMatrix->evec_matrix_r;
+  uInverseMatrix = smallRateMatrix->evec_matrix_inv_r;
+
+  /*Make the diagonal Matrix.*/
+  mat_mult(diagonalTemp,uInverseMatrix,smallRateMatrix->matrix);
+  mat_mult(diagonalMatrix,diagonalTemp,uMatrix);
+  
+  /*Set values to our struct and return it.*/
+  dMatrix->uMatrix = uMatrix;
+  dMatrix->uInverseMatrix = uInverseMatrix;
+  dMatrix->diagonalMatrix = diagonalMatrix;
+  dMatrix->rateMatrix = newRateMatrix;
+  dMatrix->smallRateMatrix = smallRateMatrix;
+  dMatrix->allEigenvalues = allEigenvalues;
+  dMatrix->eigenNumber = eigenNumber;
+
+  return dMatrix;
+}
+/**
+ * Given a diagonalMatrix object will free all memory if not allocated.
+ * @param dMatrix
+ */
+void freeDiagonalMatrix(DiagonalMatrix* dMatrix){
+  if(dMatrix == NULL)
+    return;
+  
+  if(dMatrix->diagonalMatrix != NULL)
+    mat_free(dMatrix->diagonalMatrix);
+  
+  if(dMatrix->smallRateMatrix != NULL)
+    mm_free(dMatrix->smallRateMatrix);
+  
+  if(dMatrix->rateMatrix != NULL)
+    mat_free(dMatrix->rateMatrix);
+  
+  /*No need to free eigen values as they are a pointer to memory freed by diagonalMatrix.*/
+  
+  return;
 }

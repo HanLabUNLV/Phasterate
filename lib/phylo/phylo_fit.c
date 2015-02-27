@@ -79,7 +79,8 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->no_branchlens = FALSE;
   pf->label_categories = TRUE;  //if false, assume MSA already has
                                 //categories labelled with correct gff
-  pf->nsites_threshold = DEFAULT_NSITES_THRESHOLD;
+  /*  pf->nsites_threshold = DEFAULT_NSITES_THRESHOLD;*/
+  pf->nsites_threshold = 5;
   pf->tree = NULL;
   pf->cm = NULL;
   pf->symfreq = FALSE;
@@ -100,6 +101,7 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->max_em_its = -1;
   
   pf->results = rphast ? lol_new(2) : NULL;
+  pf->extendedFlag = 0;
   return pf;
 }
 
@@ -648,7 +650,7 @@ void print_window_summary(FILE* WINDOWF, List *window_coords, int win,
 
 int run_phyloFit(struct phyloFit_struct *pf) {
   FILE *F, *WINDOWF=NULL;
-  int i, j, win, root_leaf_id = -1;
+  int i, j,k, win, root_leaf_id = -1;
   String *mod_fname;
   MSA *source_msa;
   String *tmpstr = str_new(STR_SHORT_LEN);
@@ -667,6 +669,9 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   int quiet = pf->quiet;
   TreeModel *input_mod = pf->input_mod;
   FILE *error_file=NULL;
+  double gapFreq = -1.0;
+  int residuesSize = -1;
+  double gapDivisor = -1.0;
 
   /*Error Checking*/
   if (pf->no_freqs)
@@ -694,7 +699,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   printf("Substitude model is: %d\n",subst_mod);
   if (pf->gaps_as_bases && subst_mod != JC69 && subst_mod != F81 && 
       subst_mod != HKY85G && subst_mod != REV && 
-      subst_mod != UNREST && subst_mod != SSREV && subst_mod != INDEL)
+      subst_mod != UNREST && subst_mod != SSREV && subst_mod != INDEL && subst_mod != F84E)
     die("ERROR: --gaps-as-bases currently only supported with JC69, F81, HKY85+Gap, REV, SSREV, and UNREST and INDEL.\n");
                                 /* with HKY, yields undiagonalizable matrix */
   if ((pf->no_freqs || pf->no_rates) && input_mod == NULL)
@@ -1131,6 +1136,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           ss_from_msas(msa, mod->order+1, 0, 
                        pf->cats_to_do_str != NULL ? cats_to_do : NULL, 
                        NULL, NULL, -1, subst_mod_is_codon_model(mod->subst_mod));
+          mod->geometricParameter = getGeometricDistribution(msa);
           /* (sufficient stats obtained only for categories of interest) */
       
           if (msa->length > 1000000) { /* throw out original data if
@@ -1144,7 +1150,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           params = tm_params_init_random(mod);
         else if (input_mod != NULL) 
           params = tm_params_new_init_from_model(input_mod);
-	else 
+	else
           params = tm_params_init(mod, .1, 5, pf->alpha);     
 
 	if (pf->init_parsimony)
@@ -1158,7 +1164,6 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 	  mod->backgd_freqs = NULL;
         }
 
-
         if (i == 0) {
           if (!quiet) fprintf(stderr, "Compacting sufficient statistics ...\n");
           ss_collapse_missing(msa, !pf->gaps_as_bases);
@@ -1171,11 +1176,38 @@ int run_phyloFit(struct phyloFit_struct *pf) {
                   tmpstr->chars, tm_get_subst_mod_string(subst_mod),
                   mod->nratecats > 1 ? " (with rate variation)" : "");
         }
-
+        /* This is used for the extended pruning algorithm model. It does not do
+         * frequencies the same way as usual. We do A,C,G,T out of 100% and Gaps
+         * out of 100% also. So they do not add up to 1.0.
+         */
+        if (mod->backgd_freqs == NULL && pf->extendedFlag == 1){
+          tm_init_backgd(mod, msa, cat);
+          residuesSize = mod->backgd_freqs->size-1;
+          gapFreq = vec_get(mod->backgd_freqs,4);
+          /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
+            reciprocal to divide all our frequencies by.*/
+          gapDivisor = 1.0/(1.0-gapFreq);
+          
+          for (k=0; k< residuesSize; k++){
+            double currentFreq = vec_get(mod->backgd_freqs, k);
+            double normalizedFreq = currentFreq * gapDivisor;
+            vec_set(params, mod->backgd_idx+k, normalizedFreq);
+            /*Now that they're computed copy them from the parameter vector to the model.*/
+            mod->backgd_freqs->data[k] = normalizedFreq;
+          }
+          /*Do Gap Character.*/
+          vec_set(params, mod->backgd_idx+4, gapFreq);
+          mod->backgd_freqs->data[4] = gapFreq;
+          
+          /* We needed the background frequencies properly initialized for this model. Now
+           * that we have them rerun the initiate model function.*/
+          params = tm_params_init(mod, .1, 5, pf->alpha);
+        }
+        
         if (pf->use_em)
           tm_fit_em(mod, msa, params, cat, pf->precision, pf->max_em_its, pf->logf, error_file);
-        else
-          tm_fit(mod, msa, params, cat, pf->precision, pf->logf, pf->quiet, error_file);
+        else 
+          tm_fit(mod, msa, params, cat, pf->precision, pf->logf, pf->quiet, error_file,pf->extendedFlag);
       }
 
       if (pf->output_fname_root != NULL) 
@@ -1550,7 +1582,7 @@ List* setupmsa(struct phyloFit_struct *pf, MSA* msa)
   int quiet = pf->quiet;
   //int subst_mod = pf->subst_mod;
   List *cats_to_do=NULL;
-  int free_window_coords;
+  /*int free_window_coords;*/
   FILE *WINDOWF=NULL;
   
   /* set up for categories */
@@ -1627,7 +1659,7 @@ List* setupmsa(struct phyloFit_struct *pf, MSA* msa)
       lst_push_int(pf->window_coords, 
                    min(i + pf->window_size - 1, msa->length));
     }
-    free_window_coords = TRUE;
+    /*free_window_coords = TRUE;*/
   }
   if (pf->window_coords != NULL) {
     /* set up summary file */
@@ -1927,7 +1959,7 @@ void printmodMulti(struct phyloFit_struct *pf, TreeModel* mod, MSA* msa, List* c
     for (i = 0; i < lst_size(cats_to_do); i++) {
       //TreeModel *mod;
       int cat = lst_get_int(cats_to_do, i);
-      unsigned int ninf_sites;
+      unsigned int ninf_sites = 0;
 
       if (pf->output_fname_root != NULL)
         str_cpy_charstr(mod_fname, pf->output_fname_root);
@@ -2004,9 +2036,7 @@ void freemod(struct phyloFit_struct *pf, TreeModel *mod, Vector *params, MSA *ms
        win += 2) {
     /* process each category */
     for (i = 0; i < lst_size(cats_to_do); i++) {
-      TreeModel *mod;
       //int cat = lst_get_int(cats_to_do, i);
-      tm_free(mod);
       if (params != NULL) vec_free(params);
       if (pf->window_coords != NULL)
         msa_free(msa);

@@ -41,7 +41,6 @@ int main(int argc, char *argv[]) {
   const char* treeToParse;
   char *msa_fname = NULL, *alph = "ACGT";
   /*Added by Omar to get greater size matrix*/
-  char* indelAlph = "ACGT-";
   msa_format_type input_format = UNKNOWN_FORMAT;
   char c;
   int opt_idx, seed=-1;
@@ -102,6 +101,7 @@ int main(int argc, char *argv[]) {
     {"selection", 1, 0, 0},
     {"bound", 1, 0, 'u'},
     {"seed", 1, 0, 'D'},
+    {"extended-model",1,0,'x'},
     {0, 0, 0, 0}
    };
 
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
 
   pf = phyloFit_struct_new(0);
 
-  while ((c = getopt_long(argc, argv, "T:m:t:s:g:c:C:i:o:k:a:l:w:v:M:p:A:I:K:S:b:d:O:u:Y:e:D:GVENRqLPXZUBFfnrzhWyJ", long_opts, &opt_idx)) != -1) {
+  while ((c = getopt_long(argc, argv, "T:m:t:s:g:c:C:i:o:k:a:l:w:v:M:p:A:I:K:S:b:d:O:u:Y:e:D:GVENRqLPXZUBFfnrzhWyJx", long_opts, &opt_idx)) != -1) {
     switch(c) {
     case 'T':
         if (is_dir(optarg)) {
@@ -342,6 +342,10 @@ int main(int argc, char *argv[]) {
     case 'h':
       printf("%s", HELP);
       exit(0);
+    /*Extended Felsenstein's Peeling Algorithm.*/
+    case 'x':
+      pf->extendedFlag = 1;
+      break;
     case '?':
       die("ERROR: illegal argument.     Type 'phyloFit -h' for usage.\n");
     }

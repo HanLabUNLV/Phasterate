@@ -300,7 +300,7 @@ Vector *sub_posterior_distrib_site(JumpProcess *jp, MSA *msa, int tuple_idx) {
 
       c = ss_get_char_tuple(msa, tuple_idx, 
                                  jp->mod->msa_seq_idx[node->id], 0);
-      if (msa->is_missing[(int)c] /*|| c == GAP_CHAR*/)
+      if (msa->is_missing[(int)c] || c == GAP_CHAR)
         for (a = 0; a < size; a++)
           L[node->id]->data[a][0] = 1;
       else {

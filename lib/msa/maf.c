@@ -26,7 +26,7 @@ MSA *maf_read_cats_subset(FILE *F, FILE *REFSEQF, int tuple_size,
    int store_order, char *reverse_groups, int gap_strip_mode, 
    int keep_overlapping, List *cats_to_do, List *seqnames, int seq_keep ) {
 
-  int i, start_idx, length, max_tuples, block_no,  
+  int i, start_idx, length, max_tuples, /*block_no,*/  
     refseqlen = -1, do_toupper, last_refseqpos = -1;
   Hashtable *tuple_hash;
   Hashtable *name_hash = hsh_new(25);
@@ -158,7 +158,7 @@ MSA *maf_read_cats_subset(FILE *F, FILE *REFSEQF, int tuple_size,
   }
 
   /* process MAF one block at a time */
-  block_no = 0;
+  /*block_no = 0;*/
   while (maf_read_block_addseq(F, mini_msa, name_hash, &start_idx,
 			       &length, do_toupper, seqnames != NULL && seq_keep) != EOF) {
     checkInterruptN(block_no++, 1000);

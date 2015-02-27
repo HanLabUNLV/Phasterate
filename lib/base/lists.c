@@ -28,6 +28,7 @@
 #include "msa.h"
 #include <misc.h>
 #include "tree_model.h"
+#include "phylo_fit.h"
 
 List* lst_new(int nelements, int elementsz) {
   List *l = (List*)smalloc(sizeof(List));
@@ -251,7 +252,7 @@ void lst_dbl_quantiles(List *l, double *quantiles, int nquantiles,
 /****************************************************************************/
 int lst_msa_compare(const void* ptr1, const void* ptr2){
     /*Data type of array was a void* that pointed to an MSA object, therefore
-     we must dereference to a void** to gete the adress of the MSA*/
+     we must dereference to a void** to get the address of the MSA*/
     /*This was pointer hell to figure out...*/
     MSA* first =  (MSA*)(*(void**)ptr1);
     MSA* second = (MSA*)(*(void**)ptr2);

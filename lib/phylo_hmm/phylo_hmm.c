@@ -1106,7 +1106,7 @@ void phmm_estim_mods_em(TreeModel **models, int nmodels, void *data,
 
     /* FIXME: need to use state_to_cat, etc. in deciding which categories to use */
 
-    tm_fit(phmm->mods[k], phmm->em_data->msa, params, k, OPT_HIGH_PREC, logf, 1, NULL);
+    tm_fit(phmm->mods[k], phmm->em_data->msa, params, k, OPT_HIGH_PREC, logf, 1, NULL,0);
     vec_free(params); 
   }
 
