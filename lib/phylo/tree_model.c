@@ -168,6 +168,9 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
   tm->bound_arg = NULL;
   tm->scale_during_opt = 0;
   tm->iupac_inv_map = NULL;
+  /*Init to all nulls.*/
+  for(i = 0; i < 1000; i ++)
+    tm->fileName[i] = 0;
   return tm;
 }
 
@@ -269,7 +272,7 @@ void tm_reinit(TreeModel *tm,   /* TreeModel object to reinitialize  */
 void tm_free(TreeModel *tm) {
   int i, j;
   if (tm->tree != NULL) {
-    if (tm->rate_matrix_param_row != NULL)
+    if (tm->rate_matrix_param_row != NULL && ! tm->extended)
       tm_free_rmp(tm);
     if (tm->alt_subst_mods != NULL) {
       for (i=0; i<lst_size(tm->alt_subst_mods); i++) 
@@ -1768,7 +1771,7 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
          else /*Else we are using the extended model. Here it is fine for
                * our rates to go to zero. Should not cause problems with
                * diagonal as these are not taken into account. */
-           vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.000);
+           vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 0.000);
       }
     }
   }
@@ -2926,7 +2929,7 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
   tm_set_subst_matrices(mod); 
 }
 
-
+  
 /* Scale the rate matrix of the specified tree model such that the
    expected rate of substitution at equilibrium is 1.  This is the
    standard convention; it allows the unit of measurement of branch
@@ -3759,8 +3762,7 @@ void tm_prune(TreeModel *mod,   /* TreeModel whose tree is to be pruned  */
                                    leaves on return.  Must be
                                    pre-allocated */
               ) {
-  printf("Pruning from MSA: %s\n", msa->fileName);
-  printf("Againts from Model: %s\n",mod->fileName);
+
   int i, j, old_nnodes = mod->tree->nnodes, *id_map = NULL;
 
   if (mod->tree->nnodes < 3)

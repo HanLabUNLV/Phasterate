@@ -96,6 +96,7 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->alpha = DEFAULT_ALPHA;
   pf->gff = NULL;
   pf->input_mod = NULL;
+  pf->input_mods = NULL;
   pf->use_selection = 0;
   pf->selection = 0.0;
   pf->max_em_its = -1;

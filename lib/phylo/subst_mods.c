@@ -1787,6 +1787,15 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
   for(i=0;i< matrixSize-1;i++){
     mm_set(matrix,i,i,-diagonalSum[i] - mu);
   }
+  
+  printf("Current Matrix:\n");
+  printMatrix(matrix->matrix, 5);
+  printf("Rate Parameters:\n");
+  printf("Lambda: %f\n", lambda);
+  printf("Mu: %f\n", mu);
+  printf("Alpha: %f\n", alpha);
+  printf("Betta: %f\n", betta);
+  printf("\n\n");
 
   return;
 }

@@ -511,7 +511,6 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
     **outside_joint = NULL, **outside_marginal = NULL, 
     ****subst_probs = NULL;
   double *curr_tuple_scores=NULL;
-  int defined;
 
   checkInterrupt();
 
@@ -639,7 +638,7 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
   
 double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors* post,
         double **inside_joint){
-  int tupleidx, i, j;
+  int tupleidx, i;
   int nstates = mod->rate_matrix->size;
   double total_prob;
   List* traversal;
@@ -711,7 +710,7 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
     
     total_prob = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
 
-    /* Debugging print info:*/
+    /*Debugging print info:*//*
     int paramIndex = mod->ratematrix_idx;
     double* paramArray = &(mod->all_params->data[paramIndex]);
     printf("Current Rate Matrix values:\n");
@@ -749,10 +748,11 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
       printf("Eigenvalue %d: %f\n", i, dMatrix->allEigenvalues[i]);
     
     printf("\n\n");
+    int j;
     for(i = 0; i < lst_size(traversal); i++)
       for (j = 0; j < 5; j++)
         printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
-    printf("\n\n");
+    printf("\n\n");*/
     
     /*Multiply by the amount of times this column appeared in the alignment.*/
     if(tupleidx != msa->ss->ntuples)
@@ -1170,7 +1170,7 @@ double gammaML(double branchLength,double mu,double lambda){
   double value;
   double muAndLambda = mu + lambda;
 
-  value = mu / muAndLambda * (1 - exp(-muAndLambda*branchLength));
+  value = mu / muAndLambda * (1 - exp(-muAndLambda * branchLength));
 
   return value;
 }
@@ -1193,14 +1193,14 @@ double epsilonProbability(DiagonalMatrix* dMatrix,int i,int j,double t,double* f
   double firstPart = 0;
   double lastPart = 0;
   double eigenSum = 0;
-
+  
   if(lambda != 0 || mu != 0)
     firstPart = freqs[j] * lambda / (lambda + mu);
   else
     firstPart = freqs[j];
 
   if(lambda != 0 || mu != 0)
-    lastPart = freqs[j] * mu * exp(-(lambda + mu) * t);
+    lastPart = freqs[j] * mu / (lambda + mu) * exp(-(lambda + mu) * t);
   else
     lastPart = 0;
 
@@ -1251,7 +1251,9 @@ double computeOhMatrixSummation(int i, int j, DiagonalMatrix* dMatrix, double mu
     position = findPositionOfEigenvalue(diagonalMatrix, currentEigen,multiplicity[k]);
     /* O_a(i,j) = U(i,pos)*U^(-1)(pos,j)*/
     oResults = mat_get(uMatrix, i, position) * mat_get(uInverseMatrix,position,j);
-
+    /*Notice subtraction due to distributing the negative sign. Eigenvalues are supposed
+     * to be turned positive by negating (they should all come out negative, except zero).
+     */
     sum += oResults * exp((currentEigen - mu) * t);
   }
 

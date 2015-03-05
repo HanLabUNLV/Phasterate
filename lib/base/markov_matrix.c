@@ -692,7 +692,7 @@ void extendedDiagonalize(MarkovMatrix *M) {
     M->evals_r = vec_new(M->size);
     M->evec_matrix_inv_r = mat_new(M->size, M->size);
   }
-
+  
   if (zvec_as_real(M->evals_r, evals_z, FALSE) ||
       zmat_as_real(M->evec_matrix_r, evecs_z, FALSE) ||
       zmat_as_real(M->evec_matrix_inv_r, evecs_inv_z, FALSE))
@@ -711,7 +711,7 @@ void extendedDiagonalize(MarkovMatrix *M) {
   M->evec_matrix_r = M->evec_matrix_inv_r = NULL;
   M->evals_r = NULL;
   M->diagonalize_error = 1;
-} 
+}
 
 void mm_diagonalize_real(MarkovMatrix *M) { 
   /* use existing routines then "cast" complex matrices/vectors as real */
@@ -838,7 +838,6 @@ DiagonalMatrix* getDiagonalMatrix(MarkovMatrix* rateMatrix){
     
     }
 
-  printMatrix(smallRateMatrix->matrix,4);
   /*Diagonalize our matrix!*/
   extendedDiagonalize(smallRateMatrix);
   
@@ -882,7 +881,6 @@ void freeDiagonalMatrix(DiagonalMatrix* dMatrix){
   if(dMatrix->rateMatrix != NULL)
     mat_free(dMatrix->rateMatrix);
   
-  /*No need to free eigen values as they are a pointer to memory freed by diagonalMatrix.*/
-  
+  /*No need to free eigenvalues as they are a pointer to memory freed by diagonalMatrix.*/
   return;
 }
