@@ -1244,7 +1244,7 @@ double computeOhMatrixSummation(int i, int j, DiagonalMatrix* dMatrix, double mu
       if (abs(currentEigen - allEigenvalues[l]) < 0.00001)
         multiplicity[k]++;
   }
-  
+
   /*Iterate through eigenvalues adding up values.*/
   for(k = 0; k < eigenNumber; k ++){
     currentEigen = allEigenvalues[k];
@@ -1292,7 +1292,7 @@ int findPositionOfEigenvalue(Matrix* matrix,double eigenval, int mult){
   for(l = 0; l < size;l++)
     
     /*Difference smaller than delta to account for round off error.*/
-    if(fabs(mat_get(matrix,l,l) - eigenval) < 0.0001){
+    if(fabs(mat_get(matrix,l,l) - eigenval) < 0.001){
       position = l;
       
       if (mult == 1)
@@ -1300,7 +1300,11 @@ int findPositionOfEigenvalue(Matrix* matrix,double eigenval, int mult){
       else
         mult--;
     }
-
+  /*Position not found die!*/
+  if(position == -1){
+    printf("Eigen vector: %f not found in diagonal Matrix, sorry...", eigenval);
+    exit(1);
+  }
   return position;
 }
 /* =====================================================================================*/

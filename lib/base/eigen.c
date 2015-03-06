@@ -25,7 +25,7 @@
    of eigenvalues and matrices of right and left eigenvectors,
    normalized so that they are inverses.  Returns 0 on success, 1 on
    failure. */ 
-int mat_diagonalize(Matrix *M, /* input matrix (n x n) */
+int mat_diagonalize(Matrix *M , /* input matrix (n x n) */
                     Zvector *eval, 
                                 /* computed vector of eigenvectors --
                                    preallocate dim. n */

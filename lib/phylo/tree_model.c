@@ -1955,7 +1955,7 @@ void tm_new_boundaries(Vector **lower_bounds, Vector **upper_bounds,
   *lower_bounds = vec_new(npar);
   vec_zero(*lower_bounds);  /* default lower bounds=0 != -INFTY so we always allocate and keep this */
   *upper_bounds = vec_new(npar);
-  vec_set_all(*upper_bounds, INFTY);
+  vec_set_all(*upper_bounds, 5.0);
 
   tm_set_boundaries(*lower_bounds, *upper_bounds, mod);
   if (allocate_default == 0) {
