@@ -799,7 +799,7 @@ void mm_renormalize(MarkovMatrix *M) {
 		mat_get(M->matrix, i, j) / rowsum);
                      
   }
-}
+} /*NO LONGER NEEDED*/
 /*Given a 5x5 rate matrix it will find the eigenvalues, U and inverse U matrix and
  * diagonal matrix for the inside 4x4 residue part as described in dnaml-erate paper.
  * @param rateMatrix, rateMatrix to get diagonal and eigen vector info about.
@@ -864,7 +864,7 @@ DiagonalMatrix* getDiagonalMatrix(MarkovMatrix* rateMatrix){
 
   return dMatrix;
 }
-/**
+/** //NO LONGER NEEDE
  * Given a diagonalMatrix object will free all memory if not allocated.
  * @param dMatrix
  */

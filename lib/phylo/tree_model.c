@@ -1955,7 +1955,7 @@ void tm_new_boundaries(Vector **lower_bounds, Vector **upper_bounds,
   *lower_bounds = vec_new(npar);
   vec_zero(*lower_bounds);  /* default lower bounds=0 != -INFTY so we always allocate and keep this */
   *upper_bounds = vec_new(npar);
-  vec_set_all(*upper_bounds, 5.0);
+  vec_set_all(*upper_bounds, 100);
 
   tm_set_boundaries(*lower_bounds, *upper_bounds, mod);
   if (allocate_default == 0) {
@@ -2955,26 +2955,37 @@ double tm_scale_rate_matrix(TreeModel *mod) {
 
 /**
  * Scale Tree model matrix by a parameter. Similar to function above except this is used
- * only for F84E since it computes background frequencies differently.
+ * only for F84E since it computes background frequencies differently. We have to
+ * normalize them out of one before we attempt to add them together.
  * @param mod, Tree model.
  * @return value (not used by program).
  */
 double scaleRateMatrixExtended(TreeModel *mod) {
-  /*TODO*/
-  return 0;
-  
+  double normalizedFreqs[5];
+  double gapFreq = vec_get(mod->backgd_freqs, 4);
+  double gapMultiplier = 1.0 - gapFreq;
+  double residueSize = 4;
   double scale = 0;
-  int i, j;
-  for (i = 0; i < mod->rate_matrix->size; i++) {
-    double rowsum = 0;
-    for (j = 0; j < mod->rate_matrix->size; j++) {
-      if (j != i) rowsum += mm_get(mod->rate_matrix, i, j);
-    }
-    scale += (vec_get(mod->backgd_freqs, i) * rowsum);
+  double** rateMatrix = mod->rate_matrix->matrix->data;
+  int i;
+  
+  /*Get actual background frequencies by normalizing current frequencies.*/
+  for(i = 0; i < residueSize; i++){
+    double currentFreq = vec_get(mod->backgd_freqs, i);
+    double normalizedFreq = currentFreq * gapMultiplier;
+    
+    normalizedFreqs[i] = normalizedFreq;
   }
-
-  mm_scale(mod->rate_matrix, (mod->order + 1)/scale);
-  return scale/(mod->order + 1);
+    
+  normalizedFreqs[4] = gapFreq;
+  
+  /*The row sum is already stored in the i,i entry of our matrix.*/
+  for(i = 0; i < residueSize + 1; i ++)
+    scale += - normalizedFreqs[i] * rateMatrix[i][i];
+  
+    mm_scale(mod->rate_matrix, 1/scale);
+    
+  return scale;
 }
 
 /* scale a parameter vector according to a specified rate matrix scale

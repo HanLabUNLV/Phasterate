@@ -648,11 +648,7 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
   int alph_size = strlen(mod->rate_matrix->states);
   double retval = 0;
   double p = mod->geometricParameter;
-      int rootNodeId = mod->tree->id;
-  
-  /*Diagonal Matrix will be the same for all sites as it doesn't change until we go
-   *    back to optimization script, create and use for all sites.*/
-  DiagonalMatrix* dMatrix = getDiagonalMatrix(mod->rate_matrix);
+  int rootNodeId = mod->tree->id;
   
   /*Iterate over every column in MSA, compute likelihood L(i) for ith column. Add all
    *likelihoods for overall tree. Plus one since we need to take into account an "all 
@@ -696,21 +692,21 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
           /*Case where this is not the extra (all gaps) column.*/
           if(tupleidx != msa->ss->ntuples)
             /*pL[k][n] :: Probability of base K given, node n.*/
-            pL[i][n->id] = probForNodeResidue(i,pL,mod,n,msa,tupleidx,dMatrix);
+            pL[i][n->id] = probForNodeResidue(i,pL,mod,n,msa,tupleidx);
           else /* Extra (all gap) column case*/
-            pL[i][n->id] = probForNodeResidueAllGap(i,pL,mod,n,dMatrix);
+            pL[i][n->id] = probForNodeResidueAllGap(i,pL,mod,n);
         }
         /*Handle gap according to different formula.*/
         if(tupleidx != msa->ss->ntuples)
-          pL[4][n->id] = probForNodeGap(pL,mod,n,msa,tupleidx,dMatrix);
+          pL[4][n->id] = probForNodeGap(pL,mod,n,msa,tupleidx);
         else
-          pL[4][n->id] = probForNodeGapAllGap(pL,mod,n,dMatrix);
+          pL[4][n->id] = probForNodeGapAllGap(pL,mod,n);
       }
     }
     
     total_prob = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
 
-    /*Debugging print info:*//*
+    /*Debugging print info:*/
     int paramIndex = mod->ratematrix_idx;
     double* paramArray = &(mod->all_params->data[paramIndex]);
     printf("Current Rate Matrix values:\n");
@@ -732,27 +728,13 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
     printf("T : %f\n", freq[2]);
     printf("G : %f\n", freq[3]);
     printf("- : %f\n", freq[4]);
-    
     printf("\n\n");
-    printf("Matrix Information:\n");
-    printf("U matrix Information:\n");
-    printMatrix(dMatrix->uMatrix,4);
-    printf("U Inverse matrix Information:\n");
-    printMatrix(dMatrix->uInverseMatrix,4);
     
-    printf("Diagonal matrix Information:\n");
-    printMatrix(dMatrix->diagonalMatrix,4);
-    
-    printf("Eigen Values:\n");
-    for(i = 0; i < dMatrix->eigenNumber; i ++)
-      printf("Eigenvalue %d: %f\n", i, dMatrix->allEigenvalues[i]);
-    
-    printf("\n\n");
     int j;
     for(i = 0; i < lst_size(traversal); i++)
       for (j = 0; j < 5; j++)
         printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
-    printf("\n\n");*/
+    printf("\n\n");
     
     /*Multiply by the amount of times this column appeared in the alignment.*/
     if(tupleidx != msa->ss->ntuples)
@@ -765,7 +747,6 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
 
   retval = getProbZeroL(mod, p, allGapProb, retval);
 
-  freeDiagonalMatrix(dMatrix);
   return retval;
 }
 /* =====================================================================================*/
@@ -927,7 +908,7 @@ double totalProbOfSite(double** pL,double* freqs,int rootNodeId, double p){
  * @return likelihood as computed by formula 20.
  */
 double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa,
-        int currSite,DiagonalMatrix* dMatrix){
+        int currSite){
   int q;
   int gapChar = 4;
   int residues = 4;
@@ -950,13 +931,13 @@ double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa
   /*Left hand summation over all bases.*/
   for(q = 0; q < residues; q++){
     /*Left hand side*/
-    xLeft = pL[q][lChild] * singleEventCondProb(dMatrix,q,i,lChildDist,freqs,params);
+    xLeft = pL[q][lChild] * singleEventCondProb(q,i,lChildDist,freqs,params);
     yLeft = deltaGap(k->lchild,msa,currSite) *
-            singleEventCondProb(dMatrix,gapChar,i,lChildDist,freqs,params);
+            singleEventCondProb(gapChar,i,lChildDist,freqs,params);
     /*Right hand side*/
-    xRight =  pL[q][rChild] * singleEventCondProb(dMatrix,q,i,rChildDist,freqs,params);
+    xRight =  pL[q][rChild] * singleEventCondProb(q,i,rChildDist,freqs,params);
     yRight = deltaGap(k->rchild,msa,currSite) *
-            singleEventCondProb(dMatrix,gapChar,i,rChildDist,freqs,params);
+            singleEventCondProb(gapChar,i,rChildDist,freqs,params);
     
     totalLeft += xLeft + yLeft;
     totalRight +=  xRight + yRight;
@@ -975,8 +956,7 @@ double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa
  * @param currSite, u column we are looking at.
  * @return likelihood as computed by formula 21.
  */
-double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currSite,
-        DiagonalMatrix* dMatrix){
+double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currSite){
   int q;
   int gapChar = 4;
   int residues = 4;
@@ -998,10 +978,10 @@ double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currS
   /*Left hand summation over all bases.*/
   for(q = 0; q < residues; q++){
     /*Left hand side*/
-    firstLeft =  pL[q][lChild] * singleEventCondProb(dMatrix,q,gapChar,lChildDist,freqs,params);
+    firstLeft =  pL[q][lChild] * singleEventCondProb(q,gapChar,lChildDist,freqs,params);
     secondLeft = pL[gapChar][lChild];
     /*Right hand side*/
-    firstRight = pL[q][rChild] * singleEventCondProb(dMatrix,q,gapChar,rChildDist,freqs,params);
+    firstRight = pL[q][rChild] * singleEventCondProb(q,gapChar,rChildDist,freqs,params);
     secondRight = pL[gapChar][rChild];
     
     totalLeft += firstLeft + secondLeft;
@@ -1025,8 +1005,7 @@ double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currS
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
  * @return likelihood as computed by formula 20.
  */
-double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k,
-        DiagonalMatrix* dMatrix){
+double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k){
   int q;
   int gapChar = 4;
   int residues = 4;
@@ -1049,11 +1028,11 @@ double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k,
   /*Left hand summation over all bases.*/
   for(q = 0; q < residues; q++){
     /*Left hand side*/
-    xLeft = pL[q][lChild] * singleEventCondProb(dMatrix,q,i,lChildDist,freqs,params);
-    yLeft = singleEventCondProb(dMatrix,gapChar,i,lChildDist,freqs,params);
+    xLeft = pL[q][lChild] * singleEventCondProb(q,i,lChildDist,freqs,params);
+    yLeft = singleEventCondProb(gapChar,i,lChildDist,freqs,params);
     /*Right hand side*/
-    xRight =  pL[q][rChild] * singleEventCondProb(dMatrix,q,i,rChildDist,freqs,params);
-    yRight = singleEventCondProb(dMatrix,gapChar,i,rChildDist,freqs,params);
+    xRight =  pL[q][rChild] * singleEventCondProb(q,i,rChildDist,freqs,params);
+    yRight = singleEventCondProb(gapChar,i,rChildDist,freqs,params);
     
     totalLeft += xLeft + yLeft;
     totalRight +=  xRight + yRight;
@@ -1070,7 +1049,7 @@ double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k,
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
  * @return likelihood as computed by formula 21.
  */
-double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k, DiagonalMatrix* dMatrix){
+double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
   int q;
   int gapChar = 4;
   int residues = 4;
@@ -1092,10 +1071,10 @@ double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k, DiagonalMat
   /*Left hand summation over all bases.*/
   for(q = 0; q < residues; q++){
     /*Left hand side*/
-    firstLeft =  pL[q][lChild] * singleEventCondProb(dMatrix,q,gapChar,lChildDist,freqs,params);
+    firstLeft =  pL[q][lChild] * singleEventCondProb(q,gapChar,lChildDist,freqs,params);
     secondLeft = pL[gapChar][lChild];
     /*Right hand side*/
-    firstRight = pL[q][rChild] * singleEventCondProb(dMatrix,q,gapChar,rChildDist,freqs,params);
+    firstRight = pL[q][rChild] * singleEventCondProb(q,gapChar,rChildDist,freqs,params);
     secondRight = pL[gapChar][rChild];
     
     totalLeft += firstLeft + secondLeft;
@@ -1117,8 +1096,7 @@ double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k, DiagonalMat
  * @param params, array of parameters containing: [mu,lambda,alpha,beta]
  * @return calculated probability.
  */
-double singleEventCondProb(DiagonalMatrix* dMatrix,int j,int i, double branchLength,
-        double* freqs,double* params){
+double singleEventCondProb(int j,int i, double branchLength, double* freqs,double* params){
   int gapCharacter = 4;
   double mu = params[0];
   double lambda = params[1];
@@ -1132,7 +1110,7 @@ double singleEventCondProb(DiagonalMatrix* dMatrix,int j,int i, double branchLen
     return xiValue * freqs[j];
   /*Formula (22)*/
   }else{
-    return (1-xiValue) * epsilonProbability(dMatrix,j,i,branchLength,freqs,params);
+    return (1-xiValue) * epsilonProbability(j,i,branchLength,freqs,params);
   }
 }
 /* =====================================================================================*/
@@ -1176,40 +1154,52 @@ double gammaML(double branchLength,double mu,double lambda){
 }
 /* =====================================================================================*/
 /**
- * Calculates formula (9) on dnaML-erate paper. See apendix of dnaML-erate for extra
- * information and derivations of these formulas. Notice if mu and lambda are both zero
- * then model is defined by equation (8).
+ * Calculates formula (10) and (11) on dnaML-erate paper. See apendix of dnaML-erate for 
+ * extra information and derivations of these formulas. Notice if mu and lambda are both 
+ * zero then model is defined by equation (8). 
  * @param mod, model representing our phylogenetic tree.
  * @param i, assumed alphabet letter for probability.
  * @param j,given nucleotide.
  * @param t, branch length.
  * @param freqs, array frequencies.
  * @param params, array of parameters: [mu,lambda,alpha,beta]
- * @return computed formula (9) for M_t(i,j)
+ * @return computed formula (10) for M_t(i,j)
  */
-double epsilonProbability(DiagonalMatrix* dMatrix,int i,int j,double t,double* freqs,double* params){
+double epsilonProbability(int i,int j,double t,double* freqs,double* params){
   double mu = params[0];
   double lambda = params[1];
+  double alpha = params[2];
+  double betta = params[3];
+  double muAndLambda = mu + lambda;
+  double bigAlphaVal = bigAlpha(i, j, freqs);
   double firstPart = 0;
   double lastPart = 0;
-  double eigenSum = 0;
-  
-  if(lambda != 0 || mu != 0)
-    firstPart = freqs[j] * lambda / (lambda + mu);
-  else
+  /*This is the beta only eigenvalue.*/
+  double firstEigenPart;
+  /*Betta + Alpha eigenvalue.*/
+  double secondEigenPart;
+
+  /*If first mu + lambda is zero then we use the regular Q conditional probabilities
+   else we use the extended one.*/
+  if(muAndLambda == 0){
+    /*Formula (11) Case*/
     firstPart = freqs[j];
+    firstEigenPart = (bigAlphaVal - freqs[j]) * exp(-betta * t);
+    secondEigenPart = (kronecker(i,j) - bigAlphaVal) * exp(-(betta + alpha) * t);
+    /*LastPart not used for this case!*/
+  }
+  /*Formula (10) Case!*/
+  else{
+    firstPart = freqs[j] * lambda / muAndLambda;
+    firstEigenPart = (bigAlphaVal - freqs[j]) * exp(-(betta + mu) * t);
+    secondEigenPart = (kronecker(i,j) - bigAlphaVal) * exp(-(betta + alpha + mu) * t);
+    lastPart = freqs[j] * mu / muAndLambda * exp(-muAndLambda * t);
+  }
 
-  if(lambda != 0 || mu != 0)
-    lastPart = freqs[j] * mu / (lambda + mu) * exp(-(lambda + mu) * t);
-  else
-    lastPart = 0;
-
-  eigenSum = computeOhMatrixSummation(i,j,dMatrix,mu,t);
-
-  return firstPart + eigenSum + lastPart;
+  return firstPart + firstEigenPart + secondEigenPart + lastPart;
 }
 /* =====================================================================================*/
-/**
+/** THIS IS NO LONGER USED OR NEEDED.
  * Given the parameters will compute the summation over all eigenvalues for our R matrix,
  * sum = 0
  * for eigen in eigenValues:
@@ -1277,7 +1267,7 @@ void printMatrix(Matrix* m, int size){
   return;
 }
 /* =====================================================================================*/
-/**
+/**THIS IS NO LONGER USED OR NEEDED.
  * Get position of our matrix in our diagnolized matrix (k,k)
  * @param matrix
  * @param eigenval

@@ -42,7 +42,7 @@ void tm_set_REV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx);
 void tm_set_SSREV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx);
 void tm_set_INDEL_matrix(TreeModel *mod,Vector* params, int start_idx);
 void tm_set_F84E_matrix(TreeModel *mod,Vector* params, int start_idx);
-int kronecker(int firstResidue,int secondResidue);
+
 int epsilonF(int i,int j);
 int isPurines(int i,int j);
 int isPyrimidines(int i,int j);
@@ -1741,19 +1741,11 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
   double betta = params->data[k+3];
   /*Extract background frequencies from array.*/
   double* freqArray = model->backgd_freqs->data;
-  double freqA = freqArray[0];
-  double freqC = freqArray[1];
-  double freqG = freqArray[2];
-  double freqT = freqArray[3];
   int i,j;
   int matrixSize = 5;
   
-  /*Base frequencies of pools.*/
-  double purineR = freqA + freqG;
-  double pyrimidinesR = freqC + freqT;
-  double transition; /*Transition rate*/
+  double alphaValue;
   double allRate; /*Transition/None/Transgression Rate.*/
-  double poolDivisor; /*Divisor of purine pool or pyriminides pool*/
   MarkovMatrix* matrix = model->rate_matrix;
   /*Sum of the rows for inner matrix to be subtracted at the end.*/
   double diagonalSum[4] = {0,0,0,0};
@@ -1763,13 +1755,12 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
    * R(i != j) B*pi(j) + alpha*delta(i,j);*/
   for(i = 0; i < matrixSize-1; i++)
     for(j=0; j < matrixSize-1; j++){
-      if(kronecker(i,j)) /*Do not worry about diagonal now.*/
+      if(kronecker(i,j)) /*Do not worry about diagonal for now.*/
         continue;
       /*Note if neither, epsiloF will take care of it when calculating transition.*/
-      poolDivisor = isPurines(i,j) ? purineR : pyrimidinesR;
       allRate = betta * freqArray[j];
-      transition = epsilonF(i,j) * freqArray[j] * alpha / poolDivisor;
-      val = allRate + transition;
+      alphaValue = alpha * bigAlpha(i,j, freqArray);
+      val = allRate + alphaValue;
       mm_set(matrix,i,j,val);
       diagonalSum[i] += val;
     }
@@ -1798,6 +1789,30 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
   printf("\n\n");
 
   return;
+}
+//======================================================================================
+/**
+ * Big alpha function used for calculations related to the conditional probability 
+ * function, defined as bigAlpha(i,j) = pi(j) * epsilonF(i,j)/ sum, where sum is:
+ * sigma (summation) over k (number of residues) Sigma(k): pi(k) * e(j,k). See
+ * dnaML paper between formula (9) and (10) for more information.
+ * @param i, first residue.
+ * @param j, second residue.
+ * @param frequencies, array containing our residue frequencies.
+ * @return the alpha value.
+ */
+double bigAlpha(int i, int j, double* frequencies){
+  double alphaValue = 0;
+  double sum = 0;
+  int residues = 4;
+  int k;
+  
+  for(k = 0; k < residues; k++)
+    sum += frequencies[k] * epsilonF(j,k);
+
+  alphaValue = frequencies[j] * epsilonF(i,j) / sum;
+
+  return alphaValue;
 }
 //======================================================================================
 /*Used by matrix computation on diagonal, simply return 1 if in diagonal, else 1;*/

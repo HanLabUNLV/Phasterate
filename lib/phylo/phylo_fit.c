@@ -1235,6 +1235,20 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 	if (!quiet) fprintf(stderr, "Writing model to %s ...\n", 
 			    mod_fname->chars);
 	F = phast_fopen(mod_fname->chars, "w+");
+        //Un-normalize the background frequencies when printing final output.
+        gapFreq = vec_get(mod->backgd_freqs,4);
+          /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
+            reciprocal to divide all our frequencies by.*/
+          double gapMultiplier = 1.0 - gapFreq;
+
+          for (k = 0; k < residuesSize; k++){
+            double currentFreq = vec_get(mod->backgd_freqs, k);
+            double normalizedFreq = currentFreq * gapMultiplier;
+            vec_set(params, mod->backgd_idx + k, normalizedFreq);
+
+            /*Now that they're computed copy them from the parameter vector to the model.*/
+            mod->backgd_freqs->data[k] = normalizedFreq;
+          }
 	tm_print(F, mod);
 	phast_fclose(F);
       }
