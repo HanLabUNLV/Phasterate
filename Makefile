@@ -1,44 +1,22 @@
-include make-include.mk
+TMPDIR = /tmp/phast
+CWD = ${PWD}
+CLAPACKPATH = /home/omar/work/repos/phast2/CLAPACK-3.2.1
+all:
+	@echo "Type \"make package\" to create a tarball reflecting the current state of the CVS tree."
+	(cd src; make DESTDIR=${DESTDIR} CLAPACKPATH=/home/omar/work/repos/phast2/CLAPACK-3.2.1 )
 
-SUB = lib dless exoniphy phastCons phastOdds phastMotif phyloFit phyloBoot phyloP prequel util 
+package:
+	rm -rf ${TMPDIR}
+	mkdir -p ${TMPDIR}
+	cd ${TMPDIR} ; svn checkout http://compgen.bscb.cornell.edu/svnrepo/phast/trunk phast
+	find ${TMPDIR}/phast -name ".svn" | xargs rm -rf
+	rm -r ${TMPDIR}/phast/doc ${TMPDIR}/phast/src/lib/rphast ${TMPDIR}/phast/test ${TMPDIR}/phast/binary_install.sh
+	VERSION=`cat ${TMPDIR}/phast/version | sed 's/\./_/g'` ;\
+	cd ${TMPDIR} ; tar cfz ${CWD}/phast.$$VERSION.tgz phast
+	rm -rf ${TMPDIR}
 
-CDIR = /home/omar/work/repos/phast2/phast-1.3/src
-
-all: 
-	mkdir -p ../bin ../lib
-	for dir in $(SUB) ; do cd ${CDIR}/$$dir && ${MAKE} ; done	
-ifeq ($(TARGETOS), Windows)
-	@for file in `ls ../bin` ; do mv ../bin/$$file ../bin/$$file.exe ; done
-else
-	mkdir -p ../doc/man/
-	@echo "Generating man pages..."
-	@for file in `ls ../bin` ; do perl help2man.pl ../bin/$$file ../doc/man/ ; done
-	@echo "Done."
-endif
-
-sharedlib:
-	cd ${CDIR}/lib && ${MAKE} sharedlib 
-	gcc ${CFLAGS} -shared ${LFLAGS} ${LIBPATH} -o libphast.so `find lib/ -name "*.o"` ${LIBS}
-	mkdir -p ../lib/sharedlib
-	mv libphast.so ../lib/sharedlib/
+doc::
+	(cat Doxyfile; echo "PROJECT_NUMBER=`cat version`") | doxygen -
 
 install:
-ifndef DESTDIR
-	DESTDIR=/
-endif
-	mkdir -p ${DESTDIR}/usr/bin/
-	mkdir -p ${DESTDIR}/opt/phast/data/
-	mkdir -p ${DESTDIR}/usr/share/man/man1/
-	cp ../bin/* ${DESTDIR}/usr/bin/
-	cp -R ../data/* ${DESTDIR}/opt/phast/data/
-	cp -R ../doc/man/* ${DESTDIR}/usr/share/man/man1/
-
-doc:
-	cd ../; make doc 
-
-clean:
-	@for dir in $(SUB) ; do cd ${CDIR}/$$dir && ${MAKE} clean ; done
-	rm -rf ../bin ../lib ../doc
-
-manpages:
-	@for file in `ls ../bin` ; do perl help2man.pl ../bin/$$file ; done
+	(cd src; make install DESTDIR=${DESTDIR} )
