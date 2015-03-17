@@ -2,7 +2,7 @@ include make-include.mk
 
 SUB = lib dless exoniphy phastCons phastOdds phastMotif phyloFit phyloBoot phyloP prequel util 
 
-CDIR = /home/omar/work/repos/phast/phast-1.3/src
+CDIR = /home/omar/work/repos/phast2/phast-1.3/src
 
 all: 
 	mkdir -p ../bin ../lib
