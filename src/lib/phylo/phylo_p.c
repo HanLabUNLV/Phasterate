@@ -347,7 +347,7 @@ void phyloP(struct phyloP_struct *p) {
           post_means = smalloc(msa->ss->ntuples * sizeof(double));
           post_vars = smalloc(msa->ss->ntuples * sizeof(double));
         }
-        sub_pval_per_site(jp, msa, mode, fit_model, &prior_mean, &prior_var, 
+         sub_pval_per_site(jp, msa, mode, fit_model, &prior_mean, &prior_var, 
                           pvals, post_means, post_vars, logf);
 
         if (outfile != NULL && output_wig)

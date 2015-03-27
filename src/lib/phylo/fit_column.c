@@ -80,7 +80,7 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
             pL[i][n->id] = 0; 
         }
       }
-      else {                    
+      else {
         /* general recursive case */
         MarkovMatrix *lsubst_mat = mod->P[n->lchild->id][rcat];
         MarkovMatrix *rsubst_mat = mod->P[n->rchild->id][rcat];

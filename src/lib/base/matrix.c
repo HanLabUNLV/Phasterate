@@ -129,7 +129,7 @@ void mat_print(Matrix *m, FILE *F) {
       if (val != 0 && val < min) min = val;
     }
   }
-  if (min < 1e-3) formatstr = "%14.6e ";
+  if (min < 1e-5) formatstr = "%14.6e ";
 
   for (i = 0; i < m->nrows; i++) {
     for (j = 0; j < m->ncols; j++) 

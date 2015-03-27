@@ -1125,12 +1125,7 @@ void tm_set_subst_matrices(TreeModel *tm) {
         tm_set_probs_F81(backgd_freqs, tm->P[i][j], curr_scaling_const, 
                          n->dparent * branch_scale * tm->rK[j]);
       else {                     /* full matrix exponentiation */
-        /* If our branch length is zero we instead use a tiny value to avoid
-         * zero length branch length...*/
-        double branchLength = n->dparent;
-        if(abs(branchLength) < 0.000001)
-          branchLength = 0.000001;
-        mm_exp(tm->P[i][j], rate_matrix, branchLength * branch_scale * tm->rK[j]);
+        mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);
       }
     }
   }

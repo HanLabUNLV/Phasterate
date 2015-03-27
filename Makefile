@@ -1,9 +1,9 @@
 TMPDIR = /tmp/phast
 CWD = ${PWD}
-CLAPACKPATH = /home/omar/work/repos/phast2/CLAPACK-3.2.1
+CLAPACKPATH = /home/omar/work/repos/phast/CLAPACK-3.2.1
 all:
 	@echo "Type \"make package\" to create a tarball reflecting the current state of the CVS tree."
-	(cd src; make DESTDIR=${DESTDIR} CLAPACKPATH=/home/omar/work/repos/phast2/CLAPACK-3.2.1 )
+	(cd src; make DESTDIR=${DESTDIR} CLAPACKPATH=/home/omar/work/repos/phast/CLAPACK-3.2.1 )
 
 package:
 	rm -rf ${TMPDIR}

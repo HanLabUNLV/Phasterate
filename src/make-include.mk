@@ -103,17 +103,17 @@ ifneq ($(TARGETOS), Windows)
   ifndef CLAPACKPATH
     CHECKFILE = $(shell if [ -d /usr/local/software/clapack ]; then echo "true"; fi)
     ifeq ($(CHECKFILE),true )
-      CLAPACKPATH = /home/omar/work/repos/phast2/CLAPACK-3.2.1
+      CLAPACKPATH = /home/omar/work/repos/phast/CLAPACK-3.2.1
     endif 
   endif 
     ifndef CLAPACKPATH
-      CLAPACKPATH = /home/omar/work/repos/phast2/CLAPACK-3.2.1
+      CLAPACKPATH = /home/omar/work/repos/phast/CLAPACK-3.2.1
     endif 
     #Automatically detects PLAT type by looking in CLAPACKPATH for blas*.a and extracts the * part
     PLAT = $(shell find ${CLAPACKPATH}/ -name '*.a' -exec expr match {} '.*blas\(.*\).a' \; | tr -d "\n")
   else
     ifndef CLAPACKPATH
-	    CLAPACKPATH = /home/omar/work/repos/phast2/CLAPACK-3.2.1
+	    CLAPACKPATH = /home/omar/work/repos/phast/CLAPACK-3.2.1
     endif
     # PLAT is empty for windows builds
     PLAT =

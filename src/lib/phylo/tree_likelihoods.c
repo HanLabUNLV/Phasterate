@@ -705,22 +705,13 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
     }
     
     total_prob = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
-
-    /*Debugging print info:*/
-    int paramIndex = mod->ratematrix_idx;
-    double* paramArray = &(mod->all_params->data[paramIndex]);
+    /*
     printf("Current Rate Matrix values:\n");
     printMatrix(mod->rate_matrix->matrix,5);
     printf("\n\n");
+    */ 
 
-    printf("Current Rates:");
-    printf("Lambda: %f\n", paramArray[0]);
-    printf("Mu: %f\n", paramArray[1]);
-    printf("Alpha: %f\n", paramArray[2]);
-    printf("Betta: %f\n", paramArray[3]);
-    printf("Geometric Distribution: %f\n",mod->geometricParameter);
-    printf("\n\n");
-    
+    /*
     printf("Current background frequencies:\n");
     double* freq = mod->backgd_freqs->data;
     printf("A : %f\n", freq[0]);
@@ -729,24 +720,34 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
     printf("G : %f\n", freq[3]);
     printf("- : %f\n", freq[4]);
     printf("\n\n");
-    
+    *//*
     int j;
     for(i = 0; i < lst_size(traversal); i++)
       for (j = 0; j < 5; j++)
         printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
     printf("\n\n");
-    
+    */
     /*Multiply by the amount of times this column appeared in the alignment.*/
     if(tupleidx != msa->ss->ntuples)
       retval += log2(total_prob) * msa->ss->counts[tupleidx];
     else /*Case for all gaps column.*/
       allGapProb = total_prob;
   }
-    /* Calculate total probability for site in alignment, second modification of
-     * extended pruning algorithm.*/
-
+  /* Calculate total probability for site in alignment, second modification of
+   * extended pruning algorithm.*/
   retval = getProbZeroL(mod, p, allGapProb, retval);
-
+  
+  /*Debugging print info:*/
+  int paramIndex = mod->ratematrix_idx;
+  double* paramArray = &(mod->all_params->data[paramIndex]);
+  printf("Current Rates:");
+  printf("Lambda: %f\n", paramArray[0]);
+  printf("Mu: %f\n", paramArray[1]);
+  printf("Alpha: %f\n", paramArray[2]);
+  printf("Betta: %f\n", paramArray[3]);
+  printf("Geometric Distribution: %f\n",mod->geometricParameter);
+  printf("\n\n");
+  
   return retval;
 }
 /* =====================================================================================*/
@@ -863,7 +864,6 @@ double starProb(TreeNode* node,double mu, double lambda){
   TreeNode* lChild = node->lchild;
   TreeNode* rChild = node->rchild;
   
-  /*Verify this is the correct length (dparent).*/
   double leftProb = starProb(lChild, mu, lambda);
   double rightProb = starProb(rChild, mu, lambda);
   double leftXiPrime = 1.0 - xi(lChild->dparent,mu,lambda);
@@ -922,28 +922,27 @@ double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa
 
   int rChild = k->rchild->id;
   double rChildDist = k->rchild->dparent;
-
-  double xRight,yLeft,xLeft,yRight;
   /*Total summations for both sides.*/
-  double totalRight = 0;
-  double totalLeft = 0;
-
-  /*Left hand summation over all bases.*/
+  double sSum = 0;
+  double qSum = 0;
+  /*Variables to hold values of the gap probability for both sides of P(-, i, t)*/
+  double qDelta, sDelta;
+  
+  /*Formula (20) calculate the sums for the part before the '*' and the part after.*/
   for(q = 0; q < residues; q++){
-    /*Left hand side*/
-    xLeft = pL[q][lChild] * singleEventCondProb(q,i,lChildDist,freqs,params);
-    yLeft = deltaGap(k->lchild,msa,currSite) *
-            singleEventCondProb(gapChar,i,lChildDist,freqs,params);
-    /*Right hand side*/
-    xRight =  pL[q][rChild] * singleEventCondProb(q,i,rChildDist,freqs,params);
-    yRight = deltaGap(k->rchild,msa,currSite) *
-            singleEventCondProb(gapChar,i,rChildDist,freqs,params);
-    
-    totalLeft += xLeft + yLeft;
-    totalRight +=  xRight + yRight;
+    /*Sigma with q loop: 1 <= q <= K*/
+    qSum += pL[q][lChild] * singleEventCondProb(q,i,lChildDist,freqs,params);
+    /*Sigma with s loop: 1 <= s <= K*/
+    sSum +=  pL[q][rChild] * singleEventCondProb(q,i,rChildDist,freqs,params);
   }
-
-  return totalLeft * totalRight;
+  
+ qDelta = deltaGap(k->lchild,msa,currSite) *
+         singleEventCondProb(gapChar,i,lChildDist,freqs,params);
+ 
+ sDelta = deltaGap(k->rchild,msa,currSite) *
+            singleEventCondProb(gapChar,i,rChildDist,freqs,params);
+ 
+  return (qSum + qDelta) * (sSum + sDelta);
 }
 /* =====================================================================================*/
 /**
@@ -971,26 +970,29 @@ double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currS
   int rChild = k->rchild->id;
   double rChildDist = k->rchild->dparent;
 
-  double firstLeft, firstRight, secondLeft, secondRight;
-  double totalRight = 0;
-  double totalLeft = 0;
-
+  /*Total summations for both sides.*/
+  double sSum = 0;
+  double qSum = 0;
+  /*Variables to hold values of the gap probability for both sides before/after the '+' */
+  double leftDelta, rightDelta;
+  /*Left hand side and right hand side respectively (21)*/
+  double lhs, rhs;
+  
   /*Left hand summation over all bases.*/
   for(q = 0; q < residues; q++){
-    /*Left hand side*/
-    firstLeft =  pL[q][lChild] * singleEventCondProb(q,gapChar,lChildDist,freqs,params);
-    secondLeft = pL[gapChar][lChild];
-    /*Right hand side*/
-    firstRight = pL[q][rChild] * singleEventCondProb(q,gapChar,rChildDist,freqs,params);
-    secondRight = pL[gapChar][rChild];
-    
-    totalLeft += firstLeft + secondLeft;
-    totalRight += firstRight + secondRight;
-            
+    /*Sigma with q loop: 1 <= q <= K*/
+    qSum +=  pL[q][lChild] * singleEventCondProb(q,gapChar,lChildDist,freqs,params);
+    /*Sigma with s loop: 1 <= s <= K*/
+    sSum += pL[q][rChild] * singleEventCondProb(q,gapChar,rChildDist,freqs,params);
   }
+  
+  /*Not an error the leftDelta has the rchild and the rightDelta has the lChild...*/
+  leftDelta = deltaGap(k->rchild,msa,currSite);
+  rightDelta = deltaGap(k->lchild,msa,currSite);
+  lhs =  qSum + pL[gapChar][lChild];
+  rhs =  sSum + pL[gapChar][rChild];
 
-  return totalLeft * deltaGap(k->rchild,msa,currSite) +
-          totalRight * deltaGap(k->lchild,msa,currSite);
+  return lhs * leftDelta + rightDelta * rhs;
 }
 /* =====================================================================================*/
 /**
@@ -1019,26 +1021,24 @@ double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k){
 
   int rChild = k->rchild->id;
   double rChildDist = k->rchild->dparent;
-
-  double xRight,yLeft,xLeft,yRight;
-   /*Total summations for both sides.*/
-  double totalRight = 0;
-  double totalLeft = 0;
-
-  /*Left hand summation over all bases.*/
+  /*Total summations for both sides.*/
+  double sSum = 0;
+  double qSum = 0;
+  /*Variables to hold values of the gap probability for both sides of P(-, i, t)*/
+  double qDelta, sDelta;
+  
+  /*Formula (20) calculate the sums for the part before the '*' and the part after.*/
   for(q = 0; q < residues; q++){
-    /*Left hand side*/
-    xLeft = pL[q][lChild] * singleEventCondProb(q,i,lChildDist,freqs,params);
-    yLeft = singleEventCondProb(gapChar,i,lChildDist,freqs,params);
-    /*Right hand side*/
-    xRight =  pL[q][rChild] * singleEventCondProb(q,i,rChildDist,freqs,params);
-    yRight = singleEventCondProb(gapChar,i,rChildDist,freqs,params);
-    
-    totalLeft += xLeft + yLeft;
-    totalRight +=  xRight + yRight;
+    /*Sigma with q loop: 1 <= q <= K*/
+    qSum += pL[q][lChild] * singleEventCondProb(q,i,lChildDist,freqs,params);
+    /*Sigma with s loop: 1 <= s <= K*/
+    sSum +=  pL[q][rChild] * singleEventCondProb(q,i,rChildDist,freqs,params);
   }
-
-  return totalLeft * totalRight;
+  
+ qDelta = singleEventCondProb(gapChar,i,lChildDist,freqs,params);
+ sDelta = singleEventCondProb(gapChar,i,rChildDist,freqs,params);
+ 
+  return (qSum + qDelta) * (sSum + sDelta);
 }
 /* =====================================================================================*/
 /** Same as probForNodeGap except used for extra column containing all gaps therefore
@@ -1050,7 +1050,7 @@ double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k){
  * @return likelihood as computed by formula 21.
  */
 double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
-  int q;
+ int q;
   int gapChar = 4;
   int residues = 4;
 
@@ -1064,24 +1064,25 @@ double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
   int rChild = k->rchild->id;
   double rChildDist = k->rchild->dparent;
 
-  double firstLeft, firstRight, secondLeft, secondRight;
-  double totalRight = 0;
-  double totalLeft = 0;
-
+  /*Total summations for both sides.*/
+  double sSum = 0;
+  double qSum = 0;
+  /*Left hand side and right hand side respectively (21)*/
+  double lhs, rhs;
+  
   /*Left hand summation over all bases.*/
   for(q = 0; q < residues; q++){
-    /*Left hand side*/
-    firstLeft =  pL[q][lChild] * singleEventCondProb(q,gapChar,lChildDist,freqs,params);
-    secondLeft = pL[gapChar][lChild];
-    /*Right hand side*/
-    firstRight = pL[q][rChild] * singleEventCondProb(q,gapChar,rChildDist,freqs,params);
-    secondRight = pL[gapChar][rChild];
-    
-    totalLeft += firstLeft + secondLeft;
-    totalRight += firstRight + secondRight;
+    /*Sigma with q loop: 1 <= q <= K*/
+    qSum +=  pL[q][lChild] * singleEventCondProb(q,gapChar,lChildDist,freqs,params);
+    /*Sigma with s loop: 1 <= s <= K*/
+    sSum += pL[q][rChild] * singleEventCondProb(q,gapChar,rChildDist,freqs,params);
   }
+  
+  /*Not an error the leftDelta has the rchild and the rightDelta has the lChild...*/
+  lhs =  qSum + pL[gapChar][lChild];
+  rhs =  sSum + pL[gapChar][rChild];
 
-  return totalLeft * totalRight;
+  return lhs * rhs;
 }
 /* =====================================================================================*/
 /**
@@ -1098,8 +1099,8 @@ double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
  */
 double singleEventCondProb(int j,int i, double branchLength, double* freqs,double* params){
   int gapCharacter = 4;
-  double mu = params[0];
-  double lambda = params[1];
+  double lambda = params[0];
+  double mu = params[1];
   double xiValue = xi(branchLength,mu,lambda);
     
   /*Formula (23)*/
@@ -1123,12 +1124,12 @@ double singleEventCondProb(int j,int i, double branchLength, double* freqs,doubl
  * @return value.
  */
 double xi(double branchLength,double mu,double lambda){
-  if(mu <= 0.0001 && lambda <= 0.0001)
-    return 0;
-  
-  double value;
   double muAndLambda = mu + lambda;
+  double value;
   
+  if(muAndLambda == 0)
+    return 0;
+ 
   value = lambda / muAndLambda * ( 1 - exp(- muAndLambda * branchLength) );
   
   return value;
@@ -1143,12 +1144,13 @@ double xi(double branchLength,double mu,double lambda){
  * @return value.
  */
 double gammaML(double branchLength,double mu,double lambda){
-  if(mu <= 0.0001 && lambda <= 0.0001)
-    return 0;
-  double value;
   double muAndLambda = mu + lambda;
+  double value;
 
-  value = mu / muAndLambda * (1 - exp(-muAndLambda * branchLength));
+  if(muAndLambda == 0)
+    return 0;
+
+  value = mu / muAndLambda * (1 - exp(- muAndLambda * branchLength));
 
   return value;
 }
@@ -1166,8 +1168,8 @@ double gammaML(double branchLength,double mu,double lambda){
  * @return computed formula (10) for M_t(i,j)
  */
 double epsilonProbability(int i,int j,double t,double* freqs,double* params){
-  double mu = params[0];
-  double lambda = params[1];
+  double lambda = params[0];
+  double mu = params[1];
   double alpha = params[2];
   double betta = params[3];
   double muAndLambda = mu + lambda;

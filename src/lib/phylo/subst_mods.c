@@ -1766,9 +1766,9 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
     }
 
   /*Set matrix values for (K+1) section, i.e. the gap column and row.*/
-  for(i=0;i< matrixSize-1;i++){
-    mm_set(matrix,i,4,mu); /*Last Row*/
-    mm_set(matrix,4,i,freqArray[i] * lambda); /*Last Column*/
+  for(i=0;i< matrixSize - 1;i++){
+    mm_set(matrix,i,4,mu); /*Last Column*/
+    mm_set(matrix,4,i,freqArray[i] * lambda); /*Last Row*/
   }
 
   /*Do matrix at [4][4], by definition:*/
@@ -1778,7 +1778,7 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
   for(i=0;i< matrixSize-1;i++){
     mm_set(matrix,i,i,-diagonalSum[i] - mu);
   }
-  
+  /* Debug print info
   printf("Current Matrix:\n");
   printMatrix(matrix->matrix, 5);
   printf("Rate Parameters:\n");
@@ -1787,7 +1787,7 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
   printf("Alpha: %f\n", alpha);
   printf("Betta: %f\n", betta);
   printf("\n\n");
-
+*/
   return;
 }
 //======================================================================================
@@ -2500,12 +2500,12 @@ void tm_init_mat_F84E(TreeModel* mod,Vector* params,int params_idx){
   bb = freqA * freqGR + freqC * freqTY;
   *alpha = aa / (aa + bb);
   *betta = 1.0 - (*alpha);
-
+  /*
   printf("Lambda: %f\n", * lambda);
   printf("Mu: %f\n", * mu);
   printf("Alpha: %f\n", * alpha);
   printf("Betta: %f\n", * betta);
-  
+  */
   return;
 }
 

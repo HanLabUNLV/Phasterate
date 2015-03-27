@@ -1019,7 +1019,7 @@ void tr_prune(TreeNode **t,     /* Tree to prune (may be altered
 				    the number of nodes in original tree.
 				    On return, will be filled in with the
 				    new id for each node */
-              ) {
+) {
 
   TreeNode *n;
   int i, new_nnodes = (*t)->nnodes;
