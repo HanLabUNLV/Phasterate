@@ -701,7 +701,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   if (pf->gaps_as_bases && subst_mod != JC69 && subst_mod != F81 && 
       subst_mod != HKY85G && subst_mod != REV && 
       subst_mod != UNREST && subst_mod != SSREV && subst_mod != INDEL && subst_mod != F84E)
-    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, HKY85+Gap, REV, SSREV, and UNREST and INDEL.\n");
+    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, F84E, HKY85+Gap, REV, SSREV, and UNREST and INDEL.\n");
                                 /* with HKY, yields undiagonalizable matrix */
   if ((pf->no_freqs || pf->no_rates) && input_mod == NULL)
     die("ERROR: --init-model required with --no-freqs and/or --no-rates.\n");
@@ -1151,9 +1151,10 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           params = tm_params_init_random(mod);
         else if (input_mod != NULL) 
           params = tm_params_new_init_from_model(input_mod);
-	else
+	else{
+          mod->extended = pf->extendedFlag;
           params = tm_params_init(mod, .1, 5, pf->alpha);     
-
+        }
 	if (pf->init_parsimony)
 	  tm_params_init_branchlens_parsimony(params, mod, msa, cat);
 
@@ -1186,7 +1187,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           residuesSize = mod->backgd_freqs->size-1;
           gapFreq = vec_get(mod->backgd_freqs,4);
           /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
-            reciprocal to divide all our frequencies by.*/
+           *             reciprocal to divide all our frequencies by.*/
           gapDivisor = 1.0/(1.0-gapFreq);
           
           for (k=0; k< residuesSize; k++){
@@ -1204,7 +1205,12 @@ int run_phyloFit(struct phyloFit_struct *pf) {
            * that we have them rerun the initiate model function.*/
           params = tm_params_init(mod, .1, 5, pf->alpha);
         }
-        
+        if(mod->subst_mod == F84){
+          tm_init_backgd(mod, msa, cat);
+          /* We needed the background frequencies properly initialized for this model. Now
+           * that we have them rerun the initiate model function.*/
+          params = tm_params_init(mod, .1, 5, pf->alpha);
+        }
         if (pf->use_em)
           tm_fit_em(mod, msa, params, cat, pf->precision, pf->max_em_its, pf->logf, error_file);
         else 

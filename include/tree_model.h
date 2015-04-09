@@ -331,6 +331,16 @@ TreeModel *tm_create_copy(TreeModel *src);
 */
 void tm_set_subst_matrices(TreeModel *tm);
 
+/**
+ * Given the Tree model the current matrix we are computing and the current node.
+ * It will calculate the conditional probabilities for these models.
+ * @param tm, Tree model.
+ * @param i, current i we are iterating over.
+ * @param j, current j in P[][] we are are iterating over.
+ * @param n, curent node.
+ */
+void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n);
+
 /** Setup the substitution matrices on a Tree Model with custom probability matrix and branch length.
    @param P Probability matrix to use
    @param t Branch length to use

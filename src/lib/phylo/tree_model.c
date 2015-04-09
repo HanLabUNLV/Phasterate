@@ -1124,13 +1124,67 @@ void tm_set_subst_matrices(TreeModel *tm) {
       else if (subst_mod == F81 && selection == 0.0 && bgc == 0.0)
         tm_set_probs_F81(backgd_freqs, tm->P[i][j], curr_scaling_const, 
                          n->dparent * branch_scale * tm->rK[j]);
-      else {                     /* full matrix exponentiation */
+      
+      if(subst_mod == F84 || subst_mod == F84E){
+        probsF84Models(tm, i, j, n);
+      }
+      else { /* full matrix exponentiation */
         mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);
       }
     }
   }
 }
 
+/**
+ * Given the Tree model the current matrix we are computing and the current node.
+ * It will calculate the conditional probabilities for these models.
+ * @param tm, Tree model.
+ * @param i, current i we are iterating over.
+ * @param j, current j in P[][] we are are iterating over.
+ * @param n, curent node.
+ */
+void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n){
+  //Function requires array of this size.
+  double* params;
+  int m = tm->ratematrix_idx;
+  double** matrixA = tm->P[i][j]->matrix->data;
+  int k, l;
+  double* freqs = tm->backgd_freqs->data;
+  double branchLength = n->dparent;
+  subst_mod_type subst_mod = tm->subst_mod;
+  
+  
+  if(subst_mod == F84){
+    //Lambda and mu rate only used for F84E Extended model...
+    params = (double*)malloc(sizeof(double) * 4);
+    params[0] = 0;
+    params[1] = 0;
+    params[2] = tm->all_params->data[m];
+    params[3] = tm->all_params->data[m + 1];
+  }else{
+    //F84E Model, just copy array.
+    params = &(tm->all_params->data[m]);
+    //Branch length, mu and lambda.
+    double gammaVal= gammaML(branchLength, params[1], params[0]);
+    double xiVal = xi(branchLength, params[1], params[0]);
+    
+    for(k = 0; k < 4; k++){
+      matrixA[k][4] = gammaVal; /*Last Column*/
+      matrixA[4][k] = xiVal; /*Last Row*/
+    }
+    //Set corner:
+    matrixA[4][4] = 1 - xiVal;
+  }
+  //Both Models share this in common:
+  for(k = 0; k < 4; k++)
+    for(l = 0; l < 4; l++)
+      matrixA[k][l] = epsilonProbability(l, k, branchLength, freqs, params);
+  
+  if(subst_mod == F84)
+    free(params);
+  
+  return;
+}
 /* version of above that can be used with specified branch length and
    prob matrix */
 void tm_set_subst_matrix(TreeModel *tm, MarkovMatrix *P, double t) {
@@ -1746,12 +1800,13 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
   if (mod->estimate_backgd) {
     for (i = 0; i < mod->backgd_freqs->size; i++) {
       if (mod->param_map[mod->backgd_idx+i] >= 0){
-        if(mod->extended == 0)
-          vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.001);
-        else /*Else we are using the extended model. Here it is fine for
-              * our rates to go to zero. We are assuming you cannot estimate
-              * frequencies with this model*/
+        if(mod->subst_mod == F84E)
+          /*Else we are using the extended model. Here it is fine for
+           * our rates to go to zero. We are assuming you cannot estimate
+           * frequencies with this model*/
           vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.000);
+        else 
+          vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.001);
       }
     }
   }
@@ -1761,12 +1816,12 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
   if (mod->estimate_ratemat) {
     for (i = 0; i < tm_get_nratematparams(mod); i++) {
       if (mod->param_map[mod->ratematrix_idx+i] >= 0) {
-         if(mod->extended == 0)
-           vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0e-6);
+        if(mod->subst_mod == F84E)
+           vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 0.000);
          else /*Else we are using the extended model. Here it is fine for
                * our rates to go to zero. Should not cause problems with
                * diagonal as these are not taken into account. */
-           vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 0.000);
+           vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0e-6);
       }
     }
   }
@@ -1950,7 +2005,7 @@ void tm_new_boundaries(Vector **lower_bounds, Vector **upper_bounds,
   *lower_bounds = vec_new(npar);
   vec_zero(*lower_bounds);  /* default lower bounds=0 != -INFTY so we always allocate and keep this */
   *upper_bounds = vec_new(npar);
-  vec_set_all(*upper_bounds, 100);
+  vec_set_all(*upper_bounds, 1);
 
   tm_set_boundaries(*lower_bounds, *upper_bounds, mod);
   if (allocate_default == 0) {
@@ -2405,7 +2460,7 @@ int tm_setup_params(TreeModel *mod, int offset) {
       die("ERROR: Cannot hold selection constant; no selection in model\n");
   } else if (mod->selection_idx >= 0)
     mod->param_map[mod->selection_idx] = opt_idx++;
-
+  
   //first do scale/branchlength params
   pos = -1;
   if (mod->estimate_branchlens == TM_SCALE_ONLY) {
@@ -2522,6 +2577,14 @@ int tm_setup_params(TreeModel *mod, int offset) {
       if (flag[i] == 0)
 	mod->param_map[mod->ratematrix_idx+i] = opt_idx++;
   }
+  /*Extended model and Felsentein keeps beta constant as it is manually always set to: */
+  /*1 - alpha: */
+  if(mod->extended == 1)
+    mod->param_map[mod->ratematrix_idx + 3 ] = -1;
+  
+  if(mod->subst_mod == F84)
+    mod->param_map[mod->ratematrix_idx + 1 ] = -1;
+  
   if (numpar > 0) sfree(flag);
 
   if (mod->alt_subst_mods != NULL) {
@@ -2956,6 +3019,7 @@ double tm_scale_rate_matrix(TreeModel *mod) {
  * @return value (not used by program).
  */
 double scaleRateMatrixExtended(TreeModel *mod) {
+  return 0;
   double normalizedFreqs[5];
   double gapFreq = vec_get(mod->backgd_freqs, 4);
   double gapMultiplier = 1.0 - gapFreq;

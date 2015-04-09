@@ -42,6 +42,7 @@ void tm_set_REV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx);
 void tm_set_SSREV_CODON_matrix(TreeModel *mod, Vector *params, int start_idx);
 void tm_set_INDEL_matrix(TreeModel *mod,Vector* params, int start_idx);
 void tm_set_F84E_matrix(TreeModel *mod,Vector* params, int start_idx);
+void tm_set_F84_matrix(TreeModel *mod,Vector* params, int start_idx);
 
 int epsilonF(int i,int j);
 int isPurines(int i,int j);
@@ -98,6 +99,7 @@ void tm_init_mat_from_model_REV_CODON(TreeModel *mod, Vector *params,
 void tm_init_mat_from_model_SSREV_CODON(TreeModel *mod, Vector *params,
 					int start_idx);
 void tm_init_mat_F84E(TreeModel* mod,Vector* params,int parms_idx);
+void tm_init_mat_F84(TreeModel* mod,Vector* params,int parms_idx);
 int tm_flag_subst_param_pos(TreeModel *mod, int *flag, 
 			    String *param_name);
 
@@ -151,6 +153,8 @@ subst_mod_type tm_get_subst_mod_type(const char *str) {
     retval = INDEL;
   else if (str_equals_nocase_charstr(subst_mod_str,"F84E"))
     retval = F84E;
+  else if (str_equals_nocase_charstr(subst_mod_str,"F84"))
+    retval = F84;
   str_free(subst_mod_str);
   return retval;
 }
@@ -202,6 +206,8 @@ char *tm_get_subst_mod_string(subst_mod_type type) {
     return "INDEL";
   case F84E:
     return "F84E";
+  case F84:
+    return "F84";
   default:
     return "(unknown model)";
   }
@@ -223,6 +229,7 @@ int tm_get_nratematparams(TreeModel *mod) {
   case HKY85:
     return 1;
   case HKY85G:
+  case F84:
     return 2;
   case REV:
     return (mod->rate_matrix->size * mod->rate_matrix->size 
@@ -378,14 +385,16 @@ void tm_set_rate_matrix(TreeModel *mod, Vector *params, int i) {
   case F84E:
     tm_set_F84E_matrix(mod,params,i);
     break;
+  case F84:
+    tm_set_F84_matrix(mod, params, i);
+    break;
   default:
     die("ERROR tm_set_rate_matrix: unknown substitution model\n");
   }
-  if(mod->scale_during_opt && mod->extended)
-    scaleRateMatrixExtended(mod);
+  if(mod->subst_mod == F84E || mod->subst_mod == F84)
+    return;
   else if (mod->scale_during_opt && mod->subst_mod!=JC69 && mod->subst_mod != F81)
     tm_scale_rate_matrix(mod);
-  
   return;
 }
 
@@ -465,6 +474,10 @@ void tm_rate_params_init(TreeModel *mod, Vector *params,
     /*We will initialize once we have background frequencies. Skip for now...*/
     if(!(mod->backgd_freqs == NULL))
       tm_init_mat_F84E(mod,params,params_idx);
+    break;
+  case F84:
+    if(!(mod->backgd_freqs == NULL))
+      tm_init_mat_F84(mod, params, params_idx);
     break;
   default:
     die("ERROR tm_rate_params_init: unknown substitution model\n");
@@ -569,6 +582,8 @@ void tm_rate_params_init_from_model(TreeModel *mod, Vector *params,
     break;
   case F84E:
     tm_init_mat_F84E(mod,params,params_idx);
+  case F84:
+    tm_init_mat_F84(mod,params,params_idx);
   default:
     die("ERROR tm_rate_params_init_from_model: unknown substitution model\n");
   }
@@ -1738,7 +1753,12 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
   double lambda = params->data[k];
   double mu = params->data[k+1];
   double alpha = params->data[k+2];
+  
+  /*We must always set betta here as it is not optimized and by defintion it must
+   *add up to 1 with alpha => betta = 1 - alpha.*/
+  params->data[k + 3] = 1 - alpha;
   double betta = params->data[k+3];
+  
   /*Extract background frequencies from array.*/
   double* freqArray = model->backgd_freqs->data;
   int i,j;
@@ -1759,7 +1779,7 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
         continue;
       /*Note if neither, epsiloF will take care of it when calculating transition.*/
       allRate = betta * freqArray[j];
-      alphaValue = alpha * bigAlpha(i,j, freqArray);
+      alphaValue = alpha * bigDelta(j, i, freqArray);
       val = allRate + alphaValue;
       mm_set(matrix,i,j,val);
       diagonalSum[i] += val;
@@ -1778,22 +1798,64 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
   for(i=0;i< matrixSize-1;i++){
     mm_set(matrix,i,i,-diagonalSum[i] - mu);
   }
-  /* Debug print info
-  printf("Current Matrix:\n");
-  printMatrix(matrix->matrix, 5);
-  printf("Rate Parameters:\n");
-  printf("Lambda: %f\n", lambda);
-  printf("Mu: %f\n", mu);
-  printf("Alpha: %f\n", alpha);
-  printf("Betta: %f\n", betta);
-  printf("\n\n");
-*/
+
+  return;
+}
+//======================================================================================
+/* Actual model to be used as matrix in each iteration of optimization algorithm. Uses
+ * model described by (Felsenstein 84). Uses:
+ *  transition rate (alpha), tranversion rate (betta) and residue frequencies.
+ * @param mod from file read containing rate matrix.
+ * @param vector of parameters containing all parameters related to our model.
+ * @param start in vector of parameters to be optimized.
+ */
+void tm_set_F84_matrix(TreeModel *model,Vector* params, int startIndex){
+  /*Get all necessary information from model and parameter vector.*/
+  int k = startIndex;
+  double alpha = params->data[k];
+  
+  /*We must always set betta here as it is not optimized and by defintion it must
+   *add up to 1 with alpha => betta = 1 - alpha.*/
+  params->data[k + 1] = 1 - alpha;
+  double betta = params->data[k + 1];
+  
+  /*Extract background frequencies from array.*/
+  double* freqArray = model->backgd_freqs->data;
+  int i,j;
+  int matrixSize = 4;
+  
+  double alphaValue;
+  double allRate; /*Transition/None/Transgression Rate.*/
+  MarkovMatrix* matrix = model->rate_matrix;
+  /*Sum of the rows for inner matrix to be subtracted at the end.*/
+  double diagonalSum[4] = {0,0,0,0};
+  double val;
+  
+  /*Set values of inner "Original Matrix" based on dnaML erate paper description.
+   * R(i != j) B*pi(j) + alpha*delta(i,j);*/
+  for(i = 0; i < matrixSize; i++)
+    for(j=0; j < matrixSize; j++){
+      if(kronecker(i,j)) /*Do not worry about diagonal for now.*/
+        continue;
+      /*Note if neither, epsiloF will take care of it when calculating transition.*/
+      allRate = betta * freqArray[j];
+      alphaValue = alpha * bigDelta(j, i, freqArray);
+      val = allRate + alphaValue;
+      mm_set(matrix,i,j,val);
+      diagonalSum[i] += val;
+    }
+
+  /*Do diagonal.*/
+  for(i=0;i< matrixSize;i++){
+    mm_set(matrix,i,i,-diagonalSum[i]);
+  }
+
   return;
 }
 //======================================================================================
 /**
- * Big alpha function used for calculations related to the conditional probability 
- * function, defined as bigAlpha(i,j) = pi(j) * epsilonF(i,j)/ sum, where sum is:
+ * Big delta function used for calculations related to the conditional probability 
+ * function, defined as bigDelta(i,j) = pi(j) * epsilonF(i,j)/ sum, where sum is:
  * sigma (summation) over k (number of residues) Sigma(k): pi(k) * e(j,k). See
  * dnaML paper between formula (9) and (10) for more information.
  * @param i, first residue.
@@ -1801,7 +1863,7 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
  * @param frequencies, array containing our residue frequencies.
  * @return the alpha value.
  */
-double bigAlpha(int i, int j, double* frequencies){
+double bigDelta(int j, int i, double* frequencies){
   double alphaValue = 0;
   double sum = 0;
   int residues = 4;
@@ -2486,9 +2548,9 @@ void tm_init_mat_F84E(TreeModel* mod,Vector* params,int params_idx){
    *in this order.*/
   int k = params_idx;
   double* lambda = &params->data[k];
-  double* mu = &params->data[k+1];
-  double* alpha = &params->data[k+2];
-  double* betta = &params->data[k+3];
+  double* mu = &params->data[k + 1];
+  double* alpha = &params->data[k + 2];
+  double* betta = &params->data[k + 3];
   /*Temporary Computation values.*/
   double aa, bb;
 
@@ -2500,12 +2562,46 @@ void tm_init_mat_F84E(TreeModel* mod,Vector* params,int params_idx){
   bb = freqA * freqGR + freqC * freqTY;
   *alpha = aa / (aa + bb);
   *betta = 1.0 - (*alpha);
-  /*
-  printf("Lambda: %f\n", * lambda);
-  printf("Mu: %f\n", * mu);
-  printf("Alpha: %f\n", * alpha);
-  printf("Betta: %f\n", * betta);
-  */
+
+  return;
+}
+
+/**
+ * Initializes model with sensible values for the 2 parameters to be optimized:
+ * transition rate (alpha), tranversion rate (betta).
+ * @param mod from file read containing rate matrix.
+ * @param vector of parameters containing all parameters related to our model.
+ * @param start in vector of parameters to be optimized.
+ */
+void tm_init_mat_F84(TreeModel* mod,Vector* params,int params_idx){
+  /*Extract background frequencies from array.*/
+  double freqA = mod->backgd_freqs->data[0];
+  double freqC = mod->backgd_freqs->data[1];
+  double freqG = mod->backgd_freqs->data[2];
+  double freqT = mod->backgd_freqs->data[3];
+  
+  double freqR = freqA + freqG;
+  double freqY = freqC + freqT;
+  double freqGR = freqG / freqR;
+  double freqTY = freqT / freqY;
+  
+  /*Transition/Transversion Ratio.*/
+  double ttRatio = 2.0;
+  
+  /*Extract parameters pointers from their vector,these have been arbitrarily set to be
+   *in this order.*/
+  int k = params_idx;
+  double* alpha = &params->data[k + 0];
+  double* betta = &params->data[k + 1];
+  /*Temporary Computation values.*/
+  double aa, bb;
+
+  /*Taken from dnaML.*/
+  aa = ttRatio * freqR * freqY - freqA * freqG - freqC * freqT;
+  bb = freqA * freqGR + freqC * freqTY;
+  *alpha = aa / (aa + bb);
+  *betta = 1.0 - (*alpha);
+
   return;
 }
 

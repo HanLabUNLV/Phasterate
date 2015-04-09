@@ -270,6 +270,12 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
               /* general recursive case */
               MarkovMatrix *lsubst_mat = mod->P[n->lchild->id][rcat];
               MarkovMatrix *rsubst_mat = mod->P[n->rchild->id][rcat];
+              /* Debug info, delete at some point maybe.
+              printf("Conditional Matrix:\n");
+              printMatrix(lsubst_mat->matrix,5);
+              printMatrix(rsubst_mat->matrix,5);
+              printf("End ofConditional Matrix:\n");
+               */
               for (i = 0; i < nstates; i++) {
                 double totl = 0, totr = 0;
                 for (j = 0; j < nstates; j++) 
@@ -284,7 +290,13 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
               }
             }
           }
-
+          /* Debug info, delete at some point maybe.
+          int j;
+          for(i = 0; i < lst_size(traversal); i++)
+            for (j = 0; j < mod->rate_matrix->size; j++)
+              printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
+          printf("\n\n");
+           */
           if (post != NULL && pass == 0) {
             MarkovMatrix *subst_mat;
             double this_total, denom;
@@ -447,6 +459,27 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
         
   } /* for tupleidx */
 
+  /*Debugging print info:*//*
+  int paramIndex = mod->ratematrix_idx;
+  double* paramArray = &(mod->all_params->data[paramIndex]);
+  printf("Current Rates:\n");
+  printf("Alpha: %f\n", paramArray[0]);
+  printf("Betta: %f\n", paramArray[1]);
+  printf("Likelihood: %f\n", retval);
+  printf("\n\n");
+  
+  printf("Current Rate Matrix values:\n");
+  printMatrix(mod->rate_matrix->matrix,4);
+  printf("\n\n");
+  
+  printf("Current background frequencies:\n");
+  double* freq = mod->backgd_freqs->data;
+  printf("A : %f\n", freq[0]);
+  printf("C : %f\n", freq[1]);
+  printf("G : %f\n", freq[2]);
+  printf("T : %f\n", freq[3]);
+  printf("\n\n");
+*/
   for (j = 0; j < nstates; j++) {
     sfree(inside_joint[j]);
     sfree(outside_joint[j]);
@@ -649,17 +682,17 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
   double retval = 0;
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
-  
+
   /*Iterate over every column in MSA, compute likelihood L(i) for ith column. Add all
-   *likelihoods for overall tree. Plus one since we need to take into account an "all 
+   *likelihoods for overall tree. Plus one since we need to take into account an "all
    * gap" column probability. */
-  for (tupleidx = 0; tupleidx < msa->ss->ntuples + 1; tupleidx ++) {    
+  for (tupleidx = 0; tupleidx < msa->ss->ntuples + 1; tupleidx ++) {
     checkInterruptN(tupleidx, 1000);
-    
+
     total_prob = 0;
-    
+
     double **pL = inside_joint;
-    
+
     /*Get traversal order so we iterate over nodes instead of recursing.*/
     traversal = tr_postorder(mod->tree);
     /* Iterate over traversal hitting all nodes in a post order matter.*/
@@ -705,22 +738,8 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
     }
     
     total_prob = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
+    
     /*
-    printf("Current Rate Matrix values:\n");
-    printMatrix(mod->rate_matrix->matrix,5);
-    printf("\n\n");
-    */ 
-
-    /*
-    printf("Current background frequencies:\n");
-    double* freq = mod->backgd_freqs->data;
-    printf("A : %f\n", freq[0]);
-    printf("C : %f\n", freq[1]);
-    printf("T : %f\n", freq[2]);
-    printf("G : %f\n", freq[3]);
-    printf("- : %f\n", freq[4]);
-    printf("\n\n");
-    *//*
     int j;
     for(i = 0; i < lst_size(traversal); i++)
       for (j = 0; j < 5; j++)
@@ -738,16 +757,32 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
   retval = getProbZeroL(mod, p, allGapProb, retval);
   
   /*Debugging print info:*/
+  /*
   int paramIndex = mod->ratematrix_idx;
   double* paramArray = &(mod->all_params->data[paramIndex]);
-  printf("Current Rates:");
+  printf("Current Rates:\n");
   printf("Lambda: %f\n", paramArray[0]);
   printf("Mu: %f\n", paramArray[1]);
   printf("Alpha: %f\n", paramArray[2]);
   printf("Betta: %f\n", paramArray[3]);
   printf("Geometric Distribution: %f\n",mod->geometricParameter);
+  printf("Likelihood: %f\n", retval);
   printf("\n\n");
   
+   printf("Current Rate Matrix values:\n");
+    printMatrix(mod->rate_matrix->matrix,5);
+    printf("\n\n");
+    
+
+    printf("Current background frequencies:\n");
+    double* freq = mod->backgd_freqs->data;
+    printf("A : %f\n", freq[0]);
+    printf("C : %f\n", freq[1]);
+    printf("G : %f\n", freq[2]);
+    printf("T : %f\n", freq[3]);
+    printf("- : %f\n", freq[4]);
+    printf("\n\n");
+   */
   return retval;
 }
 /* =====================================================================================*/
@@ -779,14 +814,13 @@ void printTree(TreeNode* node){
 double getProbZeroL(TreeModel* mod, double p, double allGapProb, double probAllColumns){
   int paramIndex = mod->ratematrix_idx;
   double lambda = mod->all_params->data[paramIndex];
-  double mu = mod->all_params->data[paramIndex+1];
+  double mu = mod->all_params->data[paramIndex + 1];
   double totalProb = 0;
 
-  double extraColumn = probExtraColumn(mod,mu,lambda,p);
+  double extraColumn = log2(probExtraColumn(mod,mu,lambda,p));
   /*Probability of all-gaps column using equation (25) minus one. Since we are working
    * in log though, we instead negate the value.*/
   double marginalizeValue = log2(1 - allGapProb);
-  extraColumn = log2(extraColumn);
   
   totalProb = probAllColumns - marginalizeValue + extraColumn;
   
@@ -830,7 +864,7 @@ double getGeometricDistribution(MSA* msa){
   averageLength = (double) totalSum / (double) numberOfSpecies;
   /*This is the way it's done in dnaML, it ignores the rate categories though.*/
   p = averageLength / (averageLength + 1.0);
-  
+
   return p;
 }
 /* =====================================================================================*/
@@ -1094,7 +1128,7 @@ double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
  * @param assumedBase, base to assume (j)
  * @param currentBase, given base for probability (i)
  * @param branchLength, given branch length from j to i (t)
- * @param params, array of parameters containing: [mu,lambda,alpha,beta]
+ * @param params, array of parameters containing: [lambda, mu, alpha, beta]
  * @return calculated probability.
  */
 double singleEventCondProb(int j,int i, double branchLength, double* freqs,double* params){
@@ -1127,7 +1161,7 @@ double xi(double branchLength,double mu,double lambda){
   double muAndLambda = mu + lambda;
   double value;
   
-  if(muAndLambda == 0)
+  if(muAndLambda < 0.0002)
     return 0;
  
   value = lambda / muAndLambda * ( 1 - exp(- muAndLambda * branchLength) );
@@ -1147,7 +1181,7 @@ double gammaML(double branchLength,double mu,double lambda){
   double muAndLambda = mu + lambda;
   double value;
 
-  if(muAndLambda == 0)
+  if(muAndLambda < 0.0002)
     return 0;
 
   value = mu / muAndLambda * (1 - exp(- muAndLambda * branchLength));
@@ -1164,16 +1198,16 @@ double gammaML(double branchLength,double mu,double lambda){
  * @param j,given nucleotide.
  * @param t, branch length.
  * @param freqs, array frequencies.
- * @param params, array of parameters: [mu,lambda,alpha,beta]
+ * @param params, array of parameters: [lambda, mu, alpha, beta]
  * @return computed formula (10) for M_t(i,j)
  */
-double epsilonProbability(int i,int j,double t,double* freqs,double* params){
+double epsilonProbability(int j,int i,double t,double* freqs,double* params){
   double lambda = params[0];
   double mu = params[1];
   double alpha = params[2];
   double betta = params[3];
   double muAndLambda = mu + lambda;
-  double bigAlphaVal = bigAlpha(i, j, freqs);
+  double bigDeltaVal = bigDelta(j, i, freqs);
   double firstPart = 0;
   double lastPart = 0;
   /*This is the beta only eigenvalue.*/
@@ -1186,15 +1220,15 @@ double epsilonProbability(int i,int j,double t,double* freqs,double* params){
   if(muAndLambda == 0){
     /*Formula (11) Case*/
     firstPart = freqs[j];
-    firstEigenPart = (bigAlphaVal - freqs[j]) * exp(-betta * t);
-    secondEigenPart = (kronecker(i,j) - bigAlphaVal) * exp(-(betta + alpha) * t);
+    firstEigenPart = (bigDeltaVal - freqs[j]) * exp(-betta * t);
+    secondEigenPart = (kronecker(i,j) - bigDeltaVal) * exp(-(betta + alpha) * t);
     /*LastPart not used for this case!*/
   }
   /*Formula (10) Case!*/
   else{
     firstPart = freqs[j] * lambda / muAndLambda;
-    firstEigenPart = (bigAlphaVal - freqs[j]) * exp(-(betta + mu) * t);
-    secondEigenPart = (kronecker(i,j) - bigAlphaVal) * exp(-(betta + alpha + mu) * t);
+    firstEigenPart = (bigDeltaVal - freqs[j]) * exp(-(betta + mu) * t);
+    secondEigenPart = (kronecker(i,j) - bigDeltaVal) * exp(-(betta + alpha + mu) * t);
     lastPart = freqs[j] * mu / muAndLambda * exp(-muAndLambda * t);
   }
 

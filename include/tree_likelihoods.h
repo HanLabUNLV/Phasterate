@@ -295,7 +295,7 @@ double gammaML(double branchLength,double mu,double lambda);
  * @param params, array of parameters: [mu,lambda,alpha,beta]
  * @return computed formula (9) for M_t(i,j)
  */
-double epsilonProbability(int i,int j,double t,double* freqs,double* params);
+double epsilonProbability(int j,int i,double t,double* freqs,double* params);
 
 /**
  * Given the parameters will compute the summation over all eigenvalues for our R matrix,

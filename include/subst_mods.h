@@ -45,6 +45,7 @@ typedef enum {
   SSREV_CODON,  /**< Strand-symmetric reversible (Codon) */
   INDEL, /**< Model created to take into account indel and */
   F84E, /**< Model created from (Rivas E, Eddy SR (2008)) */
+  F84,
   UNDEF_MOD   /**< No Model */
 } subst_mod_type;
 
@@ -222,16 +223,16 @@ subst_mod_type tm_codon_version(subst_mod_type subst_mod);
 subst_mod_type tm_nucleotide_version(subst_mod_type subst_mod);
 
 /**
- * Big alpha function used for calculations related to the conditional probability 
- * function, defined as bigAlpha(i,j) = pi(j) * epsilonF(i,j)/ sum, where sum is:
+ * Big Delta function used for calculations related to the conditional probability 
+ * function, defined as bigDelta(i,j) = pi(j) * epsilonF(i,j)/ sum, where sum is:
  * sigma (summation) over k (number of residues) Sigma(k): pi(k) * e(j,k). See
  * dnaML paper between formula (9) and (10) for more information.
- * @param i, first residue.
  * @param j, second residue.
+ * @param i, first residue.
  * @param frequencies, array containing our residue frequencies.
  * @return the alpha value.
  */
-double bigAlpha(int i, int j, double* frequencies);
+double bigDelta(int j, int i, double* frequencies);
 
 /*Used by matrix computation on diagonal, simply return 1 if in diagonal, else 1;*/
 int kronecker(int firstResidue,int secondResidue);
