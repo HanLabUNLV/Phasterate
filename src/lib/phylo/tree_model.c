@@ -1125,7 +1125,7 @@ void tm_set_subst_matrices(TreeModel *tm) {
         tm_set_probs_F81(backgd_freqs, tm->P[i][j], curr_scaling_const, 
                          n->dparent * branch_scale * tm->rK[j]);
       
-      if(subst_mod == F84 || subst_mod == F84E){
+      if((subst_mod == F84 || subst_mod == F84E) && tm->isPhyloP == 0){
         probsF84Models(tm, i, j, n);
       }
       else { /* full matrix exponentiation */
@@ -1142,6 +1142,7 @@ void tm_set_subst_matrices(TreeModel *tm) {
  * @param i, current i we are iterating over.
  * @param j, current j in P[][] we are are iterating over.
  * @param n, curent node.
+ * Only works for phyloFit.
  */
 void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n){
   //Function requires array of this size.
@@ -1165,7 +1166,7 @@ void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n){
     //F84E Model, just copy array.
     params = &(tm->all_params->data[m]);
     //Branch length, mu and lambda.
-    double gammaVal= gammaML(branchLength, params[1], params[0]);
+    double gammaVal = gammaML(branchLength, params[1], params[0]);
     double xiVal = xi(branchLength, params[1], params[0]);
     
     for(k = 0; k < 4; k++){

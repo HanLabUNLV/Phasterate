@@ -223,6 +223,8 @@ struct tm_struct {
   int extended;                 /**< Whether we are using extended prunning algorithm. */
   double geometricParameter;     /**< The geometric substitution parameter used by the
                                  * extended prunning algorithm.*/
+  int isPhyloP;               /**<If we are in phyloP we will do things slightly differently
+                               * exponentiating the matrix. */
 };
 
 typedef struct tm_struct TreeModel;

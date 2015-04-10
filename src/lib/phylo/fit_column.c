@@ -120,7 +120,14 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
  */
 double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
                                   double **scratch) {
-  return log(col_compute_likelihood(mod, msa, tupleidx, scratch));
+  double results;
+  
+  if(mod->extended)
+    results = log(singleSiteLikelihood(mod, msa, tupleidx, scratch));
+  else
+    results = log(col_compute_likelihood(mod, msa, tupleidx, scratch));
+  
+  return results;
 }
 
 
@@ -760,12 +767,12 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
     checkInterruptN(i, 100);
 
     /* first check for actual substitution data in column; if none,
-       don't waste time computing likelihoods */
-    if (!col_has_data(mod, msa, i)) {
+     * don't waste time computing likelihoods. Extended model cares about
+     * gaps which are considered missing data */
+    if (!col_has_data(mod, msa, i) && mod->extended == 0){
       delta_lnl = 0;
       this_scale = 1;
     }
-
     else {                      /* compute null and alt lnl */
       mod->scale = 1;
       tm_set_subst_matrices(mod);
@@ -1625,3 +1632,57 @@ int col_has_data_sub(TreeModel *mod, MSA *msa, int tupleidx, List *inside,
 
   return FALSE;
 }
+//==========================================================================================
+/*
+ * Extremely similar to double computeTotalTreeLikelihood() from tree_likelihoods.c
+ * but only calculates the scores for the given tupleIdx instead of the whole alignment
+ * basically does the work of computing for one column.
+*/
+  
+double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL){
+  int i;
+  int nstates = mod->rate_matrix->size;
+  double totalProb;
+  List* traversal;
+  int nodeidx;
+  TreeNode *n;
+  int alph_size = strlen(mod->rate_matrix->states);
+  double p = mod->geometricParameter;
+  int rootNodeId = mod->tree->id;
+  
+  /*Get traversal order so we iterate over nodes instead of recursing.*/
+  traversal = tr_postorder(mod->tree);
+  /* Iterate over traversal hitting all nodes in a post order matter.*/
+  for (nodeidx = 0; nodeidx < lst_size(traversal); nodeidx++) {
+    n = lst_get_ptr(traversal, nodeidx);
+    
+    /* Leaf: base case of recursion */
+    if (n->lchild == NULL) {
+      
+      int sequenceNumber = mod->msa_seq_idx[n->id];
+      /*Integer version of character in our alignment.*/
+      int observedState;
+      char thischar;
+
+      thischar = ss_get_char_tuple(msa, tupleidx, sequenceNumber, 0);
+      observedState = mod->rate_matrix->inv_states[(int)thischar];
+      /*Iterate over all bases setting probability based on base case*/
+      for (i = 0; i < alph_size; i++)
+        pL[i][n->id] = probabilityOfLeaf(thischar,observedState,i);   
+    }
+    else{/* General recursive case. Calculate probabilities at inner node for all bases.*/
+      
+      for (i = 0; i < nstates - 1; i++)
+        /*pL[k][n] :: Probability of base K given, node n.*/
+        pL[i][n->id] = probForNodeResidue(i,pL,mod,n,msa,tupleidx);
+      
+      /*Handle gap according to different formula.*/
+      pL[4][n->id] = probForNodeGap(pL,mod,n,msa,tupleidx);
+    }
+  }
+  
+  totalProb = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
+  
+  return totalProb;
+}
+/* =====================================================================================*/

@@ -880,7 +880,7 @@ double getGeometricDistribution(MSA* msa){
 double probExtraColumn(TreeModel* mod,double mu,double lambda, double p){
 
  TreeNode* root = mod->tree;
- return (1.0 - p) * starProb(root,mu,lambda);
+ return (1.0 - p) * starProb(root,mu,lambda, mod);
 }
 /* =====================================================================================*/
 /*Given some node, as well as our mu and lambda values. It will recursively traverse the
@@ -888,20 +888,23 @@ double probExtraColumn(TreeModel* mod,double mu,double lambda, double p){
  * @param node, node k to start recursion down on, probably root.
  * @param mu, rate of deletion.
  * @param lambda, rate of insertion.
+ * @param mod, the tree model representing our data.
  * @return starProb value.
  */
-double starProb(TreeNode* node,double mu, double lambda){
+double starProb(TreeNode* node,double mu, double lambda, TreeModel* mod){
   /*Reached base case, leaf.*/
   if(node->rchild == NULL)
     return 1;
   
   TreeNode* lChild = node->lchild;
   TreeNode* rChild = node->rchild;
+  double lChildDist = node->lchild->dparent * mod->scale;
+  double rChildDist = node->rchild->dparent * mod->scale;
   
-  double leftProb = starProb(lChild, mu, lambda);
-  double rightProb = starProb(rChild, mu, lambda);
-  double leftXiPrime = 1.0 - xi(lChild->dparent,mu,lambda);
-  double rightXiPrime = 1.0 - xi(rChild->dparent,mu,lambda);
+  double leftProb = starProb(lChild, mu, lambda, mod);
+  double rightProb = starProb(rChild, mu, lambda, mod);
+  double leftXiPrime = 1.0 - xi(lChildDist,mu,lambda);
+  double rightXiPrime = 1.0 - xi(rChildDist,mu,lambda);
 
   return leftProb * rightProb * leftXiPrime * rightXiPrime;
 }
@@ -952,10 +955,10 @@ double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa
   double* params= &(mod->all_params->data[paramIndex]);
 
   int lChild = k->lchild->id;
-  double lChildDist = k->lchild->dparent;
+  double lChildDist = k->lchild->dparent * mod->scale;
 
   int rChild = k->rchild->id;
-  double rChildDist = k->rchild->dparent;
+  double rChildDist = k->rchild->dparent * mod->scale;
   /*Total summations for both sides.*/
   double sSum = 0;
   double qSum = 0;
@@ -999,17 +1002,17 @@ double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currS
   double* params = &(mod->all_params->data[paramIndex]);
 
   int lChild = k->lchild->id;
-  double lChildDist = k->lchild->dparent;
+  double lChildDist = k->lchild->dparent * mod->scale;
 
   int rChild = k->rchild->id;
-  double rChildDist = k->rchild->dparent;
+  double rChildDist = k->rchild->dparent * mod->scale;
 
   /*Total summations for both sides.*/
   double sSum = 0;
   double qSum = 0;
   /*Variables to hold values of the gap probability for both sides before/after the '+' */
   double leftDelta, rightDelta;
-  /*Left hand side and right hand side respectively (21)*/
+  /*Left hand side and right hand side respectively, formula (21)*/
   double lhs, rhs;
   
   /*Left hand summation over all bases.*/
@@ -1051,10 +1054,10 @@ double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k){
   double* params= &(mod->all_params->data[paramIndex]);
 
   int lChild = k->lchild->id;
-  double lChildDist = k->lchild->dparent;
+  double lChildDist = k->lchild->dparent * mod->scale;
 
   int rChild = k->rchild->id;
-  double rChildDist = k->rchild->dparent;
+  double rChildDist = k->rchild->dparent * mod->scale;
   /*Total summations for both sides.*/
   double sSum = 0;
   double qSum = 0;
@@ -1093,10 +1096,10 @@ double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
   double* params = &(mod->all_params->data[paramIndex]);
 
   int lChild = k->lchild->id;
-  double lChildDist = k->lchild->dparent;
+  double lChildDist = k->lchild->dparent * mod->scale;
 
   int rChild = k->rchild->id;
-  double rChildDist = k->rchild->dparent;
+  double rChildDist = k->rchild->dparent * mod->scale;
 
   /*Total summations for both sides.*/
   double sSum = 0;

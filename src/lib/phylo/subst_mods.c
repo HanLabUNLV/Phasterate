@@ -1808,6 +1808,8 @@ void tm_set_F84E_matrix(TreeModel *model,Vector* params, int startIndex){
  * @param mod from file read containing rate matrix.
  * @param vector of parameters containing all parameters related to our model.
  * @param start in vector of parameters to be optimized.
+ * Even though we set it, this is not actually used in the likelihood calculation, all
+ * the values are computed from the individual parameters everytime, this is just for show.
  */
 void tm_set_F84_matrix(TreeModel *model,Vector* params, int startIndex){
   /*Get all necessary information from model and parameter vector.*/

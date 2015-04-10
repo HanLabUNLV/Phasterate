@@ -87,6 +87,15 @@ void print_post_prob_stats(TreeModel *mod, MSA *msa, char *output_fname_root,
 			   int do_every_site,
 			   int cat, int quiet,
 			   ListOfLists *results);
+
+/**
+ * Printing functin printing additional information computed from running phyloFit
+ * with the extended Prunning Algorithm.
+ * @param fileName, name of file to write to.
+ * @param tm, model containing information we shall write.
+ */
+void printExtendedInfo(char* fileName, TreeModel* tm);
+
 #define BRANCH_TYPE 0
 #define SUBTREE_TYPE 1
 

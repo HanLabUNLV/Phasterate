@@ -377,5 +377,12 @@ int col_has_data_sub(TreeModel *mod, MSA *msa, int tupleidx, List *inside,
  */
 void col_find_missing_branches(TreeModel *mod, MSA *msa, int tupleidx, 
                                int *has_data, int *nspec);
+
+/**
+ * Extremely similar to double computeTotalTreeLikelihood() from tree_likelihoods.c
+ * but only calculates the scores for the given tupleIdx instead of the whole alignment
+ * basically does the work of computing for one column.
+*/
+double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL);
 /** \} */
 #endif

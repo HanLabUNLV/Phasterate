@@ -1241,6 +1241,13 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 	if (!quiet) fprintf(stderr, "Writing model to %s ...\n", 
 			    mod_fname->chars);
 	F = phast_fopen(mod_fname->chars, "w+");
+        
+        /*If this is the extended prunning algorithm we must print some extra information,
+         mainly the matrix parameters we calculated.*/
+        if(mod->extended == 1)
+          //Print all needed info from model here!
+          printExtendedInfo("phyloFit.infoX", mod);
+        
         //Un-normalize the background frequencies when printing final output.
         gapFreq = vec_get(mod->backgd_freqs,4);
           /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
@@ -2064,3 +2071,41 @@ void freemod(struct phyloFit_struct *pf, TreeModel *mod, Vector *params, MSA *ms
     }
   }
 }
+//==========================================================================================
+/**
+ * Printing functin printing additional information computed from running phyloFit
+ * with the extended Prunning Algorithm.
+ * @param fileName, name of file to write to.
+ * @param tm, model containing information we shall write.
+ */
+void printExtendedInfo(char* fileName, TreeModel* tm){
+  FILE* fout= phast_fopen(fileName, "w+");
+  int k = tm->ratematrix_idx;
+  double* params = &(tm->all_params->data[k]);
+  double* freqs = tm->backgd_freqs->data;
+  double p = tm->geometricParameter;
+
+  /*Calculated rates!*/  
+  fprintf(fout, "Lambda Rate:\n");
+  fprintf(fout, "%f\n", params[0]);
+  fprintf(fout, "Mu Rate:\n");
+  fprintf(fout, "%f\n", params[1]);
+  fprintf(fout, "Alpha Rate:\n");
+  fprintf(fout, "%f\n", params[2]);
+  fprintf(fout, "Betta Rate:\n");
+  fprintf(fout, "%f\n", params[3]);
+  
+  /*Background frequencies :)*/
+  fprintf(fout, "Background frequencies (A, C, G, T):\n");
+  fprintf(fout, "%f\n", freqs[0]);
+  fprintf(fout, "%f\n", freqs[1]);
+  fprintf(fout, "%f\n", freqs[2]);
+  fprintf(fout, "%f\n", freqs[3]);
+  
+  /** Geometric Distribution Parameter. */
+  fprintf(fout, "Geometric Distribution parameter (p):\n");
+  fprintf(fout, "%f\n", p);
+  
+  return;
+}
+//==========================================================================================

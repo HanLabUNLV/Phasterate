@@ -189,9 +189,10 @@ double probExtraColumn(TreeModel* mod,double mu,double lambda, double p);
  * @param node, node k to start recursion down on, probably root.
  * @param mu, rate of deletion.
  * @param lambda, rate of insertion.
+ * @param mod, the tree model representing our data.
  * @return starProb value.
  */
-double starProb(TreeNode* node,double mu, double lambda);
+double starProb(TreeNode* node,double mu, double lambda, TreeModel* mod);
 
 /**
  * Calculates the probability at site site u of the MSA. This is the actual probability

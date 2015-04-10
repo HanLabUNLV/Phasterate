@@ -50,7 +50,17 @@ struct phyloP_struct {
   char *help, *mod_fname, *msa_fname;
   ListOfLists *results;
   int no_prune;
+  int extended; /* << Is this using the extended algorithm flag? */
+  char* infoXFileName; /* << Name of file where to read all information from*/
 };
+
+/**
+ * Extended Likelihood algorithm requires the TreeModel all_params->data
+ * and the mod->rateMatrix_idx to be set as it is used, we simulate that here.
+ * @param mod, modle to fill in parameters.
+ * @param file to read information from.
+ */
+void setExtendedMod(TreeModel* mod, char* fileName);
 
 struct phyloP_struct *phyloP_struct_new(int rphast);
 void phyloP(struct phyloP_struct *p);

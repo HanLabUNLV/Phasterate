@@ -17,7 +17,6 @@ int main(int argc, char *argv[]) {
   char c;
   FILE *msa_f = NULL;
   msa_format_type msa_format = UNKNOWN_FORMAT;
-  int gapAlphabet = 0;
   /* other variables */
   int opt_idx, seed = -1;
   List *cats_to_do_str=NULL;
@@ -47,7 +46,7 @@ int main(int argc, char *argv[]) {
     {"no-prune", 0, 0, 'P'},
     {"seed", 1, 0, 'd'},
     {"help", 0, 0, 'h'},
-    {"gap", 0, 0, 'G'},
+    {"extended", 1, 0, 'x'},
     {0, 0, 0, 0}
   };
 
@@ -57,7 +56,7 @@ int main(int argc, char *argv[]) {
   srandom(now.tv_usec);
 #endif
 
-  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:hG", 
+  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:hx:", 
                           long_opts, &opt_idx)) != -1) {
     switch (c) {
     case 'm':
@@ -153,8 +152,11 @@ int main(int argc, char *argv[]) {
       printf("%s", HELP);
       exit(0);
       break;
-    case 'G':
-      gapAlphabet = 1;
+    case 'x':
+      p->extended = 1;
+      int size = strlen(optarg);
+      p->infoXFileName =  (char*)malloc(sizeof(char) * size);
+      strcpy(p->infoXFileName, optarg);
       break;
     case '?':
       die("Bad argument.  Try 'phyloP -h'.\n");
@@ -169,6 +171,12 @@ int main(int argc, char *argv[]) {
   p->mod_fname = argv[optind];
 
   p->mod = tm_new_from_file(phast_fopen(p->mod_fname, "r"), 1);
+  p->mod->isPhyloP = 1;
+  /*Extended Likelihood algorithm requires the TreeModel all_params->data
+   and the mod->rateMatrix_idx to be set as it is used, we simulate that
+   here.*/
+  if(p->extended)
+    setExtendedMod(p->mod, p->infoXFileName);
 
   if (cats_to_do_str != NULL) {
     if (p->cm == NULL) die("ERROR: --cats-to-do requires --catmap option\n");
@@ -186,10 +194,7 @@ int main(int argc, char *argv[]) {
 			     (p->feats == NULL && p->base_by_base==0) ? FALSE : TRUE, /* --features requires order */
 			     NULL, NO_STRIP, FALSE, p->cats_to_do); 
     else
-      if(!gapAlphabet)
         p->msa = msa_new_from_file_define_format(msa_f, msa_format, NULL);
-      else
-        p->msa = msa_new_from_file_define_format(msa_f, msa_format, "ACGT-");
     phast_fclose(msa_f);
 
     /* if base_by_base and undefined chrom, use filename root as chrom */
@@ -206,4 +211,67 @@ int main(int argc, char *argv[]) {
   
   phyloP(p);    
   return 0;
+}
+/**
+ * Extended Likelihood algorithm requires the TreeModel all_params->data
+ * and the mod->rateMatrix_idx to be set as it is used, we simulate that here.
+ * @param mod, modle to fill in parameters.
+ * @param file to read information from.
+ * We expect file to be in this format:
+ * The file will be in the following format:
+ Lambda rate:
+ 0.0081
+ Mu rate:
+ 0.5532
+ Alpha rate:
+ .348
+ Betta rate:
+ 0.652
+ Background frequencies (A, C, G, T):
+ .238
+ .158
+ .320
+ .284
+ Geometric Distribution parameter (p):
+ .9954
+ */
+void setExtendedMod(TreeModel* mod, char* fileName){
+  double params[4];
+  double freqs[4];
+  FILE* fin = phast_fopen(fileName, "r");
+  char* line;
+  size_t length;
+  int i;
+  
+  /*Iterate over file reading lines and filling lines based on expected format.*/
+  for(i = 0; i < 4; i++){
+    /*This is just a title ignore it.*/
+    getline(&line, &length, fin);
+    
+    /*This is a rate!*/
+    getline(&line, &length, fin);
+    sscanf(line, "%lf", &(params[i]));
+  }
+  mod->ratematrix_idx = 0;
+  mod->all_params = vec_new_from_array(params, 4);
+
+  /*This is just a title ignore it.*/
+  getline(&line, &length, fin);
+
+  /*Get background frequencies.*/  
+  for(i = 0; i < 4; i++){
+    getline(&line, &length, fin);
+    sscanf(line, "%lf", &(freqs[i]));
+  }
+
+  /*This is just a title ignore it.*/
+  getline(&line, &length, fin);
+  
+  getline(&line, &length, fin);
+  sscanf(line, "%lf", &(mod->geometricParameter));
+  
+  /*Let the TreeModel mod know it's using an extended algorithm.*/
+  mod->extended = 1;
+  
+  return;
 }

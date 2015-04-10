@@ -60,7 +60,7 @@ struct phyloP_struct *phyloP_struct_new(int rphast) {
   p->mod_fname = NULL;
   p->msa_fname = NULL;
   p->no_prune = FALSE;
-
+  p->extended = 0;
   p->results = rphast ? lol_new(20) : NULL;
   return p;
 }
@@ -188,7 +188,15 @@ void phyloP(struct phyloP_struct *p) {
   quantiles_only = p->quantiles_only;
   output_wig = p->output_wig;
   output_gff = p->output_gff;
-
+  
+  /*Checking conditions for extended model*/
+  if((mod->subst_mod == F84E) && (p->extended != 1 || method != LRT))
+    die("F84E model can only be used with -x and LRT!\n");
+  
+  
+  if((p->extended == 1) && (mod->subst_mod != F84E || method != LRT))
+    die("Extended prunning algorithm only works with F84 and LRT\n");
+    
   if (msa == NULL && !prior_only)
     die("Need either --prior-only or an alignment\n");
   if (msa != NULL && (refidx < 0 || refidx > msa->nseqs))
