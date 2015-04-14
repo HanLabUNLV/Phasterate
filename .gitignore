@@ -1,0 +1,13 @@
+*.o
+netbeans/
+*~
+\#*#
+bin/
+lib/
+doc/
+nbproject/
+tempTest/
+*.mod
+*.infoX
+*.hs
+Makefile
