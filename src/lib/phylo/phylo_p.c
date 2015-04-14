@@ -192,7 +192,7 @@ void phyloP(struct phyloP_struct *p) {
   /*Checking conditions for extended model*/
   if((mod->subst_mod == F84E) && (p->extended != 1 || method != LRT))
     die("F84E model can only be used with -x and LRT!\n");
-  
+
   
   if((p->extended == 1) && (mod->subst_mod != F84E || method != LRT))
     die("Extended prunning algorithm only works with F84 and LRT\n");

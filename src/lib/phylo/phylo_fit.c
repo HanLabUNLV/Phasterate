@@ -675,6 +675,32 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   double gapDivisor = -1.0;
 
   /*Error Checking*/
+  
+  /*Error checking for F84E model.
+   This model should only work when used along with the -O branches, -x -G*/
+  if(pf->subst_mod == F84E){
+    if(pf->gaps_as_bases == 0)
+      die("Error: F84E Model requires -G for gaps as bases.");
+    if(pf->extendedFlag == 0)
+      printf("Warning: You probably want to use -x for extended model.");
+    if(pf->nooptstr != NULL){
+      if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
+        die("Error: F84E Model requires -O branches.");
+    }
+    else
+      die("Error: F84E Model requires -O branches.");
+  }
+  /*F85 Model check, we do not use branch lengths when optimizing. I guess we could?*/
+  if(pf->subst_mod == F84){
+    if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
+      die("Error: F84E Model requires -O branches.");
+  }
+  /*Extended Flag only works with F84E*/
+  if(pf->extendedFlag == 1){
+    if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
+      die("Error: -x only works with F84E Model.");
+  }
+  
   if (pf->no_freqs)
     pf->init_backgd_from_data = FALSE;
 
@@ -979,7 +1005,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 	if (freq != NULL) 
 	  lst_free(freq);
       }
-
+           
       if (pf->use_selection) {
 	mod->selection_idx = 0;
 	mod->selection = pf->selection;
