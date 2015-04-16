@@ -51,7 +51,7 @@ struct phyloP_struct {
   ListOfLists *results;
   int no_prune;
   int extended; /* << Is this using the extended algorithm flag? */
-  char* infoXFileName; /* << Name of file where to read all information from*/
+  char infoXFileName[1000]; /* << Name of file where to read all information from*/
 };
 
 /**

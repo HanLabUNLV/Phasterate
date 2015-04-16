@@ -154,8 +154,6 @@ int main(int argc, char *argv[]) {
       break;
     case 'x':
       p->extended = 1;
-      int size = strlen(optarg);
-      p->infoXFileName =  (char*)malloc(sizeof(char) * size);
       strcpy(p->infoXFileName, optarg);
       break;
     case '?':
@@ -239,37 +237,59 @@ void setExtendedMod(TreeModel* mod, char* fileName){
   double params[4];
   double freqs[4];
   FILE* fin = phast_fopen(fileName, "r");
-  char* line;
-  size_t length;
+  char* line = NULL;
+  size_t length = 0;
   int i;
+  /*Note, the:
+    free(line);
+    line = NULL;
+    length = 0;
+   Are necessary because of the way the getline() works, see documentation of function
+   for more details.*/
   
   /*Iterate over file reading lines and filling lines based on expected format.*/
   for(i = 0; i < 4; i++){
     /*This is just a title ignore it.*/
     getline(&line, &length, fin);
+    free(line);
+    line = NULL;
+    length = 0;
     
     /*This is a rate!*/
     getline(&line, &length, fin);
     sscanf(line, "%lf", &(params[i]));
+    free(line);
+    line = NULL;
+    length = 0;
   }
   mod->ratematrix_idx = 0;
   mod->all_params = vec_new_from_array(params, 4);
 
   /*This is just a title ignore it.*/
   getline(&line, &length, fin);
+  free(line);
+  line = NULL;
+  length = 0;
 
   /*Get background frequencies.*/  
   for(i = 0; i < 4; i++){
     getline(&line, &length, fin);
     sscanf(line, "%lf", &(freqs[i]));
+    free(line);
+    line = NULL;
+    length = 0;
   }
 
   /*This is just a title ignore it.*/
   getline(&line, &length, fin);
-  
+  free(line);
+  line = NULL;
+  length = 0;
   getline(&line, &length, fin);
   sscanf(line, "%lf", &(mod->geometricParameter));
-  
+  free(line);
+  line = NULL;
+  length = 0;
   /*Let the TreeModel mod know it's using an extended algorithm.*/
   mod->extended = 1;
   
