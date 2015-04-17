@@ -270,12 +270,14 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
               /* general recursive case */
               MarkovMatrix *lsubst_mat = mod->P[n->lchild->id][rcat];
               MarkovMatrix *rsubst_mat = mod->P[n->rchild->id][rcat];
-              /* Debug info, delete at some point maybe.
+              /* Debug info, delete at some point maybe.*//*
+              printf("Rate Matrix:\n");
+              printMatrix(mod->rate_matrix->matrix,4);
               printf("Conditional Matrix:\n");
-              printMatrix(lsubst_mat->matrix,5);
-              printMatrix(rsubst_mat->matrix,5);
+              printMatrix(lsubst_mat->matrix,4);
+              printMatrix(rsubst_mat->matrix,4);
               printf("End ofConditional Matrix:\n");
-               */
+                                                           */
               for (i = 0; i < nstates; i++) {
                 double totl = 0, totr = 0;
                 for (j = 0; j < nstates; j++) 
@@ -290,13 +292,13 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
               }
             }
           }
-          /* Debug info, delete at some point maybe.
+          /* Debug info, delete at some point maybe.*/
           int j;
           for(i = 0; i < lst_size(traversal); i++)
             for (j = 0; j < mod->rate_matrix->size; j++)
               printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
           printf("\n\n");
-           */
+
           if (post != NULL && pass == 0) {
             MarkovMatrix *subst_mat;
             double this_total, denom;
@@ -445,7 +447,8 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
       else die("got total_prob=%.10g\n", total_prob);
       }*/
     total_prob = log2(total_prob);
-
+    
+    
     if (curr_tuple_scores != NULL && 
         (cat < 0 || msa->ss->cat_counts[cat][tupleidx] > 0))
       curr_tuple_scores[tupleidx] = total_prob;
@@ -454,7 +457,7 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
 
     total_prob *= (cat >= 0 ? msa->ss->cat_counts[cat][tupleidx] : 
                    msa->ss->counts[tupleidx]); /* log space */
-
+    printf("Total Probability: %f\n", total_prob);
     retval += total_prob;     /* log space */
         
   } /* for tupleidx */
@@ -479,7 +482,9 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
   printf("G : %f\n", freq[2]);
   printf("T : %f\n", freq[3]);
   printf("\n\n");
-*/
+  */
+  printf("%f\n\n", retval);
+  
   for (j = 0; j < nstates; j++) {
     sfree(inside_joint[j]);
     sfree(outside_joint[j]);
@@ -751,11 +756,12 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
       retval += log2(total_prob) * msa->ss->counts[tupleidx];
     else /*Case for all gaps column.*/
       allGapProb = total_prob;
+    printf("Total Probability: %f\n", log2(total_prob));
   }
   /* Calculate total probability for site in alignment, second modification of
    * extended pruning algorithm.*/
   retval = getProbZeroL(mod, p, allGapProb, retval);
-  
+  printf("retval: %f\n", retval);
   /*Debugging print info:*/
   /*
   int paramIndex = mod->ratematrix_idx;

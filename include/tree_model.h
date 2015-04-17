@@ -340,8 +340,9 @@ void tm_set_subst_matrices(TreeModel *tm);
  * @param i, current i we are iterating over.
  * @param j, current j in P[][] we are are iterating over.
  * @param n, curent node.
+ * @param scale, scaling parameter (used by PhyloP).
  */
-void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n);
+void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n, double scale);
 
 /** Setup the substitution matrices on a Tree Model with custom probability matrix and branch length.
    @param P Probability matrix to use

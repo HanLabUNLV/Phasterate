@@ -173,7 +173,7 @@ int main(int argc, char *argv[]) {
   /*Extended Likelihood algorithm requires the TreeModel all_params->data
    and the mod->rateMatrix_idx to be set as it is used, we simulate that
    here.*/
-  if(p->extended)
+  if(p->extended || p->mod->subst_mod == F84)
     setExtendedMod(p->mod, p->infoXFileName);
 
   if (cats_to_do_str != NULL) {
@@ -290,8 +290,6 @@ void setExtendedMod(TreeModel* mod, char* fileName){
   free(line);
   line = NULL;
   length = 0;
-  /*Let the TreeModel mod know it's using an extended algorithm.*/
-  mod->extended = 1;
   
   return;
 }

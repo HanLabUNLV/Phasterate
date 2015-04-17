@@ -775,7 +775,7 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
     }
     else {                      /* compute null and alt lnl */
       mod->scale = 1;
-      tm_set_subst_matrices(mod);
+        tm_set_subst_matrices(mod);
 
       /* compute log likelihoods under null and alt hypotheses */
       null_lnl = col_compute_log_likelihood(mod, msa, i, d->fels_scratch[0]);

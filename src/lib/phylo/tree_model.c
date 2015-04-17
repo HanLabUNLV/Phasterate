@@ -1125,8 +1125,8 @@ void tm_set_subst_matrices(TreeModel *tm) {
         tm_set_probs_F81(backgd_freqs, tm->P[i][j], curr_scaling_const, 
                          n->dparent * branch_scale * tm->rK[j]);
       
-      if((subst_mod == F84 || subst_mod == F84E) && tm->isPhyloP == 0){
-        probsF84Models(tm, i, j, n);
+      if(subst_mod == F84){
+        probsF84Models(tm, i, j, n, branch_scale);
       }
       else { /* full matrix exponentiation */
         mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);
@@ -1142,50 +1142,25 @@ void tm_set_subst_matrices(TreeModel *tm) {
  * @param i, current i we are iterating over.
  * @param j, current j in P[][] we are are iterating over.
  * @param n, curent node.
+ * @param scale, the scaling factor if any (used by phyloP).
  * Only works for phyloFit.
  */
-void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n){
-  //Function requires array of this size.
-  double* params;
-  int m = tm->ratematrix_idx;
+void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n, double scale){
+    int m = tm->ratematrix_idx;
+  double* params = &(tm->all_params->data[m]);
   double** matrixA = tm->P[i][j]->matrix->data;
   int k, l;
   double* freqs = tm->backgd_freqs->data;
   double branchLength = n->dparent;
-  subst_mod_type subst_mod = tm->subst_mod;
-  
-  
-  if(subst_mod == F84){
-    //Lambda and mu rate only used for F84E Extended model...
-    params = (double*)malloc(sizeof(double) * 4);
-    params[0] = 0;
-    params[1] = 0;
-    params[2] = tm->all_params->data[m];
-    params[3] = tm->all_params->data[m + 1];
-  }else{
-    //F84E Model, just copy array.
-    params = &(tm->all_params->data[m]);
-    //Branch length, mu and lambda.
-    double gammaVal = gammaML(branchLength, params[1], params[0]);
-    double xiVal = xi(branchLength, params[1], params[0]);
-    
-    for(k = 0; k < 4; k++){
-      matrixA[k][4] = gammaVal; /*Last Column*/
-      matrixA[4][k] = xiVal; /*Last Row*/
-    }
-    //Set corner:
-    matrixA[4][4] = 1 - xiVal;
-  }
+
   //Both Models share this in common:
   for(k = 0; k < 4; k++)
     for(l = 0; l < 4; l++)
-      matrixA[k][l] = epsilonProbability(l, k, branchLength, freqs, params);
-  
-  if(subst_mod == F84)
-    free(params);
-  
+      matrixA[k][l] = epsilonProbability(l, k, branchLength * scale, freqs, params);
+
   return;
 }
+
 /* version of above that can be used with specified branch length and
    prob matrix */
 void tm_set_subst_matrix(TreeModel *tm, MarkovMatrix *P, double t) {

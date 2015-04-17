@@ -11,3 +11,5 @@ tempTest/
 *.infoX
 *.hs
 Makefile
+*.fa
+*.newick

@@ -1270,7 +1270,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
         
         /*If this is the extended prunning algorithm we must print some extra information,
          mainly the matrix parameters we calculated.*/
-        if(mod->extended == 1)
+        if(mod->subst_mod == F84 || mod->subst_mod == F84E)
           //Print all needed info from model here!
           printExtendedInfo("phyloFit.infoX", mod);
         
@@ -2110,16 +2110,34 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   double* params = &(tm->all_params->data[k]);
   double* freqs = tm->backgd_freqs->data;
   double p = tm->geometricParameter;
-
+  double lambda;
+  double mu;
+  double alpha;
+  double betta;
+  
+  /*F84 does not use all of them!*/
+  if(tm->subst_mod == F84){
+    lambda = 0;
+    mu = 0;
+    alpha = params[0];
+    betta = params[1];
+  }
+  else{
+    lambda = params[0];
+    mu = params[1];
+    alpha = params[2];
+    betta = params[3];
+  }
+  
   /*Calculated rates!*/  
   fprintf(fout, "Lambda Rate:\n");
-  fprintf(fout, "%f\n", params[0]);
+  fprintf(fout, "%f\n", lambda);
   fprintf(fout, "Mu Rate:\n");
-  fprintf(fout, "%f\n", params[1]);
+  fprintf(fout, "%f\n", mu);
   fprintf(fout, "Alpha Rate:\n");
-  fprintf(fout, "%f\n", params[2]);
+  fprintf(fout, "%f\n", alpha);
   fprintf(fout, "Betta Rate:\n");
-  fprintf(fout, "%f\n", params[3]);
+  fprintf(fout, "%f\n", betta);
   
   /*Background frequencies :)*/
   fprintf(fout, "Background frequencies (A, C, G, T):\n");
