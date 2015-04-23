@@ -59,17 +59,6 @@ typedef struct {
   mm_type type; /**< Whether matrix is Discrete or Continuous */
 } MarkovMatrix;
 
-/** This struct hold information needed by the extended felsenstein algorithm.*/
-typedef struct {
-  Matrix* uMatrix; /*Matrix such that R = U^(1) R_diag U.*/
-  Matrix* uInverseMatrix; /*Inverse of U matrix, i.e. U(^-1).*/
-  Matrix* diagonalMatrix; 
-  Matrix* rateMatrix;
-  MarkovMatrix* smallRateMatrix;
-  double* allEigenvalues;
-  int eigenNumber;
-} DiagonalMatrix;
-
 /** \name Markov Matrix allocation functions.
   \{ */
 
@@ -201,9 +190,6 @@ void mm_exp(MarkovMatrix *P, MarkovMatrix *Q, double t);
  */
 void mm_cpy(MarkovMatrix *dest, MarkovMatrix *src);
 
-/** Diagonalize a Markove Matrix,does not do the type checking that
- * mm_diagoinalize does.*/
-void extendedDiagonalize(MarkovMatrix *M);
 
 /** Diagonalize a Markov Matrix.
     @param M Matrix to diagonalize
@@ -251,19 +237,8 @@ void mm_set(MarkovMatrix *M, int row, int col, double val) {
  * @param size, size of matrix.
  */
 void printMatrix(Matrix* m, int size);
+
+
 /** \} */
-
-/*Given a 5x5 rate matrix it will find the eigenvalues, U and inverse U matrix and
- * diagonal matrix for the inside 4x4 residue part as described in dnaml-erate paper.
- * @param rateMatrix, rateMatrix to get diagonal and eigen vector info about.
- * @return allocated struct will all the information.
- */
-DiagonalMatrix* getDiagonalMatrix(MarkovMatrix* rateMatrix);
-
-/**
- * Given a diagonalMatrix object will free all memory if not allocated.
- * @param dMatrix
- */
-void freeDiagonalMatrix(DiagonalMatrix* dMatrix);
 
 #endif

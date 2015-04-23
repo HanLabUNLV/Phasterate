@@ -79,7 +79,6 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->no_branchlens = FALSE;
   pf->label_categories = TRUE;  //if false, assume MSA already has
                                 //categories labelled with correct gff
-  /*  pf->nsites_threshold = DEFAULT_NSITES_THRESHOLD;*/
   pf->nsites_threshold = 5;
   pf->tree = NULL;
   pf->cm = NULL;
@@ -96,13 +95,12 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->alpha = DEFAULT_ALPHA;
   pf->gff = NULL;
   pf->input_mod = NULL;
-  pf->input_mods = NULL;
   pf->use_selection = 0;
   pf->selection = 0.0;
   pf->max_em_its = -1;
-  
-  pf->results = rphast ? lol_new(2) : NULL;
+  pf->input_mods = NULL;
   pf->extendedFlag = 0;
+  pf->results = rphast ? lol_new(2) : NULL;
   return pf;
 }
 
@@ -651,7 +649,7 @@ void print_window_summary(FILE* WINDOWF, List *window_coords, int win,
 
 int run_phyloFit(struct phyloFit_struct *pf) {
   FILE *F, *WINDOWF=NULL;
-  int i, j,k, win, root_leaf_id = -1;
+  int i, j, k, win, root_leaf_id = -1;
   String *mod_fname;
   MSA *source_msa;
   String *tmpstr = str_new(STR_SHORT_LEN);
@@ -675,9 +673,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   double gapDivisor = -1.0;
 
   /*Error Checking*/
-  
-  /*Error checking for F84E model.
-   This model should only work when used along with the -O branches, -x -G*/
+  /*This model should only work when used along with the -O branches, -x -G*/
   if(pf->subst_mod == F84E){
     if(pf->gaps_as_bases == 0)
       die("Error: F84E Model requires -G for gaps as bases.");
@@ -700,7 +696,8 @@ int run_phyloFit(struct phyloFit_struct *pf) {
     if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
       die("Error: -x only works with F84E Model.");
   }
-  
+
+
   if (pf->no_freqs)
     pf->init_backgd_from_data = FALSE;
 
@@ -723,11 +720,11 @@ int run_phyloFit(struct phyloFit_struct *pf) {
       subst_mod = pf->input_mod->subst_mod;
     else subst_mod = REV;
   }
-  printf("Substitude model is: %d\n",subst_mod);
+
   if (pf->gaps_as_bases && subst_mod != JC69 && subst_mod != F81 && 
       subst_mod != HKY85G && subst_mod != REV && 
-      subst_mod != UNREST && subst_mod != SSREV && subst_mod != INDEL && subst_mod != F84E)
-    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, F84E, HKY85+Gap, REV, SSREV, and UNREST and INDEL.\n");
+      subst_mod != UNREST && subst_mod != SSREV && subst_mod != F84E)
+    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, HKY85+Gap, REV, SSREV,  UNREST and F84E.\n");
                                 /* with HKY, yields undiagonalizable matrix */
   if ((pf->no_freqs || pf->no_rates) && input_mod == NULL)
     die("ERROR: --init-model required with --no-freqs and/or --no-rates.\n");
@@ -780,11 +777,10 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   }
 
 
-
   /* allow for specified ancestor */
   if (pf->root_seqname != NULL) {
     TreeNode *rl;
-    if (tree == NULL || subst_mod_is_reversible(subst_mod))
+    if (tree == NULL || subst_mod_is_reversible(subst_mod)) 
       die("ERROR: --ancestor requires --tree and a non-reversible model.\n");
     rl = tr_get_node(tree, pf->root_seqname);     
     if (rl == NULL || rl->parent != tree) 
@@ -792,8 +788,6 @@ int run_phyloFit(struct phyloFit_struct *pf) {
     root_leaf_id = rl->id;
   }
 
-
-  /*Attempt to label tree*/
   if (pf->label_str != NULL || pf->label_type != NULL) {
     if (pf->label_str == NULL || pf->label_type == NULL ||
 	lst_size(pf->label_str) != lst_size(pf->label_type))
@@ -966,7 +960,6 @@ int run_phyloFit(struct phyloFit_struct *pf) {
       int old_nnodes, cat = lst_get_int(cats_to_do, i);
       unsigned int ninf_sites;
 
-      /*First time it's called it will create a new model based on passed matrix model*/
       if (input_mod == NULL) 
         mod = tm_new(tr_create_copy(tree), NULL, NULL, subst_mod, 
                      msa->alphabet, pf->nratecats == -1 ? 1 : pf->nratecats, 
@@ -1005,7 +998,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 	if (freq != NULL) 
 	  lst_free(freq);
       }
-           
+
       if (pf->use_selection) {
 	mod->selection_idx = 0;
 	mod->selection = pf->selection;
@@ -1163,6 +1156,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           ss_from_msas(msa, mod->order+1, 0, 
                        pf->cats_to_do_str != NULL ? cats_to_do : NULL, 
                        NULL, NULL, -1, subst_mod_is_codon_model(mod->subst_mod));
+
           mod->geometricParameter = getGeometricDistribution(msa);
           /* (sufficient stats obtained only for categories of interest) */
       
@@ -1177,10 +1171,9 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           params = tm_params_init_random(mod);
         else if (input_mod != NULL) 
           params = tm_params_new_init_from_model(input_mod);
-	else{
-          mod->extended = pf->extendedFlag;
+	else 
           params = tm_params_init(mod, .1, 5, pf->alpha);     
-        }
+
 	if (pf->init_parsimony)
 	  tm_params_init_branchlens_parsimony(params, mod, msa, cat);
 
@@ -1191,6 +1184,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 	  vec_free(mod->backgd_freqs);
 	  mod->backgd_freqs = NULL;
         }
+
 
         if (i == 0) {
           if (!quiet) fprintf(stderr, "Compacting sufficient statistics ...\n");
@@ -1210,7 +1204,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
          */
         if (mod->backgd_freqs == NULL && pf->extendedFlag == 1){
           tm_init_backgd(mod, msa, cat);
-          residuesSize = mod->backgd_freqs->size-1;
+         residuesSize = mod->backgd_freqs->size-1;
           gapFreq = vec_get(mod->backgd_freqs,4);
           /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
            *             reciprocal to divide all our frequencies by.*/
@@ -1222,11 +1216,11 @@ int run_phyloFit(struct phyloFit_struct *pf) {
             vec_set(params, mod->backgd_idx+k, normalizedFreq);
             /*Now that they're computed copy them from the parameter vector to the model.*/
             mod->backgd_freqs->data[k] = normalizedFreq;
-          }
+         }
           /*Do Gap Character.*/
           vec_set(params, mod->backgd_idx+4, gapFreq);
           mod->backgd_freqs->data[4] = gapFreq;
-          
+
           /* We needed the background frequencies properly initialized for this model. Now
            * that we have them rerun the initiate model function.*/
           params = tm_params_init(mod, .1, 5, pf->alpha);
@@ -1234,13 +1228,16 @@ int run_phyloFit(struct phyloFit_struct *pf) {
         if(mod->subst_mod == F84){
           tm_init_backgd(mod, msa, cat);
           /* We needed the background frequencies properly initialized for this model. Now
-           * that we have them rerun the initiate model function.*/
+          * that we have them rerun the initiate model function.*/
           params = tm_params_init(mod, .1, 5, pf->alpha);
         }
+
         if (pf->use_em)
           tm_fit_em(mod, msa, params, cat, pf->precision, pf->max_em_its, pf->logf, error_file);
-        else 
-          tm_fit(mod, msa, params, cat, pf->precision, pf->logf, pf->quiet, error_file,pf->extendedFlag);
+        else if(subst_mod == F84E)
+          tm_fit(mod, msa, params, cat, pf->precision, pf->logf, pf->quiet, error_file, 1);
+        else
+          tm_fit(mod, msa, params, cat, pf->precision, pf->logf, pf->quiet, error_file, 0);
       }
 
       if (pf->output_fname_root != NULL) 
@@ -1267,28 +1264,28 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 	if (!quiet) fprintf(stderr, "Writing model to %s ...\n", 
 			    mod_fname->chars);
 	F = phast_fopen(mod_fname->chars, "w+");
-        
+
         /*If this is the extended prunning algorithm we must print some extra information,
-         mainly the matrix parameters we calculated.*/
+          mainly the matrix parameters we calculated.*/
         if(mod->subst_mod == F84 || mod->subst_mod == F84E)
           //Print all needed info from model here!
           printExtendedInfo("phyloFit.infoX", mod);
         
         //Un-normalize the background frequencies when printing final output.
         gapFreq = vec_get(mod->backgd_freqs,4);
-          /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
-            reciprocal to divide all our frequencies by.*/
-          double gapMultiplier = 1.0 - gapFreq;
+        /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
+          reciprocal to divide all our frequencies by.*/
+        double gapMultiplier = 1.0 - gapFreq;
 
-          for (k = 0; k < residuesSize; k++){
-            double currentFreq = vec_get(mod->backgd_freqs, k);
-            double normalizedFreq = currentFreq * gapMultiplier;
-            vec_set(params, mod->backgd_idx + k, normalizedFreq);
+        for (k = 0; k < residuesSize; k++){
+          double currentFreq = vec_get(mod->backgd_freqs, k);
+          double normalizedFreq = currentFreq * gapMultiplier;
+          vec_set(params, mod->backgd_idx + k, normalizedFreq);
 
-            /*Now that they're computed copy them from the parameter vector to the model.*/
-            mod->backgd_freqs->data[k] = normalizedFreq;
-          }
-	tm_print(F, mod);
+          /*Now that they're computed copy them from the parameter vector to the model.*/
+          mod->backgd_freqs->data[k] = normalizedFreq;
+        }
+        tm_print(F, mod);
 	phast_fclose(F);
       }
       if (pf->results != NULL)
@@ -1357,6 +1354,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   return 0;
 }
 
+
 /*A*/
 int run_phyloFit_multi(struct phyloFit_struct *pf) {
   //FILE *F, *WINDOWF=NULL;
@@ -1408,8 +1406,8 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
 
   if (pf->gaps_as_bases && pf->subst_mod != JC69 && pf->subst_mod != F81 && 
       pf->subst_mod != HKY85G && pf->subst_mod != REV && 
-      pf->subst_mod != UNREST && pf->subst_mod != SSREV && pf->subst_mod != INDEL)
-    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, HKY85+Gap, REV, SSREV, and UNREST and INDEL.\n");
+      pf->subst_mod != UNREST && pf->subst_mod != SSREV && pf->subst_mod != F84E)
+    die("ERROR: --gaps-as-bases currently only supported with JC69, F81, HKY85+Gap, REV, SSREV, and UNREST and F84E.\n");
                                 /* with HKY, yields undiagonalizable matrix */
   if ((pf->no_freqs || pf->no_rates) && mods == NULL)
     die("ERROR: --init-model required with --no-freqs and/or --no-rates.\n");
@@ -2153,3 +2151,4 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   return;
 }
 //==========================================================================================
+

@@ -50,7 +50,6 @@ struct phyloFit_struct {
     init_parsimony, parsimony_only, no_branchlens,
     label_categories, symfreq, init_backgd_from_data,
     use_selection, max_em_its;
-  
   unsigned int nsites_threshold;
   TreeNode *tree;
   List *trees;
@@ -88,13 +87,15 @@ void print_post_prob_stats(TreeModel *mod, MSA *msa, char *output_fname_root,
 			   int cat, int quiet,
 			   ListOfLists *results);
 
+
 /**
- * Printing functin printing additional information computed from running phyloFit
+* Printing functin printing additional information computed from running phyloFit
  * with the extended Prunning Algorithm.
  * @param fileName, name of file to write to.
  * @param tm, model containing information we shall write.
  */
 void printExtendedInfo(char* fileName, TreeModel* tm);
+
 
 #define BRANCH_TYPE 0
 #define SUBTREE_TYPE 1

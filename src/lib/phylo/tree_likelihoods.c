@@ -151,7 +151,6 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
   if (post != NULL && post->rcat_expected_nsites != NULL)
     for (rcat = 0; rcat < mod->nratecats; rcat++)
       post->rcat_expected_nsites[rcat] = 0;
-
   
   /*Iterate over every column in MSA, computer likelihood L(i) for ith column. Add all
    likelihoods for overall tree.*/
@@ -270,6 +269,7 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
               /* general recursive case */
               MarkovMatrix *lsubst_mat = mod->P[n->lchild->id][rcat];
               MarkovMatrix *rsubst_mat = mod->P[n->rchild->id][rcat];
+
               /* Debug info, delete at some point maybe.*//*
               printf("Rate Matrix:\n");
               printMatrix(mod->rate_matrix->matrix,4);
@@ -293,12 +293,13 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
             }
           }
           /* Debug info, delete at some point maybe.*/
+          /*
           int j;
           for(i = 0; i < lst_size(traversal); i++)
-            for (j = 0; j < mod->rate_matrix->size; j++)
-              printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
+              for (j = 0; j < mod->rate_matrix->size; j++)
+                  printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
           printf("\n\n");
-
+          */
           if (post != NULL && pass == 0) {
             MarkovMatrix *subst_mat;
             double this_total, denom;
@@ -447,8 +448,9 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
       else die("got total_prob=%.10g\n", total_prob);
       }*/
     total_prob = log2(total_prob);
-    
-    
+    /*TO DELETE HERE OMAR*//*
+    printf("Total Probability: %f\n", total_prob);
+*/
     if (curr_tuple_scores != NULL && 
         (cat < 0 || msa->ss->cat_counts[cat][tupleidx] > 0))
       curr_tuple_scores[tupleidx] = total_prob;
@@ -457,34 +459,13 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
 
     total_prob *= (cat >= 0 ? msa->ss->cat_counts[cat][tupleidx] : 
                    msa->ss->counts[tupleidx]); /* log space */
-    printf("Total Probability: %f\n", total_prob);
+    /*TO DELETE HERE OMAR*/
+    /*printf("Total Probability: %f\n", total_prob);*/
+
     retval += total_prob;     /* log space */
         
   } /* for tupleidx */
 
-  /*Debugging print info:*//*
-  int paramIndex = mod->ratematrix_idx;
-  double* paramArray = &(mod->all_params->data[paramIndex]);
-  printf("Current Rates:\n");
-  printf("Alpha: %f\n", paramArray[0]);
-  printf("Betta: %f\n", paramArray[1]);
-  printf("Likelihood: %f\n", retval);
-  printf("\n\n");
-  
-  printf("Current Rate Matrix values:\n");
-  printMatrix(mod->rate_matrix->matrix,4);
-  printf("\n\n");
-  
-  printf("Current background frequencies:\n");
-  double* freq = mod->backgd_freqs->data;
-  printf("A : %f\n", freq[0]);
-  printf("C : %f\n", freq[1]);
-  printf("G : %f\n", freq[2]);
-  printf("T : %f\n", freq[3]);
-  printf("\n\n");
-  */
-  printf("%f\n\n", retval);
-  
   for (j = 0; j < nstates; j++) {
     sfree(inside_joint[j]);
     sfree(outside_joint[j]);
@@ -519,6 +500,432 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
   }
   return(retval);
 }
+
+/* this is retained for possible use in the future; not using weight
+   matrices for much anymore */
+void tl_compute_log_likelihood_weight_matrix(TreeModel *mod, MSA *msa, 
+                                             double *col_scores, int cat) {
+  int i, seq, idx, alph_size = strlen(msa->alphabet);
+  double retval = 0;
+  char tuple[mod->order + 2];
+  Vector *margfreqs = 
+    get_marginal_eq_freqs(mod->rate_matrix->states, mod->order+1,
+                          mod->backgd_freqs);
+  int col_by_col = (col_scores != NULL || msa->ss == NULL);
+                                /* evaluate the alignment
+                                   column-by-column if either
+                                   col-by-col scores are required or
+                                   the sufficient stats are not
+                                   available */
+                                /* NOTE: !col_by_col -> msa->ss != NULL */
+
+  checkInterrupt();
+  tuple[mod->order+1] = '\0';
+
+  if (mod->tree != NULL)
+    die("ERROR tl_compute_log_likelihood_weight_matrix: mod->tree should be NULL\n");
+  if (msa->ss == NULL && msa->seqs == NULL)
+    die("ERROR tl_compute_log_likelihood_weight_matrix: mod->ss and mod->seqs are both NULL\n");
+
+  if (cat >= 0) {
+    if (col_by_col) {
+      if (msa->categories == NULL)
+	die("ERROR tl_compute_log_likelihood_weight_matrix: msa->categories is NULL\n");
+    }
+    /* if using categories and col-by-col
+       scoring, then must have col-by-col
+       categories */
+    else if (msa->ss->cat_counts == NULL)
+      die("ERROR tl_compute_log_likelihood_weight_matrix: msa->ss->cat_counts is NULL\n");
+    /* if using categories and unordered
+       sufficient statistics, must have
+       category-by-category counts */
+  }
+
+  if (col_by_col)
+    if (msa->seqs == NULL && msa->ss->tuple_idx == NULL)
+      die("ERROR tl_compute_log_likelihood requires ordered alignment\n");
+  /* if using col-by-col scoring, must
+     have ordered representation */
+    
+  retval = 0;
+  for (idx = 0; 
+       idx < (col_by_col ? msa->length : msa->ss->ntuples);
+       idx++) {
+    int thisstate, col, tupleidx;
+    double col_val = 0, prob = 0;
+
+    /* NOTE: when evaluating col-by-col, idx is a column, but otherwise
+       idx is a tuple index.  Let's be clear about this ... */
+    col = (col_by_col ? idx : -1); 
+    if (msa->ss == NULL) tupleidx = -1; 
+    else if (col_by_col) tupleidx = msa->ss->tuple_idx[col];
+    else tupleidx = idx;      /* NOTE: tupleidx will be defined
+                                 whenever msa->ss != NULL */
+
+    if (cat < 0 || (col_by_col && msa->categories[col] == cat) ||
+        (!col_by_col && msa->ss->cat_counts[cat][tupleidx] > 0)) {
+
+      for (seq = 0; seq < msa->nseqs; seq++) {
+
+        for (i = -mod->order; i <= 0; i++) {
+          if (msa->ss != NULL)
+            tuple[mod->order+i] = ss_get_char_tuple(msa, tupleidx, seq, i); 
+          else if (col + i >= 0)
+            tuple[mod->order+i] = msa->seqs[seq][col+i];
+          else 
+            tuple[mod->order+i] = msa->missing[0];
+        }
+
+        if (!mod->allow_gaps && 
+            msa->inv_alphabet[(int)tuple[mod->order]] < 0 &&
+            !msa->is_missing[(int)tuple[mod->order]]) {
+            
+          col_val = NEGINFTY; /* we want to apply the strict penalty
+                                 iff there is an unrecognized
+                                 character in *this* (the rightmost)
+                                 col; missing data is a special case -- don't
+                                 penalize even if not in alphabet */
+
+                                /* FIXME: seems too complicated --
+                                   just check for gap? */
+          break; 
+        }
+        else if (mod->allow_but_penalize_gaps &&
+                 msa->inv_alphabet[(int)tuple[mod->order]] < 0) { 
+          /* temporary */
+          double tmp_prob;
+          prob = 1;
+          for (i = 0; i < alph_size; i++) {
+            tuple[mod->order] = msa->alphabet[i];
+            tmp_prob = vec_get(margfreqs, tuple_index_missing_data(tuple, msa->inv_alphabet, msa->is_missing, alph_size));
+            if (tmp_prob < prob) prob = tmp_prob;
+          }
+          if (prob == 0) prob = 0.01;
+        }
+        else {
+          thisstate = tuple_index_missing_data(tuple, msa->inv_alphabet, 
+                                               msa->is_missing, alph_size);
+          prob = vec_get(margfreqs, thisstate);
+        }
+
+        if (prob == 0) { col_val = NEGINFTY; break; }
+
+        col_val += log2(prob);
+
+        if (mod->use_conditionals && mod->order > 0) {
+          tuple[mod->order] = msa->missing[0];
+          col_val -= log2(vec_get(margfreqs, tuple_index_missing_data(tuple, msa->inv_alphabet, msa->is_missing, alph_size)));
+        }
+      }
+    }
+    if (!col_by_col)   /* tuple-by-tuple scoring */
+      col_val *= (cat >= 0 ? msa->ss->cat_counts[cat][tupleidx] : 
+                  msa->ss->counts[tupleidx]);
+    retval += col_val;
+    if (col_scores != NULL) col_scores[col] = col_val;
+  }
+  if (retval < NEGINFTY) retval = NEGINFTY; 
+  /* must be true if any of the columns
+     considered had prob NEGINFTY */
+  vec_free(margfreqs);
+}
+
+
+TreePosteriors *tl_new_tree_posteriors(TreeModel *mod, MSA *msa, int do_bases, 
+                                       int do_substs, int do_expected_nsubst, 
+                                       int do_expected_nsubst_tot,
+				       int do_expected_nsubst_col,
+                                       int do_rate_cats, int do_rate_cats_exp) {
+  int i, j, k, r, ntuples, nnodes, nstates;
+  TreePosteriors *tp = (TreePosteriors*)smalloc(sizeof(TreePosteriors));
+
+  if (mod->tree ==  NULL)
+    die("ERROR tl_new_tree_posteriors: mod->tree is NULL\n");
+  if (msa->ss == NULL)
+    die("ERROR tl_new_tree_posteriors: msa->ss is NULL\n");
+
+  ntuples = msa->ss->ntuples;
+  nnodes = mod->tree->nnodes;
+  nstates = mod->rate_matrix->size;
+
+  if (do_bases) {
+    tp->base_probs = (double****)smalloc(mod->nratecats * sizeof(double***));
+    for (r = 0; r < mod->nratecats; r++) {
+      tp->base_probs[r] = (double***)smalloc(nstates * sizeof(double**));
+      for (i = 0; i < nstates; i++) {
+        tp->base_probs[r][i] = (double**)smalloc(nnodes * sizeof(double*));
+        for (j = 0; j < nnodes; j++) {
+          tp->base_probs[r][i][j] = (double*)smalloc(ntuples * sizeof(double));
+        }
+      }
+    }
+  }
+  else tp->base_probs = NULL;
+
+  if (do_substs) {
+    tp->subst_probs = (double*****)smalloc(mod->nratecats * sizeof(double****));
+    for (r = 0; r < mod->nratecats; r++) {
+      checkInterrupt();
+      tp->subst_probs[r] = (double****)smalloc(nstates * sizeof(double***));
+      for (i = 0; i < nstates; i++) {
+        tp->subst_probs[r][i] = (double***)smalloc(nstates * sizeof(double**));
+        for (j = 0; j < nstates; j++) {
+          tp->subst_probs[r][i][j] = (double**)smalloc(nnodes * sizeof(double*));
+          for (k = 0; k < nnodes; k++) 
+            if (k != mod->tree->id) /* don't need one for the root */
+              tp->subst_probs[r][i][j][k] = (double*)smalloc(ntuples * 
+                                                            sizeof(double));
+            else 
+              tp->subst_probs[r][i][j][k] = NULL;
+        }
+      }
+    }
+  }
+  else tp->subst_probs = NULL;
+
+  if (do_expected_nsubst) {
+    tp->expected_nsubst = (double***)smalloc(mod->nratecats * sizeof(double**));
+    for (r = 0; r < mod->nratecats; r++) {
+      tp->expected_nsubst[r] = (double**)smalloc(nnodes * sizeof(double*));
+      for (i = 0; i < nnodes; i++) {
+        if (i != mod->tree->id)
+          tp->expected_nsubst[r][i] = (double*)smalloc(ntuples * sizeof(double));
+        else
+          tp->expected_nsubst[r][i] = NULL;
+      }
+    }
+  }
+  else tp->expected_nsubst = NULL;
+
+  if (do_expected_nsubst_tot) {
+    tp->expected_nsubst_tot = (double****)smalloc(mod->nratecats * sizeof(double***));
+    for (r = 0; r < mod->nratecats; r++) {
+      tp->expected_nsubst_tot[r] = (double***)smalloc(nstates * sizeof(double**));
+      for (i = 0; i < nstates; i++) {
+        tp->expected_nsubst_tot[r][i] = (double**)smalloc(nstates * 
+                                                         sizeof(double*));
+        for (j = 0; j < nstates; j++) 
+          tp->expected_nsubst_tot[r][i][j] = (double*)smalloc(nnodes * 
+                                                             sizeof(double));
+      }
+    }
+  }
+  else tp->expected_nsubst_tot = NULL;
+
+  if (do_expected_nsubst_col) {
+    tp->expected_nsubst_col = (double*****)smalloc(mod->nratecats * sizeof(double****));
+    for (r=0; r < mod->nratecats; r++) {
+      tp->expected_nsubst_col[r] = (double****)smalloc(nnodes * sizeof(double***));
+      for (i=0; i < nnodes; i++) {
+	tp->expected_nsubst_col[r][i] = (double***)smalloc(ntuples * sizeof(double**));
+	for (j=0; j < ntuples; j++) {
+	  tp->expected_nsubst_col[r][i][j] = (double**)smalloc(nstates * sizeof(double*));
+	  for (k=0; k < nstates; k++) 
+	    tp->expected_nsubst_col[r][i][j][k] = (double*)smalloc(nstates * sizeof(double));
+	}
+      }
+    }
+  }
+  else tp->expected_nsubst_col = NULL;
+
+  if (do_rate_cats) {
+    tp->rcat_probs = (double**)smalloc(mod->nratecats * sizeof(double*));
+    for (i = 0; i < mod->nratecats; i++)
+      tp->rcat_probs[i] = (double*)smalloc(ntuples * sizeof(double));
+  }
+  else tp->rcat_probs = NULL;
+
+  if (do_rate_cats_exp) 
+    tp->rcat_expected_nsites = (double*)smalloc(mod->nratecats * sizeof(double));
+  else tp->rcat_expected_nsites = NULL;
+
+  return tp;
+}
+
+void tl_free_tree_posteriors(TreeModel *mod, MSA *msa, TreePosteriors *tp) {
+  int i, j, k, r, ntuples, nnodes, nstates;
+
+  if (mod->tree == NULL)
+    die("ERROR tl_free_tree_posteriors: mod->tree is NULL\n");
+  if (msa->ss == NULL)
+    die("ERROR tl_free_tree_posteriors: msa->ss is NULL\n");
+  ntuples = msa->ss->ntuples;
+  nnodes = mod->tree->nnodes;
+  nstates = mod->rate_matrix->size;
+
+  if (tp->base_probs != NULL) {
+    for (r = 0; r < mod->nratecats; r++) {
+      for (i = 0; i < nstates; i++) {
+        for (j = 0; j < nnodes; j++) 
+          if (tp->base_probs[r][i][j] != NULL)
+            sfree(tp->base_probs[r][i][j]);
+        sfree(tp->base_probs[r][i]);
+      }
+      sfree(tp->base_probs[r]);
+    }
+    sfree(tp->base_probs);
+  }
+  if (tp->subst_probs != NULL) {
+    for (r = 0; r < mod->nratecats; r++) {
+      for (i = 0; i < nstates; i++) {
+        for (j = 0; j < nstates; j++) {
+          for (k = 0; k < nnodes; k++) 
+            if (k != mod->tree->id) 
+              sfree(tp->subst_probs[r][i][j][k]);
+          sfree(tp->subst_probs[r][i][j]);
+        }
+        sfree(tp->subst_probs[r][i]);
+      }
+      sfree(tp->subst_probs[r]);
+    }
+    sfree(tp->subst_probs);
+  }
+  if (tp->expected_nsubst != NULL) {
+    for (r = 0; r < mod->nratecats; r++) {
+      for (i = 0; i < nnodes; i++) 
+        if (i != mod->tree->id)
+          sfree(tp->expected_nsubst[r][i]);
+      sfree(tp->expected_nsubst[r]);
+    }
+    sfree(tp->expected_nsubst);
+  }
+  if (tp->expected_nsubst_tot != NULL) {
+    for (r = 0; r < mod->nratecats; r++) {
+      for (i = 0; i < nstates; i++) {
+        for (j = 0; j < nstates; j++) 
+          sfree(tp->expected_nsubst_tot[r][i][j]);
+        sfree(tp->expected_nsubst_tot[r][i]);
+      }
+      sfree(tp->expected_nsubst_tot[r]);
+    }
+    sfree(tp->expected_nsubst_tot);
+  }
+  if (tp->expected_nsubst_col != NULL) {
+    for (r = 0; r < mod->nratecats; r++) {
+      for (i=0; i < nnodes; i++) {
+	for (j=0; j < ntuples; j++) {
+	  for (k=0; k < nstates; k++) 
+	    sfree(tp->expected_nsubst_col[r][i][j][k]);
+	  sfree(tp->expected_nsubst_col[r][i][j]);
+	}
+	sfree(tp->expected_nsubst_col[r][i]);
+      }
+      sfree(tp->expected_nsubst_col[r]);
+    }
+    sfree(tp->expected_nsubst_col);
+  }
+  if (tp->rcat_probs != NULL) {
+    for (i = 0; i < mod->nratecats; i++)
+      sfree(tp->rcat_probs[i]);
+    sfree(tp->rcat_probs);           
+  }
+  if (tp->rcat_expected_nsites != NULL) {
+    sfree(tp->rcat_expected_nsites);           
+  }
+
+  sfree(tp);
+}
+
+/* compute the expected (posterior) complete log likelihood of a tree
+   model based on a TreePosteriors object.  Equilibrium frequencies
+   are not considered. */
+double tl_compute_partial_ll_suff_stats(TreeModel *mod, TreePosteriors *post) {
+  double retval = 0;
+  int i, j, k, cat;
+  TreeNode *n;
+  int nstates = mod->rate_matrix->size;
+
+  for (cat = 0; cat < mod->nratecats; cat++) {
+    for (i = 0; i < mod->tree->nnodes; i++) {
+      MarkovMatrix *subst_mat;
+      if (i == mod->tree->id) continue; /* skip root */
+      n = lst_get_ptr(mod->tree->nodes, i);
+      subst_mat = mod->P[n->id][cat];
+      for (j = 0; j < nstates; j++) { /* from tuple */
+        for (k = 0; k < nstates; k++) { /* to tuple */
+          retval += (post->expected_nsubst_tot[cat][j][k][i] *
+                     log2(mm_get(subst_mat, j, k)));
+        }
+      }
+    }
+  }
+  return retval;
+}
+
+/* The functions below are used for computing likelihoods with
+   weight-matrix models.  They should possibly be moved to misc.c.  */
+
+/* given an alphabet, a tuple size, and a vector of equilibrium
+   frequences, create a new vector of marginal equilibrium
+   frequencies describing the space of "meta-tuples", which contain
+   actual characters *or* missing data characters.  Each meta-tuple is
+   given an equilibrium frequency equal to the sum of the frequencies
+   of all "matching" ordinary tuples.  Missing data characters are
+   assumed to be gap characters or Ns. */
+Vector *get_marginal_eq_freqs (char *alphabet, int tuple_size, 
+			       Vector *eq_freqs) {
+  int alph_size = strlen(alphabet);
+  int ntuples = int_pow(alph_size, tuple_size);
+  int i;
+  Vector *retval = vec_new(int_pow(alph_size+1, tuple_size));
+  vec_zero(retval);
+
+  /* loop through the ordinary (non-meta) tuples */
+  for (i = 0; i < ntuples; i++) {
+    int digits[tuple_size];
+    int j, k, remainder;
+    
+    /* first decompose the tuple into its "digits" */
+    remainder = i;
+    for (j = 0; j < tuple_size; j++) { /* from least sig. to most */
+      digits[j] = remainder % alph_size;
+      remainder /= alph_size;
+    }
+
+    /* now consider every pattern of missing-data characters that can
+       be overlaid on it.  The equilibrium frequency of the tuple
+       contributes to the marginal frequency corresponding to every
+       such pattern.  There are 2^tuple_size of them to consider. */
+    for (k = 0; k < (1 << tuple_size); k++) {
+      int newtuple = 0, base = 1;
+      for (j = 0; j < tuple_size; j++) {
+        if (k & (1 << j)) 
+          newtuple += alph_size * base;
+        else 
+          newtuple += digits[j] * base;
+        base *= (alph_size + 1);
+      }
+      vec_set(retval, newtuple, 
+                     vec_get(retval, newtuple) + 
+                     vec_get(eq_freqs, i));
+    }
+  }
+  return retval;
+}
+
+/* given a tuple consisting of actual characters and/or missing data,
+   return the corresponding state number in the "meta-tuple" space.
+   Returns -1 for unallowed tuples */
+int tuple_index_missing_data(char *tuple, int *inv_alph, int *is_missing,
+                             int alph_size) {
+  int retval = 0, i;
+  int tuple_size = strlen(tuple);
+  for (i = 0; i < tuple_size; i++) {
+    int charidx = inv_alph[(int)tuple[tuple_size-i-1]];
+    if (charidx < 0) {
+      if (tuple[tuple_size-i-1] == GAP_CHAR || 
+          is_missing[(int)tuple[tuple_size-i-1]])
+        charidx = alph_size;
+      else return -1;
+    }
+    retval += charidx * int_pow(alph_size+1, i);
+                                /* i == 0 => least sig. dig; 
+                                   i == tuple_size-1 => most sig. dig */
+  }
+  return retval;
+}
+
 /* =====================================================================================*/
 /* Compute the likelihood of a tree model with respect to an
    alignment. Similar to above except uses an extended Felsestein
@@ -743,25 +1150,26 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
     }
     
     total_prob = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
-    
     /*
     int j;
     for(i = 0; i < lst_size(traversal); i++)
       for (j = 0; j < 5; j++)
         printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
     printf("\n\n");
-    */
+     */
     /*Multiply by the amount of times this column appeared in the alignment.*/
     if(tupleidx != msa->ss->ntuples)
       retval += log2(total_prob) * msa->ss->counts[tupleidx];
     else /*Case for all gaps column.*/
       allGapProb = total_prob;
-    printf("Total Probability: %f\n", log2(total_prob));
+    /*
+    printf("Total Probability: %f\n", log2(total_prob));*/
   }
   /* Calculate total probability for site in alignment, second modification of
    * extended pruning algorithm.*/
   retval = getProbZeroL(mod, p, allGapProb, retval);
-  printf("retval: %f\n", retval);
+  /*
+  printf("retval: %f\n", retval);*/
   /*Debugging print info:*/
   /*
   int paramIndex = mod->ratematrix_idx;
@@ -1244,57 +1652,6 @@ double epsilonProbability(int j,int i,double t,double* freqs,double* params){
   return firstPart + firstEigenPart + secondEigenPart + lastPart;
 }
 /* =====================================================================================*/
-/** THIS IS NO LONGER USED OR NEEDED.
- * Given the parameters will compute the summation over all eigenvalues for our R matrix,
- * sum = 0
- * for eigen in eigenValues:
- *   sum += O(a,i,j)*exp(-(eigen+mu)*t)
- * Where Matrix O is defined in the apendix of the paper.
- * @param rMatrix, rateMatrix for our model.
- * @param mu, rate of deletions.
- * @param t, branch length.
- * @return sum.
- */
-double computeOhMatrixSummation(int i, int j, DiagonalMatrix* dMatrix, double mu, double t){
-  double currentEigen;
-  double sum = 0;
-  int k, l;
-  int position;
-  double oResults;
-  
-  /*Get from Matrix.*/
-  int eigenNumber = dMatrix->eigenNumber;
-  double* allEigenvalues = dMatrix->allEigenvalues;
-  Matrix* diagonalMatrix = dMatrix->diagonalMatrix;
-  Matrix* uMatrix = dMatrix->uMatrix;
-  Matrix* uInverseMatrix = dMatrix->uInverseMatrix;
-  
-  /*If we have multiplicity higher than 1 we must account for this when finding the 
-   * position of our eigenvalues in the diagonal matrix.*/
-  int multiplicity[4] = {0, 0, 0, 0};
-  
-  for( k = 0; k < eigenNumber; k ++){
-    currentEigen = allEigenvalues[k];
-    for( l = 0; l <= k; l ++)
-      if (abs(currentEigen - allEigenvalues[l]) < 0.00001)
-        multiplicity[k]++;
-  }
-
-  /*Iterate through eigenvalues adding up values.*/
-  for(k = 0; k < eigenNumber; k ++){
-    currentEigen = allEigenvalues[k];
-    position = findPositionOfEigenvalue(diagonalMatrix, currentEigen,multiplicity[k]);
-    /* O_a(i,j) = U(i,pos)*U^(-1)(pos,j)*/
-    oResults = mat_get(uMatrix, i, position) * mat_get(uInverseMatrix,position,j);
-    /*Notice subtraction due to distributing the negative sign. Eigenvalues are supposed
-     * to be turned positive by negating (they should all come out negative, except zero).
-     */
-    sum += oResults * exp((currentEigen - mu) * t);
-  }
-
-  return sum;
-}
-/* =====================================================================================*/
 /**
  * Helper function to print matrices.
  * @param m, the actual matrix.
@@ -1310,37 +1667,6 @@ void printMatrix(Matrix* m, int size){
   }
   printf("\n");
   return;
-}
-/* =====================================================================================*/
-/**THIS IS NO LONGER USED OR NEEDED.
- * Get position of our matrix in our diagnolized matrix (k,k)
- * @param matrix
- * @param eigenval
- * @param mult, the multiplicity of this eigenvalue.
- * @return position on success, -1 on failure.
- */
-int findPositionOfEigenvalue(Matrix* matrix,double eigenval, int mult){
-  int l;
-  int position = -1;
-  int size = 4;
-
-  for(l = 0; l < size;l++)
-    
-    /*Difference smaller than delta to account for round off error.*/
-    if(fabs(mat_get(matrix,l,l) - eigenval) < 0.001){
-      position = l;
-      
-      if (mult == 1)
-        break;
-      else
-        mult--;
-    }
-  /*Position not found die!*/
-  if(position == -1){
-    printf("Eigen vector: %f not found in diagonal Matrix, sorry...", eigenval);
-    exit(1);
-  }
-  return position;
 }
 /* =====================================================================================*/
 /**
@@ -1424,428 +1750,3 @@ int probabilityOfLeaf(char currentChar,int observedState,int iResidue){
 }
 /* =====================================================================================*/
 /*EOO (End of Omar)*/
-/* this is retained for possible use in the future; not using weight
-   matrices for much anymore */
-void tl_compute_log_likelihood_weight_matrix(TreeModel *mod, MSA *msa, 
-                                             double *col_scores, int cat) {
-  int i, seq, idx, alph_size = strlen(msa->alphabet);
-  double retval = 0;
-  char tuple[mod->order + 2];
-  Vector *margfreqs = 
-    get_marginal_eq_freqs(mod->rate_matrix->states, mod->order+1,
-                          mod->backgd_freqs);
-  int col_by_col = (col_scores != NULL || msa->ss == NULL);
-                                /* evaluate the alignment
-                                   column-by-column if either
-                                   col-by-col scores are required or
-                                   the sufficient stats are not
-                                   available */
-                                /* NOTE: !col_by_col -> msa->ss != NULL */
-
-  checkInterrupt();
-  tuple[mod->order+1] = '\0';
-
-  if (mod->tree != NULL)
-    die("ERROR tl_compute_log_likelihood_weight_matrix: mod->tree should be NULL\n");
-  if (msa->ss == NULL && msa->seqs == NULL)
-    die("ERROR tl_compute_log_likelihood_weight_matrix: mod->ss and mod->seqs are both NULL\n");
-
-  if (cat >= 0) {
-    if (col_by_col) {
-      if (msa->categories == NULL)
-	die("ERROR tl_compute_log_likelihood_weight_matrix: msa->categories is NULL\n");
-    }
-    /* if using categories and col-by-col
-       scoring, then must have col-by-col
-       categories */
-    else if (msa->ss->cat_counts == NULL)
-      die("ERROR tl_compute_log_likelihood_weight_matrix: msa->ss->cat_counts is NULL\n");
-    /* if using categories and unordered
-       sufficient statistics, must have
-       category-by-category counts */
-  }
-
-  if (col_by_col)
-    if (msa->seqs == NULL && msa->ss->tuple_idx == NULL)
-      die("ERROR tl_compute_log_likelihood requires ordered alignment\n");
-  /* if using col-by-col scoring, must
-     have ordered representation */
-    
-  retval = 0;
-  for (idx = 0; 
-       idx < (col_by_col ? msa->length : msa->ss->ntuples);
-       idx++) {
-    int thisstate, col, tupleidx;
-    double col_val = 0, prob = 0;
-
-    /* NOTE: when evaluating col-by-col, idx is a column, but otherwise
-       idx is a tuple index.  Let's be clear about this ... */
-    col = (col_by_col ? idx : -1); 
-    if (msa->ss == NULL) tupleidx = -1; 
-    else if (col_by_col) tupleidx = msa->ss->tuple_idx[col];
-    else tupleidx = idx;      /* NOTE: tupleidx will be defined
-                                 whenever msa->ss != NULL */
-
-    if (cat < 0 || (col_by_col && msa->categories[col] == cat) ||
-        (!col_by_col && msa->ss->cat_counts[cat][tupleidx] > 0)) {
-
-      for (seq = 0; seq < msa->nseqs; seq++) {
-
-        for (i = -mod->order; i <= 0; i++) {
-          if (msa->ss != NULL)
-            tuple[mod->order+i] = ss_get_char_tuple(msa, tupleidx, seq, i); 
-          else if (col + i >= 0)
-            tuple[mod->order+i] = msa->seqs[seq][col+i];
-          else 
-            tuple[mod->order+i] = msa->missing[0];
-        }
-
-        if (!mod->allow_gaps && 
-            msa->inv_alphabet[(int)tuple[mod->order]] < 0 &&
-            !msa->is_missing[(int)tuple[mod->order]]) {
-            
-          col_val = NEGINFTY; /* we want to apply the strict penalty
-                                 iff there is an unrecognized
-                                 character in *this* (the rightmost)
-                                 col; missing data is a special case -- don't
-                                 penalize even if not in alphabet */
-
-                                /* FIXME: seems too complicated --
-                                   just check for gap? */
-          break; 
-        }
-        else if (mod->allow_but_penalize_gaps &&
-                 msa->inv_alphabet[(int)tuple[mod->order]] < 0) { 
-          /* temporary */
-          double tmp_prob;
-          prob = 1;
-          for (i = 0; i < alph_size; i++) {
-            tuple[mod->order] = msa->alphabet[i];
-            tmp_prob = vec_get(margfreqs, tuple_index_missing_data(tuple, msa->inv_alphabet, msa->is_missing, alph_size));
-            if (tmp_prob < prob) prob = tmp_prob;
-          }
-          if (prob == 0) prob = 0.01;
-        }
-        else {
-          thisstate = tuple_index_missing_data(tuple, msa->inv_alphabet, 
-                                               msa->is_missing, alph_size);
-          prob = vec_get(margfreqs, thisstate);
-        }
-
-        if (prob == 0) { col_val = NEGINFTY; break; }
-
-        col_val += log2(prob);
-
-        if (mod->use_conditionals && mod->order > 0) {
-          tuple[mod->order] = msa->missing[0];
-          col_val -= log2(vec_get(margfreqs, tuple_index_missing_data(tuple, msa->inv_alphabet, msa->is_missing, alph_size)));
-        }
-      }
-    }
-    if (!col_by_col)   /* tuple-by-tuple scoring */
-      col_val *= (cat >= 0 ? msa->ss->cat_counts[cat][tupleidx] : 
-                  msa->ss->counts[tupleidx]);
-    retval += col_val;
-    if (col_scores != NULL) col_scores[col] = col_val;
-  }
-  if (retval < NEGINFTY) retval = NEGINFTY; 
-  /* must be true if any of the columns
-     considered had prob NEGINFTY */
-  vec_free(margfreqs);
-}
-
-
-TreePosteriors *tl_new_tree_posteriors(TreeModel *mod, MSA *msa, int do_bases, 
-                                       int do_substs, int do_expected_nsubst, 
-                                       int do_expected_nsubst_tot,
-				       int do_expected_nsubst_col,
-                                       int do_rate_cats, int do_rate_cats_exp) {
-  int i, j, k, r, ntuples, nnodes, nstates;
-  TreePosteriors *tp = (TreePosteriors*)smalloc(sizeof(TreePosteriors));
-
-  if (mod->tree ==  NULL)
-    die("ERROR tl_new_tree_posteriors: mod->tree is NULL\n");
-  if (msa->ss == NULL)
-    die("ERROR tl_new_tree_posteriors: msa->ss is NULL\n");
-
-  ntuples = msa->ss->ntuples;
-  nnodes = mod->tree->nnodes;
-  nstates = mod->rate_matrix->size;
-
-  if (do_bases) {
-    tp->base_probs = (double****)smalloc(mod->nratecats * sizeof(double***));
-    for (r = 0; r < mod->nratecats; r++) {
-      tp->base_probs[r] = (double***)smalloc(nstates * sizeof(double**));
-      for (i = 0; i < nstates; i++) {
-        tp->base_probs[r][i] = (double**)smalloc(nnodes * sizeof(double*));
-        for (j = 0; j < nnodes; j++) {
-          tp->base_probs[r][i][j] = (double*)smalloc(ntuples * sizeof(double));
-        }
-      }
-    }
-  }
-  else tp->base_probs = NULL;
-
-  if (do_substs) {
-    tp->subst_probs = (double*****)smalloc(mod->nratecats * sizeof(double****));
-    for (r = 0; r < mod->nratecats; r++) {
-      checkInterrupt();
-      tp->subst_probs[r] = (double****)smalloc(nstates * sizeof(double***));
-      for (i = 0; i < nstates; i++) {
-        tp->subst_probs[r][i] = (double***)smalloc(nstates * sizeof(double**));
-        for (j = 0; j < nstates; j++) {
-          tp->subst_probs[r][i][j] = (double**)smalloc(nnodes * sizeof(double*));
-          for (k = 0; k < nnodes; k++) 
-            if (k != mod->tree->id) /* don't need one for the root */
-              tp->subst_probs[r][i][j][k] = (double*)smalloc(ntuples * 
-                                                            sizeof(double));
-            else 
-              tp->subst_probs[r][i][j][k] = NULL;
-        }
-      }
-    }
-  }
-  else tp->subst_probs = NULL;
-
-  if (do_expected_nsubst) {
-    tp->expected_nsubst = (double***)smalloc(mod->nratecats * sizeof(double**));
-    for (r = 0; r < mod->nratecats; r++) {
-      tp->expected_nsubst[r] = (double**)smalloc(nnodes * sizeof(double*));
-      for (i = 0; i < nnodes; i++) {
-        if (i != mod->tree->id)
-          tp->expected_nsubst[r][i] = (double*)smalloc(ntuples * sizeof(double));
-        else
-          tp->expected_nsubst[r][i] = NULL;
-      }
-    }
-  }
-  else tp->expected_nsubst = NULL;
-
-  if (do_expected_nsubst_tot) {
-    tp->expected_nsubst_tot = (double****)smalloc(mod->nratecats * sizeof(double***));
-    for (r = 0; r < mod->nratecats; r++) {
-      tp->expected_nsubst_tot[r] = (double***)smalloc(nstates * sizeof(double**));
-      for (i = 0; i < nstates; i++) {
-        tp->expected_nsubst_tot[r][i] = (double**)smalloc(nstates * 
-                                                         sizeof(double*));
-        for (j = 0; j < nstates; j++) 
-          tp->expected_nsubst_tot[r][i][j] = (double*)smalloc(nnodes * 
-                                                             sizeof(double));
-      }
-    }
-  }
-  else tp->expected_nsubst_tot = NULL;
-
-  if (do_expected_nsubst_col) {
-    tp->expected_nsubst_col = (double*****)smalloc(mod->nratecats * sizeof(double****));
-    for (r=0; r < mod->nratecats; r++) {
-      tp->expected_nsubst_col[r] = (double****)smalloc(nnodes * sizeof(double***));
-      for (i=0; i < nnodes; i++) {
-	tp->expected_nsubst_col[r][i] = (double***)smalloc(ntuples * sizeof(double**));
-	for (j=0; j < ntuples; j++) {
-	  tp->expected_nsubst_col[r][i][j] = (double**)smalloc(nstates * sizeof(double*));
-	  for (k=0; k < nstates; k++) 
-	    tp->expected_nsubst_col[r][i][j][k] = (double*)smalloc(nstates * sizeof(double));
-	}
-      }
-    }
-  }
-  else tp->expected_nsubst_col = NULL;
-
-  if (do_rate_cats) {
-    tp->rcat_probs = (double**)smalloc(mod->nratecats * sizeof(double*));
-    for (i = 0; i < mod->nratecats; i++)
-      tp->rcat_probs[i] = (double*)smalloc(ntuples * sizeof(double));
-  }
-  else tp->rcat_probs = NULL;
-
-  if (do_rate_cats_exp) 
-    tp->rcat_expected_nsites = (double*)smalloc(mod->nratecats * sizeof(double));
-  else tp->rcat_expected_nsites = NULL;
-
-  return tp;
-}
-
-void tl_free_tree_posteriors(TreeModel *mod, MSA *msa, TreePosteriors *tp) {
-  int i, j, k, r, ntuples, nnodes, nstates;
-
-  if (mod->tree == NULL)
-    die("ERROR tl_free_tree_posteriors: mod->tree is NULL\n");
-  if (msa->ss == NULL)
-    die("ERROR tl_free_tree_posteriors: msa->ss is NULL\n");
-  ntuples = msa->ss->ntuples;
-  nnodes = mod->tree->nnodes;
-  nstates = mod->rate_matrix->size;
-
-  if (tp->base_probs != NULL) {
-    for (r = 0; r < mod->nratecats; r++) {
-      for (i = 0; i < nstates; i++) {
-        for (j = 0; j < nnodes; j++) 
-          if (tp->base_probs[r][i][j] != NULL)
-            sfree(tp->base_probs[r][i][j]);
-        sfree(tp->base_probs[r][i]);
-      }
-      sfree(tp->base_probs[r]);
-    }
-    sfree(tp->base_probs);
-  }
-  if (tp->subst_probs != NULL) {
-    for (r = 0; r < mod->nratecats; r++) {
-      for (i = 0; i < nstates; i++) {
-        for (j = 0; j < nstates; j++) {
-          for (k = 0; k < nnodes; k++) 
-            if (k != mod->tree->id) 
-              sfree(tp->subst_probs[r][i][j][k]);
-          sfree(tp->subst_probs[r][i][j]);
-        }
-        sfree(tp->subst_probs[r][i]);
-      }
-      sfree(tp->subst_probs[r]);
-    }
-    sfree(tp->subst_probs);
-  }
-  if (tp->expected_nsubst != NULL) {
-    for (r = 0; r < mod->nratecats; r++) {
-      for (i = 0; i < nnodes; i++) 
-        if (i != mod->tree->id)
-          sfree(tp->expected_nsubst[r][i]);
-      sfree(tp->expected_nsubst[r]);
-    }
-    sfree(tp->expected_nsubst);
-  }
-  if (tp->expected_nsubst_tot != NULL) {
-    for (r = 0; r < mod->nratecats; r++) {
-      for (i = 0; i < nstates; i++) {
-        for (j = 0; j < nstates; j++) 
-          sfree(tp->expected_nsubst_tot[r][i][j]);
-        sfree(tp->expected_nsubst_tot[r][i]);
-      }
-      sfree(tp->expected_nsubst_tot[r]);
-    }
-    sfree(tp->expected_nsubst_tot);
-  }
-  if (tp->expected_nsubst_col != NULL) {
-    for (r = 0; r < mod->nratecats; r++) {
-      for (i=0; i < nnodes; i++) {
-	for (j=0; j < ntuples; j++) {
-	  for (k=0; k < nstates; k++) 
-	    sfree(tp->expected_nsubst_col[r][i][j][k]);
-	  sfree(tp->expected_nsubst_col[r][i][j]);
-	}
-	sfree(tp->expected_nsubst_col[r][i]);
-      }
-      sfree(tp->expected_nsubst_col[r]);
-    }
-    sfree(tp->expected_nsubst_col);
-  }
-  if (tp->rcat_probs != NULL) {
-    for (i = 0; i < mod->nratecats; i++)
-      sfree(tp->rcat_probs[i]);
-    sfree(tp->rcat_probs);           
-  }
-  if (tp->rcat_expected_nsites != NULL) {
-    sfree(tp->rcat_expected_nsites);           
-  }
-
-  sfree(tp);
-}
-
-/* compute the expected (posterior) complete log likelihood of a tree
-   model based on a TreePosteriors object.  Equilibrium frequencies
-   are not considered. */
-double tl_compute_partial_ll_suff_stats(TreeModel *mod, TreePosteriors *post) {
-  double retval = 0;
-  int i, j, k, cat;
-  TreeNode *n;
-  int nstates = mod->rate_matrix->size;
-
-  for (cat = 0; cat < mod->nratecats; cat++) {
-    for (i = 0; i < mod->tree->nnodes; i++) {
-      MarkovMatrix *subst_mat;
-      if (i == mod->tree->id) continue; /* skip root */
-      n = lst_get_ptr(mod->tree->nodes, i);
-      subst_mat = mod->P[n->id][cat];
-      for (j = 0; j < nstates; j++) { /* from tuple */
-        for (k = 0; k < nstates; k++) { /* to tuple */
-          retval += (post->expected_nsubst_tot[cat][j][k][i] *
-                     log2(mm_get(subst_mat, j, k)));
-        }
-      }
-    }
-  }
-  return retval;
-}
-
-/* The functions below are used for computing likelihoods with
-   weight-matrix models.  They should possibly be moved to misc.c.  */
-
-/* given an alphabet, a tuple size, and a vector of equilibrium
-   frequences, create a new vector of marginal equilibrium
-   frequencies describing the space of "meta-tuples", which contain
-   actual characters *or* missing data characters.  Each meta-tuple is
-   given an equilibrium frequency equal to the sum of the frequencies
-   of all "matching" ordinary tuples.  Missing data characters are
-   assumed to be gap characters or Ns. */
-Vector *get_marginal_eq_freqs (char *alphabet, int tuple_size, 
-			       Vector *eq_freqs) {
-  int alph_size = strlen(alphabet);
-  int ntuples = int_pow(alph_size, tuple_size);
-  int i;
-  Vector *retval = vec_new(int_pow(alph_size+1, tuple_size));
-  vec_zero(retval);
-
-  /* loop through the ordinary (non-meta) tuples */
-  for (i = 0; i < ntuples; i++) {
-    int digits[tuple_size];
-    int j, k, remainder;
-    
-    /* first decompose the tuple into its "digits" */
-    remainder = i;
-    for (j = 0; j < tuple_size; j++) { /* from least sig. to most */
-      digits[j] = remainder % alph_size;
-      remainder /= alph_size;
-    }
-
-    /* now consider every pattern of missing-data characters that can
-       be overlaid on it.  The equilibrium frequency of the tuple
-       contributes to the marginal frequency corresponding to every
-       such pattern.  There are 2^tuple_size of them to consider. */
-    for (k = 0; k < (1 << tuple_size); k++) {
-      int newtuple = 0, base = 1;
-      for (j = 0; j < tuple_size; j++) {
-        if (k & (1 << j)) 
-          newtuple += alph_size * base;
-        else 
-          newtuple += digits[j] * base;
-        base *= (alph_size + 1);
-      }
-      vec_set(retval, newtuple, 
-                     vec_get(retval, newtuple) + 
-                     vec_get(eq_freqs, i));
-    }
-  }
-  return retval;
-}
-
-/* given a tuple consisting of actual characters and/or missing data,
-   return the corresponding state number in the "meta-tuple" space.
-   Returns -1 for unallowed tuples */
-int tuple_index_missing_data(char *tuple, int *inv_alph, int *is_missing,
-                             int alph_size) {
-  int retval = 0, i;
-  int tuple_size = strlen(tuple);
-  for (i = 0; i < tuple_size; i++) {
-    int charidx = inv_alph[(int)tuple[tuple_size-i-1]];
-    if (charidx < 0) {
-      if (tuple[tuple_size-i-1] == GAP_CHAR || 
-          is_missing[(int)tuple[tuple_size-i-1]])
-        charidx = alph_size;
-      else return -1;
-    }
-    retval += charidx * int_pow(alph_size+1, i);
-                                /* i == 0 => least sig. dig; 
-                                   i == tuple_size-1 => most sig. dig */
-  }
-  return retval;
-}
-

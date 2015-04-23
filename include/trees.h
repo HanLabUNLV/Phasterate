@@ -1,6 +1,6 @@
 /***************************************************************************
  * PHAST: PHylogenetic Analysis with Space/Time models
- * Copyright (c) 2002-2005 University of California, 2006-2010 Cornell
+ * Copyright (c) 2002-2005 University of California, 2006-2010 Cornell 
  * University.  All rights reserved.
  *
  * This source code is distributed under a BSD-style license.  See the
@@ -8,7 +8,7 @@
  ***************************************************************************/
 
 /** @file trees.h
-    Functions and structures to hold, manipulate, and test trees, branches, and nodes.
+    Functions and structures to hold, manipulate, and test trees, branches, and nodes.  
     @ingroup phylo
 */
 
@@ -76,18 +76,9 @@ struct tree_node {
                                    root (Only guaranteed to be defined for
      				   the TreeNode at the root of a tree)*/
 };
-/**
- * Given the optarg which should be a name of a file, it will open the .mod file
- * ignore everything except the tree and return a treeNode obeject.
- * 
- * @param string
- * @return parsedTree
- */
-char* tr_only_from_file(const char* string);
 
 /** \name Tree allocation functions 
 \{ */
-
 
 /** Parse a tree from a file in Newick (New Hampshire) format 
    @param f File descriptor containing data to make new TreeNode from
@@ -470,5 +461,14 @@ void tr_label_subtree(TreeNode *tree, const char *subtreeNode,
  */
 void tr_get_labelled_nodes(TreeNode *tree, const char *label, List *rv);
 /** \} */
+
+/**
+ * Given the optarg which should be a name of a file, it will open the .mod file
+ * ignore everything except the tree and return a treeNode obeject.
+ *
+ * @param string
+ * @return parsedTree
+ */
+char* tr_only_from_file(const char* string);
 
 #endif 

@@ -117,7 +117,7 @@ struct tm_struct {
   TreeNode *tree;		/**< Root node of tree (used to traverse tree node by node) */
   Vector *backgd_freqs;		/**< Equilibrium frequencies */
   MarkovMatrix *rate_matrix;	/**< Rate matrix */
-  subst_mod_type subst_mod;	/**< Substitution model being used for Substitutionthis tree model */
+  subst_mod_type subst_mod;	/**< Substitution model being used for this tree model */
   int *msa_seq_idx;             /**< (Optional) Mapping from leaf
                                    indices to sequence indices in a
                                    given MSA; used in likelihood
@@ -227,10 +227,10 @@ struct tm_struct {
                                * exponentiating the matrix. */
 };
 
-typedef struct tm_struct TreeModel;
-
 // Collect trees from files in a directory
 List *tm_new_from_dir(char *dir);
+
+typedef struct tm_struct TreeModel;
 
 /** \name Tree Model allocation/cleanup functions 
 \{ */
@@ -439,7 +439,6 @@ void tm_scale_params(TreeModel *mod, Vector *params, double scale_factor);
    @param quiet Whether to report progress to stderr
    @param error_file If non-NULL, write estimate, variance, and 95% 
    confidence interval for each parameter to this file.
- * @param extendedFlag, boolean predicate: whether to use normal prunning algorithm or extended.
    @returns 0 on success, 1 on failure
  */
 int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat, 

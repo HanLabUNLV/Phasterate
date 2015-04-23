@@ -128,7 +128,7 @@ OPTIONS:\n\
 int main(int argc, char *argv[]) {
   TreeNode *tree = NULL;
   TreeModel *backgd_mod = NULL;
-  int i, j, /*separate_backgd = 0, */
+  int i, j,
     size = DEFAULT_SIZE, meme_mode = 0, profile_mode = 0, 
     nrestarts = 10, npseudocounts = 5, nsamples = -1, 
     nmostprevalent = -1, tuple_size = -1, nbest = -1, sample_parms = 0,
@@ -161,7 +161,6 @@ int main(int argc, char *argv[]) {
       backgd_mod = tm_new_from_file(phast_fopen(optarg, "r"), 1);
       break;
     case 's':
-      /*separate_backgd = 1; Never used...*/
       break;
     case 'k':
       size = get_arg_int(optarg);
@@ -343,7 +342,7 @@ int main(int argc, char *argv[]) {
                           pmsa->pooled_msa->alphabet, 1, 0, NULL, -1);
       tm_fit(backgd_mod, pmsa->pooled_msa, 
              tm_params_init(backgd_mod, .1, 5, 0), 
-             -1, OPT_MED_PREC, NULL, 0, NULL,0);
+             -1, OPT_MED_PREC, NULL, 0, NULL, 0);
     }
   }
 

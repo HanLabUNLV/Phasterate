@@ -43,7 +43,6 @@ typedef enum {
   HKY_CODON, /**< Hasegawa, Kishino and Yano (Codon)*/
   REV_CODON, /**< Reversible (Codon) */
   SSREV_CODON,  /**< Strand-symmetric reversible (Codon) */
-  INDEL, /**< Model created to take into account indel and */
   F84E, /**< Model created from (Rivas E, Eddy SR (2008)) */
   F84,
   UNDEF_MOD   /**< No Model */
@@ -236,5 +235,6 @@ double bigDelta(int j, int i, double* frequencies);
 
 /*Used by matrix computation on diagonal, simply return 1 if in diagonal, else 1;*/
 int kronecker(int firstResidue,int secondResidue);
+
 /** \} */
 #endif

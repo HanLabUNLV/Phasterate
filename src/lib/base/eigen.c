@@ -25,7 +25,7 @@
    of eigenvalues and matrices of right and left eigenvectors,
    normalized so that they are inverses.  Returns 0 on success, 1 on
    failure. */ 
-int mat_diagonalize(Matrix *M , /* input matrix (n x n) */
+int mat_diagonalize(Matrix *M, /* input matrix (n x n) */
                     Zvector *eval, 
                                 /* computed vector of eigenvectors --
                                    preallocate dim. n */
@@ -33,11 +33,10 @@ int mat_diagonalize(Matrix *M , /* input matrix (n x n) */
                                 /* computed matrix of right
                                    eigenvectors (columns) --
                                    preallocate n x n */
-                    Zmatrix *levect,
+                    Zmatrix *levect
                                 /* computed matrix of left
                                    eigenvectors (rows) -- preallocate
                                    n x n  */
-                    int verifyMatrix
 		    ) { 
 #ifdef SKIP_LAPACK
   die("ERROR: LAPACK required for matrix diagonalization.\n");
@@ -63,12 +62,7 @@ int mat_diagonalize(Matrix *M , /* input matrix (n x n) */
   dgeev_(&jobvl, &jobvr, &n, tmp, &n, wr, wi, vl, 
 	 &n, vr, &n, work, &lwork, &info);
 #endif
-  /*We don't want to check if imaginary part is small enough, if so, set to zero.*/
-  if(verifyMatrix == 1)
-    for(i = 0; i < n; i++)
-      if(abs(wi[i]) < 0.0000001)
-        wi[i] = 0;
-    
+
   if (info != 0) {
     fprintf(stderr, "ERROR executing the LAPACK 'dgeev' routine.\n"); 
     return 1;
@@ -134,9 +128,7 @@ int mat_diagonalize(Matrix *M , /* input matrix (n x n) */
       zmat_set(levect, i, j, scaled_val);
     }
   }  
-  /*We do not want the verification done, return.*/
-  if(verifyMatrix == 1)
-    return 0;
+
   /* verify correctness, if necessary */
   if (check) {
     for (i = 0; i < n; i++) {
@@ -147,7 +139,27 @@ int mat_diagonalize(Matrix *M , /* input matrix (n x n) */
 	  z = z_add(z, z_mul(zvec_get(eval, k), temp));
 	  z2 = z_add(z2, temp);
 	}
-
+        if (isnan(z.y) ||
+	    isnan(z.x) ||
+	    fabs(z.y) > EQ_THRESHOLD ||
+            fabs(z.x - mat_get(M, i, j)) > EQ_THRESHOLD ||
+	    (mat_get(M, i, j) != 0.0 &&
+	     fabs(z.x - mat_get(M, i, j))/mat_get(M, i, j) > 1e-6) ||
+	    fabs(z2.y > EQ_THRESHOLD) ||
+	    fabs(z2.x - (i==j)) > EQ_THRESHOLD) {
+	  /*	  printf("diagonalization failed i=%i j=%i\n", i, j);
+	  printf("%e\n", z.y);
+	  printf("%e %e %e\n", z.x, mat_get(M, i, j), z.x - mat_get(M, i, j));
+	  printf("%e %e %e %e %e\n",
+		 z.x, mat_get(M, i, j), z.x - mat_get(M, i, j),
+		 fabs(z.x - mat_get(M, i, j)), 
+		 fabs(z.x - mat_get(M, i, j))/mat_get(M, i, j));
+		 printf("%e %e\n", z2.y, z2.x);*/
+	  //	  printf("diagonalization failed trying higham\n");
+	  return 1;
+          die("ERROR: diagonalization failed (got %e + %ei, expected %e).\n", 
+		  z.x, z.y, mat_get(M, i, j));
+	}
       }
     }
   }

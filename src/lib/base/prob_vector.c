@@ -10,7 +10,7 @@
 /* $Id: prob_vector.c,v 1.14 2008-11-12 02:07:59 acs Exp $ */
 
 /* Vectors representing discrete probability distributions over
-   non-negative integers. General idea is element x of vector v (x >=
+   non-negative integers.  General idea is element x of vector v (x >=
    0) represents p(x).  With long-tailed distributions (e.g.,
    Poisson), vectors are truncated at size x_max such that p(y) <
    epsilon for y >= x_max, where epsilon is an input parameter. */
@@ -115,8 +115,6 @@ void pv_p_values(Vector *distrib, double *x_0, int n, double *pvals,
     hcdf = pv_cdf(distrib, UPPER); /* CDF for upper tail */
   
   /* look up tail probabilities from CDF */
-  /*int lookup = 0;*/
-  
   for (i = 0; i < n; i++) {
     if (side == LOWER)
       pvals[i] = lcdf->data[(int)floor(x_0[i])];

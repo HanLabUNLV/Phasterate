@@ -80,7 +80,7 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
             pL[i][n->id] = 0; 
         }
       }
-      else {
+      else {                    
         /* general recursive case */
         MarkovMatrix *lsubst_mat = mod->P[n->lchild->id][rcat];
         MarkovMatrix *rsubst_mat = mod->P[n->rchild->id][rcat];
@@ -122,7 +122,7 @@ double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
                                   double **scratch) {
   double results;
   
-  if(mod->extended)
+  if(mod->subst_mod == F84E)
     results = log(singleSiteLikelihood(mod, msa, tupleidx, scratch));
   else
     results = log(col_compute_likelihood(mod, msa, tupleidx, scratch));
@@ -773,9 +773,10 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
       delta_lnl = 0;
       this_scale = 1;
     }
+
     else {                      /* compute null and alt lnl */
       mod->scale = 1;
-        tm_set_subst_matrices(mod);
+      tm_set_subst_matrices(mod);
 
       /* compute log likelihoods under null and alt hypotheses */
       null_lnl = col_compute_log_likelihood(mod, msa, i, d->fels_scratch[0]);
@@ -1632,6 +1633,7 @@ int col_has_data_sub(TreeModel *mod, MSA *msa, int tupleidx, List *inside,
 
   return FALSE;
 }
+
 //==========================================================================================
 /*
  * Extremely similar to double computeTotalTreeLikelihood() from tree_likelihoods.c

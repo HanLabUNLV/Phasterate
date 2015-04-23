@@ -295,10 +295,6 @@ void get_tuple_str(char *tuple_str, int tuple_idx, int tuple_size,
 */
 Matrix* read_subst_mat(FILE *F, char *alph);
 
-int is_file(const char* path);
-int is_dir(const char* path);
-List* list_files_in_dir(const char* dirname, const char* extension);
-
 /** Open a file by filename and get file descriptor.
     @param fname Full path to file
     @param mode Open mode i.e. w, r, r+, w+, etc.
@@ -810,6 +806,11 @@ void free_n_dimensional_array(void *data, int ndim, int *dimsize);
 
 int get_nlines_in_file(FILE *F);
 
+int is_file(const char* path);
+int is_dir(const char* path);
+List* list_files_in_dir(const char* dirname, const char* extension);
+
+
 /**
  * 
  * @param path, given a path it will extract just the fileName for comparison purposes.
@@ -817,4 +818,5 @@ int get_nlines_in_file(FILE *F);
  */
 char* getFileName(char* path);
 int parseString(char* buffer,char** strings);
+
 #endif

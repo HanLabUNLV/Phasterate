@@ -275,7 +275,6 @@ Matrix* read_subst_mat(FILE *F, char *alph) {
   str_free(line);
   return retval;
 }
-
 int is_file(const char* path) {
     struct stat buf;
     stat(path, &buf);
@@ -566,7 +565,8 @@ double normalize_probs(double *p, int size) {
   for (i = 0; i < size; i++) sum += p[i];
 
   if(sum == 0) /*Avoid divide by zero*/
-      return sum;
+    return sum;
+
   for (i = 0; i < size; i++) p[i] /= sum;  
   return sum;
 }
@@ -1332,6 +1332,7 @@ void dbl_vector_print(double *vect, int D) {
   int i;
   for (i = 0; i < D; i++) printf("%d: %f\n", i, vect[i]);
 }
+
 
 /**
  * 

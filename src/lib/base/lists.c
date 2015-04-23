@@ -180,10 +180,12 @@ void lst_qsort(List *l, int (*compare)(const void *, const void *)) {
   /* will we need to use max(elementsz, sizeof(void*))? */
   qsort(&l->array[l->lidx], lst_size(l), l->elementsz, compare);
 }
+
 /*Q sort to properly sort MSA and Mod pointer lists.*/
 void lst_qsort2(List *l,int (*compare)(const void*, const void*)){
     qsort(*(l->array),lst_size(l),l->elementsz,compare);
 }
+
 /* free the elements of a list of strings */
 void lst_free_strings(List *l) {
   int i;

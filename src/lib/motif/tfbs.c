@@ -216,7 +216,7 @@ MS *ms_read(const char *filename, const char *alphabet) {
   List *names = lst_new_ptr(10);
   List *seqs = lst_new_ptr(10);
   static Regex *descrip_re = NULL;
-  int i, nseqs, j, do_toupper/*, line_no*/;
+  int i, nseqs, j, do_toupper;
   String *line = str_new(STR_MED_LEN);
   List *l = lst_new_ptr(2);
   String *n, *s, *new_str = NULL;
@@ -228,7 +228,7 @@ MS *ms_read(const char *filename, const char *alphabet) {
   if (descrip_re == NULL) 
     descrip_re = str_re_new("[[:space:]]*>[[:space:]]*(.+)");
 
-  /*line_no=1;*/
+
   while ((str_readline(line, F)) != EOF) {
     if (str_re_match(line, descrip_re, l, 1) > 0) {
       lst_push_ptr(names, lst_get_ptr(l, 1));

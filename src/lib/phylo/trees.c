@@ -35,47 +35,7 @@ static int idcounter = 0;
                                 
 /* bottom-right y */
 #define BR_Y 700                
-
-
-
-
-/**
- * Given the optarg which should be a name of a file, it will open the .mod file
- * ignore everything except the tree and return a treeNode obeject.
- * 
- * @param string
- * @return parsedTree
- */
-char* tr_only_from_file(const char* string){
-    FILE* fin = phast_fopen(string,"r");
-    /*Temporary holder for tags until tree is found*/
-    char tag[STR_MED_LEN];
-    String* tempStr = str_new(STR_LONG_LEN);
-    int results;
-           
-    results = fscanf(fin,"%s",tag);
-   
-    /*Iterate until TREE is reached.*/
-    while(strcmp(tag,"TREE:") && results != EOF){
-        str_readline(tempStr,fin);
-        results = fscanf(fin,"%s",tag);
-    }
-   
-    if (!strcmp(tag,"TREE:")){
-        str_readline(tempStr, fin);
-        str_double_trim(tempStr);
-
-        if (tempStr->chars[tempStr->length-1] == ';')
-                tempStr->chars[--tempStr->length] = '\0';
-
-     
-    return tempStr->chars;
-    
-    }else
-        return NULL;   
-}
-
-
+                                
 
 /** Parse a tree from a file in Newick (New Hampshire) format */
 TreeNode *tr_new_from_file(FILE *f) { 
@@ -149,15 +109,13 @@ TreeNode *tr_new_from_string(const char *treestr) {
       if (node->parent->lchild != NULL && node->parent->rchild != NULL){
         if (node->parent == root && !already_allowed)
           already_allowed = TRUE;
-        else{
-          printf("Failed at Tree: %s\n",treestr);
+        else
           die("ERROR (tree parser): invalid binary tree (too many children)\n");
                                 /* we'll prohibit multinary
                                    branchings, except that we'll allow
                                    a single trinary branch immediately
                                    below the root (common with
                                    reversible models) */
-        }
       }
 
       tr_add_child(node->parent, newnode = tr_new_node());
@@ -1019,7 +977,7 @@ void tr_prune(TreeNode **t,     /* Tree to prune (may be altered
 				    the number of nodes in original tree.
 				    On return, will be filled in with the
 				    new id for each node */
-) {
+              ) {
 
   TreeNode *n;
   int i, new_nnodes = (*t)->nnodes;
@@ -1672,3 +1630,41 @@ void tr_get_labelled_nodes(TreeNode *tree, const char *label, List *rv) {
       lst_push_ptr(rv, node);
   }
 }
+
+/**
+ * Given the optarg which should be a name of a file, it will open the .mod file
+ * ignore everything except the tree and return a treeNode obeject.
+ * 
+ * @param string
+ * @return parsedTree
+ */
+char* tr_only_from_file(const char* string){
+    FILE* fin = phast_fopen(string,"r");
+    /*Temporary holder for tags until tree is found*/
+    char tag[STR_MED_LEN];
+    String* tempStr = str_new(STR_LONG_LEN);
+    int results;
+           
+    results = fscanf(fin,"%s",tag);
+   
+    /*Iterate until TREE is reached.*/
+    while(strcmp(tag,"TREE:") && results != EOF){
+        str_readline(tempStr,fin);
+        results = fscanf(fin,"%s",tag);
+    }
+   
+    if (!strcmp(tag,"TREE:")){
+        str_readline(tempStr, fin);
+        str_double_trim(tempStr);
+
+        if (tempStr->chars[tempStr->length-1] == ';')
+                tempStr->chars[--tempStr->length] = '\0';
+
+     
+    return tempStr->chars;
+    
+    }else
+        return NULL;   
+}
+
+

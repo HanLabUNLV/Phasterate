@@ -32,21 +32,21 @@
 #include "phyloFit.help"
 #include "misc.h"
 
-
 MSA* read_msa(struct phyloFit_struct *pf, char * msa_fname, msa_format_type input_format, char* alph);
 List *msa_from_dir(struct phyloFit_struct *pf, char * dir, msa_format_type input_format, char* alph);
 void printNames(struct phyloFit_struct *pf);
 
+
 int main(int argc, char *argv[]) {
   const char* treeToParse;
   char *msa_fname = NULL, *alph = "ACGT";
-  /*Added by Omar to get greater size matrix*/
   msa_format_type input_format = UNKNOWN_FORMAT;
   char c;
   int opt_idx, seed=-1;
   String *optstr;
   List *tmplist = NULL; 
   struct phyloFit_struct *pf;
+  FILE *infile;
   
   struct option long_opts[] = {
     {"tree-only",1,0,'T'}, /*Tree only model, gets the mod file to get information from
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     {"seed", 1, 0, 'D'},
     {"extended-model",1,0,'x'},
     {0, 0, 0, 0}
-   };
+  };
 
   // NOTE: remaining shortcuts left: HjQx
 
@@ -137,12 +137,8 @@ int main(int argc, char *argv[]) {
       break;
     case 's':
       pf->subst_mod = tm_get_subst_mod_type(optarg);
-      if (pf->subst_mod == UNDEF_MOD)
+      if (pf->subst_mod == UNDEF_MOD) 
         die("ERROR: illegal substitution model.     Type \"phyloFit -h\" for usage.\n");
-      if(pf->subst_mod == INDEL){
-        alph = "ACGT-";
-        pf->gaps_as_bases = TRUE;
-      }
       break;
     case 'g':
       pf->gff = gff_read_set(phast_fopen(optarg, "r"));
@@ -215,9 +211,8 @@ int main(int argc, char *argv[]) {
         pf->mod_file_names = list_files_in_dir(optarg, ".mod");
         pf->input_mods = tm_new_from_dir(optarg);
       }
-      else {
+      else
         pf->input_mod = tm_new_from_file(phast_fopen(optarg, "r"), 1);
-      }
       break;
     case 'r':
       pf->random_init = TRUE;
@@ -372,7 +367,7 @@ int main(int argc, char *argv[]) {
   /* set up for categories */
   /* first label sites, if necessary */
   pf->label_categories = (input_format != MAF);
-  
+ 
   if (pf->input_mods) {
       /*
        List need to be sorted before hand! The get file from directory does not
@@ -398,21 +393,23 @@ MSA* read_msa(struct phyloFit_struct *pf, char * msa_fname, msa_format_type inpu
   
   FILE* infile = phast_fopen(msa_fname, "r");
   MSA* msa = NULL;  
-  
+
   if (input_format == UNKNOWN_FORMAT)
     input_format = msa_format_for_content(infile, 1);
 
-  if (pf->nonoverlapping && (pf->use_conditionals || pf->gff != NULL ||
-          pf->cats_to_do_str || input_format == SS))
+  if (pf->nonoverlapping && (pf->use_conditionals || pf->gff != NULL || 
+			     pf->cats_to_do_str || input_format == SS))
     die("ERROR: cannot use --non-overlapping with --markov, --features,\n--msa-format SS, or --do-cats.\n");
 
 
   /* read alignment */
-  if (!pf->quiet)
-    fprintf(stderr, "Reading alignment from %s ...\n", msa_fname);
+  if (!pf->quiet) fprintf(stderr, "Reading alignment from %s ...\n", msa_fname);
   if (input_format == MAF) {
-    msa = maf_read(infile, NULL,tm_order(pf->subst_mod) + 1,NULL, pf->gff, pf->cm,
-            pf->nonoverlapping ? tm_order(pf->subst_mod) + 1 : -1,FALSE, pf->reverse_group_tag, NO_STRIP, FALSE);
+    pf->msa = maf_read(infile, NULL, 
+		       tm_order(pf->subst_mod) + 1, 
+		       NULL, pf->gff, pf->cm, 
+		       pf->nonoverlapping ? tm_order(pf->subst_mod) + 1 : -1, 
+		       FALSE, pf->reverse_group_tag, NO_STRIP, FALSE);
     if (pf->gaps_as_bases)
       msa_reset_alphabet(msa, alph);
   }else
@@ -430,11 +427,11 @@ List *msa_from_dir(struct phyloFit_struct *pf, char * dir, msa_format_type input
   DIR *dfd;
   MSA **tmpmsas = smalloc(MAX_TREE_NUM * sizeof (MSA*));
   int i, msas_num = 0;
-  
+
   if ((dfd = opendir(dir)) == NULL) {
     fprintf(stderr, "Can't open %s\n", dir);
-    return 0;
-  }
+  return 0;
+}
   char filename_qfd[STR_MED_LEN];
 
   while ((dp = readdir(dfd)) != NULL) {

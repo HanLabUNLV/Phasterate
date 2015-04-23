@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
   char c;
   FILE *msa_f = NULL;
   msa_format_type msa_format = UNKNOWN_FORMAT;
+
   /* other variables */
   int opt_idx, seed = -1;
   List *cats_to_do_str=NULL;
@@ -55,8 +56,7 @@ int main(int argc, char *argv[]) {
   gettimeofday(&now, NULL);
   srandom(now.tv_usec);
 #endif
-
-  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:hx:", 
+  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:hx:",
                           long_opts, &opt_idx)) != -1) {
     switch (c) {
     case 'm':
@@ -151,7 +151,6 @@ int main(int argc, char *argv[]) {
     case 'h':
       printf("%s", HELP);
       exit(0);
-      break;
     case 'x':
       p->extended = 1;
       strcpy(p->infoXFileName, optarg);
@@ -176,6 +175,7 @@ int main(int argc, char *argv[]) {
   if(p->extended || p->mod->subst_mod == F84)
     setExtendedMod(p->mod, p->infoXFileName);
 
+
   if (cats_to_do_str != NULL) {
     if (p->cm == NULL) die("ERROR: --cats-to-do requires --catmap option\n");
     p->cats_to_do = cm_get_category_list(p->cm, cats_to_do_str, FALSE);
@@ -191,8 +191,8 @@ int main(int argc, char *argv[]) {
 			     p->cats_to_do==NULL ? NULL : p->feats, p->cm, -1, 
 			     (p->feats == NULL && p->base_by_base==0) ? FALSE : TRUE, /* --features requires order */
 			     NULL, NO_STRIP, FALSE, p->cats_to_do); 
-    else
-        p->msa = msa_new_from_file_define_format(msa_f, msa_format, NULL);
+    else 
+      p->msa = msa_new_from_file_define_format(msa_f, msa_format, NULL);
     phast_fclose(msa_f);
 
     /* if base_by_base and undefined chrom, use filename root as chrom */
@@ -210,6 +210,7 @@ int main(int argc, char *argv[]) {
   phyloP(p);    
   return 0;
 }
+
 /**
  * Extended Likelihood algorithm requires the TreeModel all_params->data
  * and the mod->rateMatrix_idx to be set as it is used, we simulate that here.
@@ -290,6 +291,17 @@ void setExtendedMod(TreeModel* mod, char* fileName){
   free(line);
   line = NULL;
   length = 0;
+  
+  /*F84 Probability function still expects data to be in the format of only
+   2 parameters in the param matrix. This is needed as the function is shared between
+   phyloFit and phyloP!*/
+  if(mod->subst_mod == F84){
+    //Make the usual lambda and mu to alpha and beta.
+    params[0] = params[2];
+    params[1] = params[3];
+    mod->all_params = vec_new_from_array(params, 2);
+    
+  }
   
   return;
 }

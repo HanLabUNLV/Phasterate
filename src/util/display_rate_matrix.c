@@ -201,7 +201,6 @@ Matrix* unproject_rates(TreeModel *mod_tuples, TreeModel *mod_single) {
 void do_context_dependent_ti_tv(TreeModel *mod) {
   char *alph = mod->rate_matrix->states;
   int alph_size = strlen(alph);
-  /*char tuple_i[mod->order+2], tuple_j[mod->order+2];*/
   double context_ti[alph_size][alph_size], context_tv[alph_size][alph_size],
     ti_AT_5_pyrim[3][3], tv_AT_5_pyrim[3][3],
     all_ti, all_tv, expected_rate;
@@ -213,8 +212,6 @@ void do_context_dependent_ti_tv(TreeModel *mod) {
   if (alph_size != 4)
     die("ERROR do_contect_dependent_ti_tv: alph_size (%i) should be 4\n", 
 	alph_size);
-
-  /*tuple_i[mod->order+1] = tuple_j[mod->order+1] = '\0';*/
 
   /* We only care about substitutions at the middle position */
   for (first = 0; first < alph_size; first++) {

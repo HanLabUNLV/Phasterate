@@ -49,7 +49,7 @@ struct lst_struct {
   int elementsz;                /**< number of bytes for each list element */
   int step;                     /**< number of array elements occupied
                                    by each list element (multiple are
-                                   possible)  *step*/ 
+                                   possible)  */ 
 };
 /** List type. */
 typedef struct lst_struct List;
@@ -67,6 +67,7 @@ int lst_dbl_compare_asc(const void* ptr1, const void* ptr2);
 int lst_dbl_compare_desc(const void* ptr1, const void* ptr2);
 int lst_mod_compare(const void* ptr1, const void* ptr2);
 int lst_msa_compare(const void* ptr1, const void* ptr2);
+
 void *srealloc(void *ptr, size_t size);
 
 
@@ -658,6 +659,29 @@ void lst_clear(List* l)
 {  l->ridx = l->lidx = 0; }
 
 
+/** \} */
+
+/** \name List sort & search operations. */
+
+/** \{ */
+
+/** Sort list using qsort.
+   Compares objects using specified comparison function. 
+
+  @param l Target list.
+  @param compare Comparison function: arguments are pointers to objects in the list
+				   (see details under lst_delete_obj_compare()). 
+
+  \sa lst_qsort_int, lst_qsort_dbl.
+*/
+void lst_qsort(List *l, 
+	       int (*compare)(const void *, const void *)
+				/* Comparison function: arguments are
+				   pointers to objects in the list
+				   (see details under
+				   lst_delete_obj_compare). */
+	       );
+
 /** Sort list of integers using qsort. 
 
   @param l Target list.
@@ -777,7 +801,7 @@ int lst_find_ptr(List *l, void *ptr)
    Compares objects using specified comparison function. 
 
   @param l Target list.
-  @param compare Comparison function: arguments are pointers to objects in the list
+ @param compare Comparison function: arguments are pointers to objects in the list
 				   (see details under lst_delete_obj_compare()). 
 */
 void lst_qsort(List* l, int (*compare)(const void *, const void *));
@@ -785,7 +809,6 @@ void lst_qsort(List* l, int (*compare)(const void *, const void *));
 				   pointers to objects in the list
 				   (see details under
 				   lst_delete_obj_compare). */
-	    
 
 
 #endif

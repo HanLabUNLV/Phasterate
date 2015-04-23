@@ -49,11 +49,11 @@ typedef struct {
   int ncats;			/**< Number of categories */
   int alloc_len;		/**< Length of memory allocated for sequence */
   int idx_offset;		/**< Index offset */
+  char fileName[1000];
   int *is_informative;          /**< If non-NULL, indicates which
                                    sequences are to be considered
                                    "informative", e.g., for
                                    phylogenetic analysis */
-  char fileName[1000];          /**< Name of file where this alignment came from, useful for failures*/
 } MSA;
 
 /** Size of lookup tables */

@@ -128,6 +128,60 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
 				 int cat,
                                  TreePosteriors *post);
 
+/** Create a new TreePosteriors object.
+    @param mod Tree Model of which the posterior probabilities are calculated
+    @param msa Multiple Alignment
+    @param do_bases Whether to allocate space for base probabilities
+    @param do_subst Whether to allocate space for substitution probabilities
+    @param do_expected_nsubst Whether to allocate space for expected number of substitutions matrix
+    @param do_expected_nsubst_tot Whether to allocate space for total expected number of substitutions
+    @param do_expected_nsubst_col Whether to allocate space for expected number of substitutions per column
+    @param do_rate_cats Whether to allocate space for rate categories
+    @param do_rate_cats_exp Whether to allocate space for expected rate categories
+    @result Newly allocated TreePosteriors object
+*/
+TreePosteriors *tl_new_tree_posteriors(TreeModel *mod, MSA *msa, int do_bases, 
+                                       int do_substs, int do_expected_nsubst, 
+                                       int do_expected_nsubst_tot,
+				       int do_expected_nsubst_col,
+                                       int do_rate_cats, int do_rate_cats_exp);
+
+/** Free TreePosteriors object
+   @param mod Tree model of which posterior are calculated
+   @param msa Multiple Alignment
+   @param tp TreePosteriors object to free
+ */
+void tl_free_tree_posteriors(TreeModel *mod, MSA *msa, TreePosteriors *tp);
+
+/** Compute the expected (posterior) complete log likelihood of a tree
+   model based on a TreePosteriors object.  
+   @param[in] mod Tree Model
+   @param[in] post Pre-calculated posterior probabilities
+   @note Equilibrium frequencies are not considered
+   @result Log Likelihood of tree
+*/
+double tl_compute_partial_ll_suff_stats(TreeModel *mod, TreePosteriors *post);
+
+/* Could not find implementation */
+double tl_compute_ll_suff_stats(TreeModel *mod, MSA *msa, TreePosteriors *post);
+
+/** Given an alphabet, a tuple size, and a vector of equilibrium
+   frequencies, create a new vector of marginal equilibrium
+   frequencies describing the space of "meta-tuples", which contain
+   actual characters *or* missing data characters.  
+   Each meta-tuple is
+   given an equilibrium frequency equal to the sum of the frequencies
+   of all "matching" ordinary tuples.  
+    Missing data characters are
+   assumed to be gap characters or Ns. 
+   @param alphabet List of possible characters
+   @param tuple_size Size of tuples
+   @param eq_freqs Equilibrium frequencies
+   @param New vector of marginal equilibrium frequencies
+*/
+Vector *get_marginal_eq_freqs (char *alphabet, int tuple_size, 
+                                   Vector *eq_freqs);
+
 /* Compute the likelihood of a tree model with respect to an
    alignment. Similar to above except uses an extended Felsestein
  * Tree Prunning algorithm as detailed by: Probabilistic Phylogenetic Inference 
@@ -243,7 +297,8 @@ double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k);
  */
 double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currSite);
 
-/** Same as probForNodeGap except used for extra column containing all gaps therefore
+/**
+ * Same as probForNodeGap except used for extra column containing all gaps therefore
  * we don not need to check deltaGap() to see if all children are gaps.
  * @param pL, probabilities calculated so far.
  * @param mod, TreeModel containing all information about our model.
@@ -299,28 +354,6 @@ double gammaML(double branchLength,double mu,double lambda);
 double epsilonProbability(int j,int i,double t,double* freqs,double* params);
 
 /**
- * Given the parameters will compute the summation over all eigenvalues for our R matrix,
- * sum = 0
- * for eigen in eigenValues:
- *   sum += O(a,i,j)*exp(-(eigen+mu)*t)
- * Where Matrix O is defined in the apendix of the paper.
- * @param rMatrix, rateMatrix for our model.
- * @param mu, rate of deletions.
- * @param t, branch length.
- * @return sum.
- */
-double computeOhMatrixSummation(int i, int j, DiagonalMatrix* rMatrix, double mu, double t);
-
-/**
- * Get position of our matrix in our diagonalized matrix (k,k)
- * @param matrix
- * @param eigenval
- * @param mult, multiplicity of given eigenvalue.
- * @return position on success, -1 on failure.
- */
-int findPositionOfEigenvalue(Matrix* matrix,double eigenval, int mult);
-
-/**
  * Recursive function. Given a node on a tree will return either true if node was
  * a gap or false if node was not a gap. Used by probForNodeResidue and probForNodeGap.
  * @param k, node being looked at.
@@ -355,59 +388,6 @@ char getCharacterForSpecie(char* name,MSA* msa,int index);
  */
 int probabilityOfLeaf(char currentChar,int observedState,int iResidue);
 
-/** Create a new TreePosteriors object.
-    @param mod Tree Model of which the posterior probabilities are calculated
-    @param msa Multiple Alignment
-    @param do_bases Whether to allocate space for base probabilities
-    @param do_subst Whether to allocate space for substitution probabilities
-    @param do_expected_nsubst Whether to allocate space for expected number of substitutions matrix
-    @param do_expected_nsubst_tot Whether to allocate space for total expected number of substitutions
-    @param do_expected_nsubst_col Whether to allocate space for expected number of substitutions per column
-    @param do_rate_cats Whether to allocate space for rate categories
-    @param do_rate_cats_exp Whether to allocate space for expected rate categories
-    @result Newly allocated TreePosteriors object.
-*/
-TreePosteriors *tl_new_tree_posteriors(TreeModel *mod, MSA *msa, int do_bases, 
-                                       int do_substs, int do_expected_nsubst, 
-                                       int do_expected_nsubst_tot,
-				       int do_expected_nsubst_col,
-                                       int do_rate_cats, int do_rate_cats_exp);
-
-/** Free TreePosteriors object
-   @param mod Tree model of which posterior are calculated
-   @param msa Multiple Alignment
-   @param tp TreePosteriors object to free
- */
-void tl_free_tree_posteriors(TreeModel *mod, MSA *msa, TreePosteriors *tp);
-
-/** Compute the expected (posterior) complete log likelihood of a tree
-   model based on a TreePosteriors object.  
-   @param[in] mod Tree Model
-   @param[in] post Pre-calculated posterior probabilities
-   @note Equilibrium frequencies are not considered
-   @result Log Likelihood of tree
-*/
-double tl_compute_partial_ll_suff_stats(TreeModel *mod, TreePosteriors *post);
-
-/* Could not find implementation */
-double tl_compute_ll_suff_stats(TreeModel *mod, MSA *msa, TreePosteriors *post);
-
-/** Given an alphabet, a tuple size, and a vector of equilibrium
-   frequencies, create a new vector of marginal equilibrium
-   frequencies describing the space of "meta-tuples", which contain
-   actual characters *or* missing data characters.  
-   Each meta-tuple is
-   given an equilibrium frequency equal to the sum of the frequencies
-   of all "matching" ordinary tuples.  
-    Missing data characters are
-   assumed to be gap characters or Ns. 
-   @param alphabet List of possible characters
-   @param tuple_size Size of tuples
-   @param eq_freqs Equilibrium frequencies
-   @param New vector of marginal equilibrium frequencies
-*/
-Vector *get_marginal_eq_freqs (char *alphabet, int tuple_size, 
-                                   Vector *eq_freqs);
-
+ 
 
 #endif

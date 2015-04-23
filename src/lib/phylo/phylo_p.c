@@ -60,7 +60,7 @@ struct phyloP_struct *phyloP_struct_new(int rphast) {
   p->mod_fname = NULL;
   p->msa_fname = NULL;
   p->no_prune = FALSE;
-  p->extended = 0;
+  p->extended = 0; 
   p->results = rphast ? lol_new(20) : NULL;
   return p;
 }
@@ -95,7 +95,7 @@ TreeModel* fit_tree_model(TreeModel *source_mod, MSA *msa,
   tm_init_rmp(source_mod);           /* (no. params changes) */
   params = tm_params_new_init_from_model(retval);
 
-  tm_fit(retval, msa, params, -1, OPT_HIGH_PREC, NULL, 1, NULL,0);
+  tm_fit(retval, msa, params, -1, OPT_HIGH_PREC, NULL, 1, NULL, 0);
 
   oldscale = vec_get(params, retval->scale_idx);
 
@@ -188,7 +188,7 @@ void phyloP(struct phyloP_struct *p) {
   quantiles_only = p->quantiles_only;
   output_wig = p->output_wig;
   output_gff = p->output_gff;
-  
+
   /*Checking conditions for extended model*/
   if((mod->subst_mod != F84)){
     if((mod->subst_mod == F84E) && (p->extended != 1 || method != LRT))
@@ -196,12 +196,12 @@ void phyloP(struct phyloP_struct *p) {
   }else{
     if(p->extended != 1 || method != LRT)
       die("F84 Must be given an input file through -x and use LRT!");
-    p->extended = 0;
+   p->extended = 0;
   }
-  
+
   if((p->extended == 1) && (mod->subst_mod != F84E || method != LRT))
     die("Extended prunning algorithm only works with F84 and LRT\n");
-    
+
   if (msa == NULL && !prior_only)
     die("Need either --prior-only or an alignment\n");
   if (msa != NULL && (refidx < 0 || refidx > msa->nseqs))
@@ -360,7 +360,7 @@ void phyloP(struct phyloP_struct *p) {
           post_means = smalloc(msa->ss->ntuples * sizeof(double));
           post_vars = smalloc(msa->ss->ntuples * sizeof(double));
         }
-         sub_pval_per_site(jp, msa, mode, fit_model, &prior_mean, &prior_var, 
+        sub_pval_per_site(jp, msa, mode, fit_model, &prior_mean, &prior_var, 
                           pvals, post_means, post_vars, logf);
 
         if (outfile != NULL && output_wig)

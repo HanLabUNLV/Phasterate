@@ -24,11 +24,9 @@
   @param[out] eval Eigen values computed from diagonalization preallocate dimension n
   @param[out] revect Normalized matrix of right eigen vectors from diagonalization preallocate dimension (n x n)
   @param[out] levect Normalized matrix of left eigen vectors from diagonalization preallocate dimension (n x n)
- * @param verifyMatrix
   @result 0 on success, otherwise failure
 */
-int mat_diagonalize(Matrix *M, Zvector *eval, Zmatrix *revect, Zmatrix *levect,
-        int verifyMatrix);
+int mat_diagonalize(Matrix *M, Zvector *eval, Zmatrix *revect, Zmatrix *levect);
 
 /** Compute eigenvalues only of square, real non-symmetric matrix.
   @param[in,out] M Input matrix to find eigen values from dimension (n x n)
