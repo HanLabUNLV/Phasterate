@@ -466,7 +466,7 @@ int main(int argc, char *argv[]) {
       if (use_em)
         tm_fit_em(thismod, msa, params, -1, precision, -1, NULL, NULL);
       else
-        tm_fit(thismod, msa, params, -1, precision, NULL, quiet, NULL, 0);
+        tm_fit(thismod, msa, params, -1, precision, NULL, quiet, NULL);
 
       if (dump_mods_root != NULL) {
         sprintf(fname, "%s.%d.mod", dump_mods_root, i+1);

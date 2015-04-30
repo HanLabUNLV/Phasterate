@@ -498,6 +498,9 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
     }
     sfree(subst_probs);
   }
+  
+  printf("Rate Matrix:\n");
+  printMatrix(mod->rate_matrix->matrix,4);
   return(retval);
 }
 

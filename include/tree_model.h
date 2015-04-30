@@ -443,7 +443,7 @@ void tm_scale_params(TreeModel *mod, Vector *params, double scale_factor);
  */
 int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat, 
            opt_precision_type precision, FILE *logf, int quiet,
-	   FILE *error_file,int extendedFlag);
+	   FILE *error_file);
 
 
 /** Fit several tree models (which share parameters) to data using BFGS

@@ -54,6 +54,7 @@
 /* internal functions */
 double tm_likelihood_wrapper(Vector *params, void *data);
 double tm_multi_likelihood_wrapper(Vector *params, void *data);
+double tmMultiGapAwareLikelihoodWrapper(Vector *params, void *data);
 double gapAwareLikelihoodWrapper(Vector *params, void *data);
 
 /* tree == NULL implies weight matrix (most other params ignored in
@@ -1938,7 +1939,7 @@ void tm_new_boundaries(Vector **lower_bounds, Vector **upper_bounds,
   *lower_bounds = vec_new(npar);
   vec_zero(*lower_bounds);  /* default lower bounds=0 != -INFTY so we always allocate and keep this */
   *upper_bounds = vec_new(npar);
-  vec_set_all(*upper_bounds, 5);
+  vec_set_all(*upper_bounds, INFTY);
 
   tm_set_boundaries(*lower_bounds, *upper_bounds, mod);
   if (allocate_default == 0) {
@@ -1991,7 +1992,7 @@ void tm_check_boundaries(Vector *opt_params, Vector *lower_bounds,
    on success, 1 on failure.  */
 int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
            opt_precision_type precision, FILE *logf, int quiet,
-	   FILE *error_file, int extendedFlag) {
+	   FILE *error_file) {
   double ll;
   Vector *lower_bounds, *upper_bounds, *opt_params;
   int i, retval = 0, npar, numeval;
@@ -2153,6 +2154,15 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
 		   subst_mod_is_codon_model(mod[i]->subst_mod));
     }
   }
+  
+  /*Set global geometric parameter for all models now that the sufficient stats are set.*/
+  double totalP = 0;
+  for(i = 0; i < nmsa; i ++)
+    totalP += getGeometricDistribution(msa[i]);
+  totalP /= (double)nmsa;
+  for(i = 0; i < nmsa; i ++)
+    mod[i]->geometricParameter = totalP;
+  
   nstate = int_pow(strlen(msa[0]->alphabet), mod[0]->order+1);
 
   for (j=0; j < nmod; j++) {
@@ -2193,14 +2203,82 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
 	npar = mod[j]->param_map[i]+1;
     }
   }
+  
+  double totalFreqs[4] = {0, 0, 0, 0};
+  double gapTotalFreq = 0;
+  int residues = 4, k;
+  double gapFreq, gapDivisor;
+  
+  if (mod[0]->subst_mod == F84E){
+    /*We will normalize the vectors if we have a 5-gap model.*/  
+    for (i = 0; i < nmod; i++) {      
+      gapFreq = mod[i]->backgd_freqs->data[4];
+      /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
+       *             reciprocal to divide all our frequencies by.*/
+      gapDivisor = 1.0 / (1.0 - gapFreq);
+      
+      for (k = 0; k < residues; k++){
+        double currentFreq = vec_get(mod[i]->backgd_freqs, k);
+        double normalizedFreq = currentFreq * gapDivisor;
+
+        /*Now that they're computed copy them from the parameter vector to the model.*/
+        mod[i]->backgd_freqs->data[k] = normalizedFreq;
+      }
+      /*Do Gap Character.*/
+      mod[i]->backgd_freqs->data[4] = gapFreq;
+    }
+  }
+  
+  /*We want to figure out the global background frequencies and geometric parameter
+   so our data shares them.*/
+  for (i = 0; i < nmod; i++) {
+    double* tempFreqs = mod[i]->backgd_freqs->data;
+    
+    /*Iterate over our temporary frequencies and add them to the total!*/
+    for(j = 0; j < residues; j++)
+      totalFreqs[j] += tempFreqs[j];
+     
+    if(mod[i]->subst_mod == F84E)
+      gapTotalFreq += tempFreqs[4];
+  }
+  
+   /*Find the average by dividing by number of models entered.*/
+  double total = (double) nmod;
+  for(j = 0; j < residues; j++)
+    totalFreqs[j] /= total;
+  
+  if(mod[0]->subst_mod == F84E)
+    gapTotalFreq /= total;
+
+  /*Set frequencies and geometric distribution with a deep copy!*/
+  for (i = 0; i < nmod; i++){
+    double* modFreqs = mod[i]->backgd_freqs->data;
+
+    for(j = 0; j < residues; j++){
+      modFreqs[j] = totalFreqs[j];
+      vec_set(mod[i]->all_params, mod[i]->backgd_idx + j, modFreqs[j]);
+    }
+    if(mod[0]->subst_mod == F84E){
+      modFreqs[4] = gapTotalFreq;
+      vec_set(mod[i]->all_params, mod[i]->backgd_idx + 4, gapTotalFreq);
+      
+    }
+  }
+  
   if (npar <= 0)
     die("ERROR tm_fit npar=%i.  Nothing to optimize!\n", npar);
   opt_params = vec_new(npar);
-  for (j=0; j < nmod; j++) {
-    for (i=0; i<mod[j]->all_params->size; i++)
-      if (mod[j]->param_map[i] >=0)
-	vec_set(opt_params, mod[j]->param_map[i], vec_get(mod[j]->all_params, i));
-  }
+  
+  /*All models now need to be reinitialized with the proper values based on the global
+   * values!*/
+  for (i = 0; i < nmod; i++)
+    tm_rate_params_init(mod[i], mod[i]->all_params, mod[i]->ratematrix_idx, 0);
+  
+  /*No need to iterate over models as they all share the same parameters!*/
+  for (i = 0; i < mod[0]->all_params->size; i++)
+    if (mod[0]->param_map[i] >=0)
+      vec_set(opt_params, mod[0]->param_map[i], vec_get(mod[0]->all_params, i));
+  
   tm_new_boundaries(&lower_bounds, &upper_bounds, npar, mod[0], 1);
   for (j=1; j < nmod; j++)
     tm_set_boundaries(lower_bounds, upper_bounds, mod[j]);
@@ -2212,16 +2290,28 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
 
   if (!quiet) fprintf(stderr, "numpar = %i\n", opt_params->size);
   modlist = lst_new_ptr(nmod);
-  for (i=0; i < nmod; i++) lst_push_ptr(modlist, mod[i]);
-  retval = opt_bfgs(tm_multi_likelihood_wrapper, opt_params, (void*)modlist,
-		    &ll, lower_bounds, upper_bounds, logf, NULL, precision,
-		    NULL, &numeval);
+
+  for (i=0; i < nmod; i++)
+    lst_push_ptr(modlist, mod[i]);
+    
+  /*Note, program will break if not all models are the same...*/
+  if(mod[0]->subst_mod == F84E){
+    retval = opt_bfgs(tmMultiGapAwareLikelihoodWrapper, opt_params, (void*)modlist, &ll,
+            lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);
+    for (j=0; j < nmod; j++)
+      mod[j]->lnL = gapAwareLikelihoodWrapper(opt_params, mod[j]) * -1.0 * log(2);
+  }
+  else{ /*Just regular model!*/
+    retval = opt_bfgs(tm_multi_likelihood_wrapper, opt_params, (void*)modlist, &ll,
+            lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);
+    for (j=0; j < nmod; j++)
+      mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0 * log(2); 
+  }
+  
   lst_free(modlist);
-
-  for (j=0; j < nmod; j++)
-    mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0 * log(2);
+  
   ll *= -1.0*log(2);
-
+  
   if (!quiet) {
     fprintf(stderr, "Done.  log(likelihood) = %f numeval=%i (", ll, numeval);
     for (i=0; i < npar; i++) {
@@ -2666,12 +2756,6 @@ double tm_likelihood_wrapper(Vector *params, void *data) {
   tm_unpack_params(mod, params, -1);
   val = -1 * tl_compute_log_likelihood(mod, mod->msa, NULL, NULL, mod->category,
 				       NULL);
-/*  if (1) {
-     int i;
-     printf("val=%f", val);
-     for (i=0; i < params->size; i++) printf("\t%e", vec_get(params, i));
-     printf("\n");
-  }*/
   return val;
 }
 
@@ -2695,6 +2779,15 @@ double tm_likelihood_wrapper(Vector *params, void *data) {
   }
   return ll;
   }*/
+
+double tmMultiGapAwareLikelihoodWrapper(Vector *params, void *data) {
+  List *modlist = (List*)data;
+  double ll=0;
+  int i;
+  for (i=0; i < lst_size(modlist); i++)
+    ll += gapAwareLikelihoodWrapper(params, lst_get_ptr(modlist, i));
+  return ll;
+}
 
 double tm_multi_likelihood_wrapper(Vector *params, void *data) {
   List *modlist = (List*)data;
@@ -2795,12 +2888,14 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
   }
 
   /* backgd freqs */
+  if(mod->subst_mod != F84E){ //This model does gaps differently!
   sum = 0;
   for (j = 0; j < mod->backgd_freqs->size; j++)
     sum += vec_get(params, mod->backgd_idx+j);
   for (j = 0; j < mod->backgd_freqs->size; j++)
     vec_set(mod->backgd_freqs, j, vec_get(params, mod->backgd_idx+j)/sum);
-
+  }
+  
   /* rate variation */
   if (mod->nratecats > 1) {
     if (mod->site_model)  {   /* Nielsen-yang site model parameterization */

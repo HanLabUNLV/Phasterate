@@ -568,8 +568,10 @@ void tm_rate_params_init_from_model(TreeModel *mod, Vector *params,
     break;
   case F84E:
     tm_init_mat_F84E(mod,params,params_idx);
+    break;
   case F84:
     tm_init_mat_F84(mod,params,params_idx);
+    break;
   default:
     die("ERROR tm_rate_params_init_from_model: unknown substitution model\n");
   }
@@ -664,6 +666,7 @@ void tm_set_K80_matrix(TreeModel *mod, double kappa) {
 
 void tm_set_HKY_matrix(TreeModel *mod, double kappa, int kappa_idx) {
   int i, j;
+
   int setup_mapping = 
     (kappa_idx >= 0 && mod->rate_matrix_param_row != NULL && 
      lst_size(mod->rate_matrix_param_row[kappa_idx]) == 0);

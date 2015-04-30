@@ -686,7 +686,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
     else
       die("Error: F84E Model requires -O branches.");
   }
-  /*F85 Model check, we do not use branch lengths when optimizing. I guess we could?*/
+  /*F84 Model check, we do not use branch lengths when optimizing. I guess we could?*/
   if(pf->subst_mod == F84){
     if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
       die("Error: F84E Model requires -O branches.");
@@ -1204,7 +1204,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
          */
         if (mod->backgd_freqs == NULL && pf->extendedFlag == 1){
           tm_init_backgd(mod, msa, cat);
-         residuesSize = mod->backgd_freqs->size-1;
+          residuesSize = mod->backgd_freqs->size-1;
           gapFreq = vec_get(mod->backgd_freqs,4);
           /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
            *             reciprocal to divide all our frequencies by.*/
@@ -1225,6 +1225,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
            * that we have them rerun the initiate model function.*/
           params = tm_params_init(mod, .1, 5, pf->alpha);
         }
+        
         if(mod->subst_mod == F84){
           tm_init_backgd(mod, msa, cat);
           /* We needed the background frequencies properly initialized for this model. Now
@@ -1234,10 +1235,9 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 
         if (pf->use_em)
           tm_fit_em(mod, msa, params, cat, pf->precision, pf->max_em_its, pf->logf, error_file);
-        else if(subst_mod == F84E)
-          tm_fit(mod, msa, params, cat, pf->precision, pf->logf, pf->quiet, error_file, 1);
         else
-          tm_fit(mod, msa, params, cat, pf->precision, pf->logf, pf->quiet, error_file, 0);
+          tm_fit(mod, msa, params, cat, pf->precision, pf->logf, pf->quiet, error_file);
+
       }
 
       if (pf->output_fname_root != NULL) 
@@ -1265,29 +1265,16 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 			    mod_fname->chars);
 	F = phast_fopen(mod_fname->chars, "w+");
 
-        /*If this is the extended prunning algorithm we must print some extra information,
+        /*If this is the F84[E] algorithm we must print some extra information,
           mainly the matrix parameters we calculated.*/
         if(mod->subst_mod == F84 || mod->subst_mod == F84E)
           //Print all needed info from model here!
           printExtendedInfo("phyloFit.infoX", mod);
         
-        //Un-normalize the background frequencies when printing final output.
-        gapFreq = vec_get(mod->backgd_freqs,4);
-        /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
-          reciprocal to divide all our frequencies by.*/
-        double gapMultiplier = 1.0 - gapFreq;
-
-        for (k = 0; k < residuesSize; k++){
-          double currentFreq = vec_get(mod->backgd_freqs, k);
-          double normalizedFreq = currentFreq * gapMultiplier;
-          vec_set(params, mod->backgd_idx + k, normalizedFreq);
-
-          /*Now that they're computed copy them from the parameter vector to the model.*/
-          mod->backgd_freqs->data[k] = normalizedFreq;
-        }
         tm_print(F, mod);
 	phast_fclose(F);
       }
+      
       if (pf->results != NULL)
 	lol_push_treeModel(pf->results, mod, mod_fname->chars);
 
@@ -1380,6 +1367,35 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   //TreeModel *input_mod = pf->input_mod;
   List *mods = pf->input_mods;
   FILE *error_file=NULL;
+  
+  /*Error Checking*/
+  /*This model should only work when used along with the -O branches, -x -G*/
+  if(pf->subst_mod == F84E){
+    if(pf->gaps_as_bases == 0)
+      die("Error: F84E Model requires -G for gaps as bases.");
+    if(pf->extendedFlag == 0)
+      printf("Warning: You probably want to use -x for extended model.");
+    if(pf->nooptstr != NULL){
+      if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
+        die("Error: F84E Model requires -O branches.");
+    }
+    else
+      die("Error: F84E Model requires -O branches.");
+  }
+  /*F84 Model check, we do not use branch lengths when optimizing. I guess we could?*/
+  if(pf->subst_mod == F84){
+    if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
+      die("Error: F84E Model requires -O branches.");
+  }
+  /*Extended Flag only works with F84E*/
+  if(pf->extendedFlag == 1){
+    if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
+      die("Error: -x only works with F84E Model.");
+  }
+  //Get subsitution mod of input files!
+  int substMod = ((TreeModel*)lst_get_ptr(pf->input_mods, 0))->subst_mod;
+  if(pf->subst_mod == F84E && pf->subst_mod != substMod)
+      die("\nError: F84E can only be used with F84E mod files.");
 
   if (pf->no_freqs)
     pf->init_backgd_from_data = FALSE;
@@ -1451,75 +1467,14 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
         lst_set_ptr(pf->trees, i, tree);  
       }
     }
-/*    else if (msa->nseqs == 2) {
-      sprintf(tmpchstr, "(%s,%s)", msa->names[0], msa->names[1]);
-      tree = tr_new_from_string(tmpchstr);
-      free_tree = TRUE;
-    }
-    else if (msa->nseqs == 3 && subst_mod_is_reversible(subst_mod) && pf->alt_mod_str == NULL) {
-      sprintf(tmpchstr, "(%s,(%s,%s))", msa->names[0], msa->names[1], 
-              msa->names[2]);
-      tree = tr_new_from_string(tmpchstr);
-      free_tree = TRUE;
-    }
-    else die("ERROR: --tree required.\n");*/
   }
-
-
 
   /* allow for specified ancestor */
-  if (pf->root_seqname != NULL) {
-    /*TreeNode *rl;
-    if (tree == NULL || subst_mod_is_reversible(subst_mod)) 
-      die("ERROR: --ancestor requires --tree and a non-reversible model.\n");
-    rl = tr_get_node(tree, pf->root_seqname);     
-    if (rl == NULL || rl->parent != tree) 
-      die("ERROR: Sequence specified by --ancestor must be a child of the root.\n");
-    root_leaf_id = rl->id;*/
+  if (pf->root_seqname != NULL)
     die("ERROR: --ancestor not allowed with multiple input models.\n");
-  }
 
-  if (pf->label_str != NULL || pf->label_type != NULL) {
-    /*if (pf->label_str == NULL || pf->label_type == NULL ||
-	lst_size(pf->label_str) != lst_size(pf->label_type))
-      //shouldn't happen unless bug
-      die("label_str and label_type should both be lists of same length\n");
-    for (i=0; i < lst_size(pf->label_str); i++) {
-      String *currstr = (String*)lst_get_ptr(pf->label_str, i), *arg1, *label;
-      List *tmplst = lst_new_ptr(10);
-      String *nodename;
-      str_split(currstr, ":", tmplst);
-      if (lst_size(tmplst) != 2) 
-	die("ERROR: bad argument to --label-branches or --label-subtree.\n");
-      arg1 = lst_get_ptr(tmplst, 0);
-      label = lst_get_ptr(tmplst, 1);
-      lst_clear(tmplst);
-      if (lst_get_int(pf->label_type, i) == BRANCH_TYPE) {
-	str_split(arg1, ",", tmplst);
-	for (j=0; j < lst_size(tmplst); j++) {
-	  nodename = (String*)lst_get_ptr(tmplst, j);
-	  tr_label_node(tree, nodename->chars, label->chars);
-	}
-	lst_free_strings(tmplst);
-      } else if (lst_get_int(pf->label_type, i) == SUBTREE_TYPE) {
-	int include_leading_branch = FALSE;
-	TreeNode *node;
-	nodename = arg1;
-	node = tr_get_node(tree, nodename->chars);
-	if (node == NULL && nodename->chars[nodename->length-1] == '+') {
-	  nodename->chars[--nodename->length] = '\0';
-	  node = tr_get_node(tree, nodename->chars);
-	  include_leading_branch = TRUE;
-	}
-	tr_label_subtree(tree, nodename->chars, include_leading_branch, 
-			 label->chars);
-      } else die("ERROR got label_type %i\n", lst_get_int(pf->label_type, i));
-      str_free(arg1);
-      str_free(label);
-      lst_free(tmplst);
-    }*/
+  if (pf->label_str != NULL || pf->label_type != NULL)
     die("ERROR: --label-branches or --label-subtree not allowed with multiple input models.\n");
-  }
 
   for (i=0; i<lst_size(pf->msas); i++) {
     MSA *msa = lst_get_ptr(pf->msas, i);
@@ -1532,6 +1487,7 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
     MSA *msa = lst_get_ptr(pf->msas, i);
     cats_to_do = setupmsa(pf, msa);
   }
+  
   if(cats_to_do == NULL)
       die("Error: No categories to do found, make sure folder has Alignment files?\n");
   if (pf->error_fname != NULL)
@@ -1549,7 +1505,7 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
     MSA *msa = lst_get_ptr(pf->msas, i);
     TreeNode *tree = lst_get_ptr(pf->trees, i);
     List* tmpmods = setupmod(pf, input_mod, msa, tree, cats_to_do, newparams,i,toSkipList);
-    
+
     for (j=0; j<lst_size(tmpmods); j++) {
         lst_push_ptr(newmods, lst_get_ptr(tmpmods, j));
     }
@@ -1583,20 +1539,33 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   
   // fit model
   tm_fit_multi((TreeModel **)mods->array, lst_size(mods), (MSA **)msas->array, lst_size(msas), newparams, OPT_VERY_HIGH_PREC, NULL, 1);
+  
   /*Write results to always to this directory.*/
   /*Maybe should not be hardcoded?*/
   mkdir("phyloFitResults",S_IRWXU);
   printf("Printing results to: phyloFitResults/\n");
+  
   // print model
   for (i=0; i<lst_size(pf->msas); i++) {
     MSA *msa = lst_get_ptr(pf->msas, i);
     TreeModel *mod = lst_get_ptr(mods, i);
     printmodMulti(pf, mod, msa, cats_to_do,i);
+    /*If this is the F84[E] algorithm we must print some extra information,
+     *           mainly the matrix parameters we calculated.*/
+    if(mod->subst_mod == F84 || mod->subst_mod == F84E){
+      //Print all needed info from model here!
+      char temp1[100];
+      char temp2[100];
+      
+      strcpy(temp1, "phyloFitResults/");
+      strcpy(temp2, mod->fileName);
+      strcat(temp2, ".infoX");
+      strcat(temp1, temp2);
+      printExtendedInfo(temp1, mod);
+    }
   }
 
   // free model
-  
-  
   if (error_file != NULL) phast_fclose(error_file);
   if (parsimony_cost_file != NULL) phast_fclose(parsimony_cost_file); 
   str_free(tmpstr);
