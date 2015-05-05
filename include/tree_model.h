@@ -344,6 +344,17 @@ void tm_set_subst_matrices(TreeModel *tm);
  */
 void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n, double scale);
 
+/**
+ * Given the Tree model the current matrix we are computing and the current node.
+ * It will calculate the conditional probabilities for the F8E Model.
+ * @param tm, Tree model.
+ * @param i, current i we are iterating over.
+ * @param j, current j in P[][] we are are iterating over.
+ * @param n, curent node.
+ * @param scale, scaling parameter (used by PhyloP).
+ */
+void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale);
+
 /** Setup the substitution matrices on a Tree Model with custom probability matrix and branch length.
    @param P Probability matrix to use
    @param t Branch length to use

@@ -264,13 +264,33 @@ double totalProbOfSite(double** pL,double* freqs,int rootNodeId, double p);
  * a current base. Formula (20) on the paper.
  * @param i, given residue to compute for.
  * @param pL, probabilities calculated so far.
- * @param mod, TreeModel containing all information about our model.
- * @param k, node k we're iterating over.
+ * @param lMatrix, conditional probability matrix.
+ * @param rMatrix, conditional probability matrix.
+ * @param lChild, leftChild id for pL.
+ * @param rChild, rightChild id for pL.
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
+ * @param k, tree node used for calculating delta gap.
+ * @param currSite, u column we are looking at.
  * @return likelihood as computed by formula 20.
  */
-double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa,
-        int currSite);
+double probForNodeResidue(int i,double** pL,double** lMatrix, double** rMatrix,
+        int lChild, int rChild, MSA* msa, TreeNode* k, int currSite);
+
+/**
+ * Computes the likelihood of node curentNode (k) given the likelihoods up to node k for
+ * gap character. Formula (21) on the paper.
+ * @param pL, probabilities calculated so far.
+ * @param lMatrix, conditional probability matrix.
+ * @param rMatrix, conditional probability matrix.
+ * @param lChild, leftChild id for pL.
+ * @param rChild, rightChild id for pL.
+ * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
+ * @param currSite, u column we are looking at.
+ *  * @param currSite, u column we are looking at.
+ * @return likelihood as computed by formula 21.
+ */
+double probForNodeGap(double** pL, double** lMatrix, double** rMatrix, int lChild,
+        int rChild, MSA* msa, TreeNode* k, int currSite);
 
 /**
  * Same as probForNodeResidue except used for extra column containing all gaps therefore
@@ -279,34 +299,26 @@ double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa
  * a current base. Formula (20) on the paper.
  * @param i, given residue to compute for.
  * @param pL, probabilities calculated so far.
- * @param mod, TreeModel containing all information about our model.
- * @param k, node k we're iterating over.
- * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
+ * @param lMatrix, conditional probability matrix.
+ * @param rMatrix, conditional probability matrix.
+ * @param lChild, leftChild id for pL.
+ * @param rChild, rightChild id for pL.
  * @return likelihood as computed by formula 20.
  */
-double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k);
+double probForNodeResidueAllGap(int i,double** pL,double** lMatrix, double** rMatrix,
+        int lChild, int rChild);
 
-/**
- * Computes the likelihood of node curentNode (k) given the likelihoods up to node k for
- * gap character. Formula (21) on the paper.
- * @param pL, probabilities calculated so far.
- * @param mod, TreeModel containing all information about our model.
- * @param k, node k we're iterating over.
- * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
- * @return likelihood as computed by formula 21.
- */
-double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currSite);
-
-/**
- * Same as probForNodeGap except used for extra column containing all gaps therefore
+/** Same as probForNodeGap except used for extra column containing all gaps therefore
  * we don not need to check deltaGap() to see if all children are gaps.
  * @param pL, probabilities calculated so far.
- * @param mod, TreeModel containing all information about our model.
- * @param k, node k we're iterating over.
- * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
+ * @param lMatrix, conditional probability matrix.
+ * @param rMatrix, conditional probability matrix.
+ * @param lChild, leftChild id for pL.
+ * @param rChild, rightChild id for pL.
  * @return likelihood as computed by formula 21.
  */
-double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k);
+double probForNodeGapAllGap(double** pL,double** lMatrix, double** rMatrix,
+        int lChild, int rChild);
 
 /**
  * The single event conditional probability. Calculates: P(j|i,t) as like formula

@@ -499,8 +499,6 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
     sfree(subst_probs);
   }
   
-  printf("Rate Matrix:\n");
-  printMatrix(mod->rate_matrix->matrix,4);
   return(retval);
 }
 
@@ -1135,20 +1133,27 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
 
       }
       else{/* General recursive case. Calculate probabilities at inner node for all bases.*/
-
+        /*Get matrices for left and right side.*/
+        int lChild = n->lchild->id;
+        int rChild = n->rchild->id;
+        /*No rate categories used for this model!*/
+        double** lMatrix = mod->P[lChild][0]->matrix->data;
+        double** rMatrix = mod->P[rChild][0]->matrix->data;
+        
         for (i = 0; i < nstates-1; i++){
           /*Case where this is not the extra (all gaps) column.*/
           if(tupleidx != msa->ss->ntuples)
             /*pL[k][n] :: Probability of base K given, node n.*/
-            pL[i][n->id] = probForNodeResidue(i,pL,mod,n,msa,tupleidx);
+            pL[i][n->id] = probForNodeResidue(i, pL, lMatrix, rMatrix, lChild, rChild,
+                    msa, n, tupleidx);
           else /* Extra (all gap) column case*/
-            pL[i][n->id] = probForNodeResidueAllGap(i,pL,mod,n);
+            pL[i][n->id] = probForNodeResidueAllGap(i, pL, lMatrix, rMatrix, lChild, rChild);
         }
         /*Handle gap according to different formula.*/
         if(tupleidx != msa->ss->ntuples)
-          pL[4][n->id] = probForNodeGap(pL,mod,n,msa,tupleidx);
+          pL[4][n->id] = probForNodeGap(pL, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
         else
-          pL[4][n->id] = probForNodeGapAllGap(pL,mod,n);
+          pL[4][n->id] = probForNodeGapAllGap(pL, lMatrix, rMatrix, lChild, rChild);
       }
     }
     
@@ -1355,27 +1360,21 @@ double totalProbOfSite(double** pL,double* freqs,int rootNodeId, double p){
  * a current base. Formula (20) on the paper.
  * @param i, given residue to compute for.
  * @param pL, probabilities calculated so far.
- * @param mod, TreeModel containing all information about our model.
- * @param k, node k we're iterating over.
+ * @param lMatrix, conditional probability matrix.
+ * @param rMatrix, conditional probability matrix.
+ * @param lChild, leftChild id for pL.
+ * @param rChild, rightChild id for pL.
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
+ * @param k, tree node used for calculating delta gap.
  * @param currSite, u column we are looking at.
  * @return likelihood as computed by formula 20.
  */
-double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa,
-        int currSite){
+double probForNodeResidue(int i,double** pL,double** lMatrix, double** rMatrix,
+        int lChild, int rChild, MSA* msa, TreeNode* k, int currSite){
   int q;
   int gapChar = 4;
   int residues = 4;
 
-  double* freqs= mod->backgd_freqs->data;
-  int paramIndex = mod->ratematrix_idx;
-  double* params= &(mod->all_params->data[paramIndex]);
-
-  int lChild = k->lchild->id;
-  double lChildDist = k->lchild->dparent * mod->scale;
-
-  int rChild = k->rchild->id;
-  double rChildDist = k->rchild->dparent * mod->scale;
   /*Total summations for both sides.*/
   double sSum = 0;
   double qSum = 0;
@@ -1385,16 +1384,13 @@ double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa
   /*Formula (20) calculate the sums for the part before the '*' and the part after.*/
   for(q = 0; q < residues; q++){
     /*Sigma with q loop: 1 <= q <= K*/
-    qSum += pL[q][lChild] * singleEventCondProb(q,i,lChildDist,freqs,params);
+    qSum += pL[q][lChild] * lMatrix[i][q];
     /*Sigma with s loop: 1 <= s <= K*/
-    sSum +=  pL[q][rChild] * singleEventCondProb(q,i,rChildDist,freqs,params);
+    sSum +=  pL[q][rChild] * rMatrix[i][q];
   }
   
- qDelta = deltaGap(k->lchild,msa,currSite) *
-         singleEventCondProb(gapChar,i,lChildDist,freqs,params);
- 
- sDelta = deltaGap(k->rchild,msa,currSite) *
-            singleEventCondProb(gapChar,i,rChildDist,freqs,params);
+ qDelta = deltaGap(k->lchild, msa, currSite) * lMatrix[i][gapChar]; 
+ sDelta = deltaGap(k->rchild, msa, currSite) * rMatrix[i][gapChar];
  
   return (qSum + qDelta) * (sSum + sDelta);
 }
@@ -1403,26 +1399,20 @@ double probForNodeResidue(int i,double** pL,TreeModel* mod, TreeNode* k,MSA* msa
  * Computes the likelihood of node curentNode (k) given the likelihoods up to node k for
  * gap character. Formula (21) on the paper.
  * @param pL, probabilities calculated so far.
- * @param mod, TreeModel containing all information about our model.
- * @param k, node k we're iterating over.
+ * @param lMatrix, conditional probability matrix.
+ * @param rMatrix, conditional probability matrix.
+ * @param lChild, leftChild id for pL.
+ * @param rChild, rightChild id for pL.
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
  * @param currSite, u column we are looking at.
+ *  * @param currSite, u column we are looking at.
  * @return likelihood as computed by formula 21.
  */
-double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currSite){
+double probForNodeGap(double** pL, double** lMatrix, double** rMatrix, int lChild,
+        int rChild, MSA* msa, TreeNode* k, int currSite){
   int q;
   int gapChar = 4;
   int residues = 4;
-
-  double* freqs= mod->backgd_freqs->data;
-  int paramIndex = mod->ratematrix_idx;
-  double* params = &(mod->all_params->data[paramIndex]);
-
-  int lChild = k->lchild->id;
-  double lChildDist = k->lchild->dparent * mod->scale;
-
-  int rChild = k->rchild->id;
-  double rChildDist = k->rchild->dparent * mod->scale;
 
   /*Total summations for both sides.*/
   double sSum = 0;
@@ -1435,14 +1425,14 @@ double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currS
   /*Left hand summation over all bases.*/
   for(q = 0; q < residues; q++){
     /*Sigma with q loop: 1 <= q <= K*/
-    qSum +=  pL[q][lChild] * singleEventCondProb(q,gapChar,lChildDist,freqs,params);
+    qSum +=  pL[q][lChild] * lMatrix[gapChar][q];
     /*Sigma with s loop: 1 <= s <= K*/
-    sSum += pL[q][rChild] * singleEventCondProb(q,gapChar,rChildDist,freqs,params);
+    sSum += pL[q][rChild] * rMatrix[gapChar][q];
   }
   
   /*Not an error the leftDelta has the rchild and the rightDelta has the lChild...*/
-  leftDelta = deltaGap(k->rchild,msa,currSite);
-  rightDelta = deltaGap(k->lchild,msa,currSite);
+  leftDelta = deltaGap(k->rchild, msa, currSite);
+  rightDelta = deltaGap(k->lchild, msa, currSite);
   lhs =  qSum + pL[gapChar][lChild];
   rhs =  sSum + pL[gapChar][rChild];
 
@@ -1456,25 +1446,18 @@ double probForNodeGap(double** pL,TreeModel* mod, TreeNode* k,MSA* msa,int currS
  * a current base. Formula (20) on the paper.
  * @param i, given residue to compute for.
  * @param pL, probabilities calculated so far.
- * @param mod, TreeModel containing all information about our model.
- * @param k, node k we're iterating over.
- * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
+ * @param lMatrix, conditional probability matrix.
+ * @param rMatrix, conditional probability matrix.
+ * @param lChild, leftChild id for pL.
+ * @param rChild, rightChild id for pL.
  * @return likelihood as computed by formula 20.
  */
-double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k){
+double probForNodeResidueAllGap(int i,double** pL,double** lMatrix, double** rMatrix,
+        int lChild, int rChild){
   int q;
   int gapChar = 4;
   int residues = 4;
 
-  double* freqs= mod->backgd_freqs->data;
-  int paramIndex = mod->ratematrix_idx;
-  double* params= &(mod->all_params->data[paramIndex]);
-
-  int lChild = k->lchild->id;
-  double lChildDist = k->lchild->dparent * mod->scale;
-
-  int rChild = k->rchild->id;
-  double rChildDist = k->rchild->dparent * mod->scale;
   /*Total summations for both sides.*/
   double sSum = 0;
   double qSum = 0;
@@ -1484,39 +1467,31 @@ double probForNodeResidueAllGap(int i,double** pL,TreeModel* mod, TreeNode* k){
   /*Formula (20) calculate the sums for the part before the '*' and the part after.*/
   for(q = 0; q < residues; q++){
     /*Sigma with q loop: 1 <= q <= K*/
-    qSum += pL[q][lChild] * singleEventCondProb(q,i,lChildDist,freqs,params);
+    qSum += pL[q][lChild] * lMatrix[i][q];
     /*Sigma with s loop: 1 <= s <= K*/
-    sSum +=  pL[q][rChild] * singleEventCondProb(q,i,rChildDist,freqs,params);
+    sSum +=  pL[q][rChild] * lMatrix[i][q];
   }
+
+  qDelta = lMatrix[i][gapChar];
+  sDelta = rMatrix[i][gapChar];
   
- qDelta = singleEventCondProb(gapChar,i,lChildDist,freqs,params);
- sDelta = singleEventCondProb(gapChar,i,rChildDist,freqs,params);
- 
   return (qSum + qDelta) * (sSum + sDelta);
 }
 /* =====================================================================================*/
 /** Same as probForNodeGap except used for extra column containing all gaps therefore
  * we don not need to check deltaGap() to see if all children are gaps.
  * @param pL, probabilities calculated so far.
- * @param mod, TreeModel containing all information about our model.
- * @param k, node k we're iterating over.
- * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
+ * @param lMatrix, conditional probability matrix.
+ * @param rMatrix, conditional probability matrix.
+ * @param lChild, leftChild id for pL.
+ * @param rChild, rightChild id for pL.
  * @return likelihood as computed by formula 21.
  */
-double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
- int q;
+double probForNodeGapAllGap(double** pL,double** lMatrix, double** rMatrix,
+        int lChild, int rChild){
+  int q;
   int gapChar = 4;
   int residues = 4;
-
-  double* freqs= mod->backgd_freqs->data;
-  int paramIndex = mod->ratematrix_idx;
-  double* params = &(mod->all_params->data[paramIndex]);
-
-  int lChild = k->lchild->id;
-  double lChildDist = k->lchild->dparent * mod->scale;
-
-  int rChild = k->rchild->id;
-  double rChildDist = k->rchild->dparent * mod->scale;
 
   /*Total summations for both sides.*/
   double sSum = 0;
@@ -1527,9 +1502,9 @@ double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
   /*Left hand summation over all bases.*/
   for(q = 0; q < residues; q++){
     /*Sigma with q loop: 1 <= q <= K*/
-    qSum +=  pL[q][lChild] * singleEventCondProb(q,gapChar,lChildDist,freqs,params);
+    qSum +=  pL[q][lChild] * lMatrix[gapChar][q];
     /*Sigma with s loop: 1 <= s <= K*/
-    sSum += pL[q][rChild] * singleEventCondProb(q,gapChar,rChildDist,freqs,params);
+    sSum += pL[q][rChild] * rMatrix[gapChar][q];
   }
   
   /*Not an error the leftDelta has the rchild and the rightDelta has the lChild...*/
@@ -1544,7 +1519,6 @@ double probForNodeGapAllGap(double** pL,TreeModel* mod, TreeNode* k){
  * (22),(23),(24) on dnaML-erate paper. Depending on whether either assumedBase or
  * currentBase is a gap. It uses the gamma-t (6) , xi-t (7) and P_t-epsilon (9)
  * functions to calculate the return value (functions defined below).
- * @param mod, model representing our phylogenetic tree.
  * @param assumedBase, base to assume (j)
  * @param currentBase, given base for probability (i)
  * @param branchLength, given branch length from j to i (t)

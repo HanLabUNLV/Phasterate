@@ -1074,7 +1074,7 @@ void tm_set_subst_matrices(TreeModel *tm) {
 
       /*F84E model does not require this for algorithm.*/
       if(subst_mod == F84E)
-        return;
+        probsF84EModels(tm, i, j, n, branch_scale);
       /* for simple models, full matrix exponentiation is not necessary */
       else if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
         tm_set_probs_JC69(tm, tm->P[i][j],
@@ -1112,10 +1112,37 @@ void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   double* freqs = tm->backgd_freqs->data;
   double branchLength = n->dparent;
 
-  //Both Models share this in common:
   for(k = 0; k < 4; k++)
     for(l = 0; l < 4; l++)
       matrixA[k][l] = epsilonProbability(l, k, branchLength * scale, freqs, params);
+
+  return;
+}
+
+/**
+ * Given the Tree model the current matrix we are computing and the current node.
+ * It will calculate the conditional probabilities for the F84E model. This is
+ * used so we don't calculate every value at every iteration of the loop.
+ * @param tm, Tree model.
+ * @param i, current i we are iterating over.
+ * @param j, current j in P[][] we are are iterating over.
+ * @param n, curent node.
+ * @param scale, the scaling factor if any (used by phyloP).
+ * Only works for phyloFit.
+ */
+void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
+  int m = tm->ratematrix_idx;
+  double* params = & (tm->all_params->data[m]);
+  int matrixSize = 5;
+  double** matrixA = tm->P[i][j]->matrix->data;
+  int k, l;
+  double* freqs = tm->backgd_freqs->data;
+  double branchLength = n->dparent;
+
+  //Both Models share this in common:
+  for(k = 0; k < matrixSize; k++)
+    for(l = 0; l < matrixSize; l++)
+      matrixA[k][l] = singleEventCondProb(l, k, branchLength * scale, freqs, params);
 
   return;
 }

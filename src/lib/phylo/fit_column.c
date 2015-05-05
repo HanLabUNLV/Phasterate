@@ -1673,13 +1673,20 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL){
         pL[i][n->id] = probabilityOfLeaf(thischar,observedState,i);   
     }
     else{/* General recursive case. Calculate probabilities at inner node for all bases.*/
+      /*Get matrices for left and right side.*/
+      int cat = 0; /*No rate categories allowed!*/
+      int lChild = n->lchild->id;
+      int rChild = n->rchild->id;
+      double** lMatrix = mod->P[lChild][cat]->matrix->data;
+      double** rMatrix = mod->P[rChild][cat]->matrix->data;
       
       for (i = 0; i < nstates - 1; i++)
         /*pL[k][n] :: Probability of base K given, node n.*/
-        pL[i][n->id] = probForNodeResidue(i,pL,mod,n,msa,tupleidx);
+        pL[i][n->id] = probForNodeResidue(i, pL, lMatrix, rMatrix, lChild, rChild,
+                msa, n, tupleidx);
       
       /*Handle gap according to different formula.*/
-      pL[4][n->id] = probForNodeGap(pL,mod,n,msa,tupleidx);
+      pL[4][n->id] = probForNodeGap(pL, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
     }
   }
   
