@@ -1072,7 +1072,6 @@ void tm_set_subst_matrices(TreeModel *tm) {
 	/* treat as if infinitely long */
         tm_set_probs_independent(tm, tm->P[i][j]);
 
-      /*F84E model does not require this for algorithm.*/
       if(subst_mod == F84E)
         probsF84EModels(tm, i, j, n, branch_scale);
       /* for simple models, full matrix exponentiation is not necessary */
@@ -2321,7 +2320,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   for (i=0; i < nmod; i++)
     lst_push_ptr(modlist, mod[i]);
     
-  /*Note, program will break if not all models are the same...*/
+  /*Do Most of the work here!*/
   if(mod[0]->subst_mod == F84E){
     retval = opt_bfgs(tmMultiGapAwareLikelihoodWrapper, opt_params, (void*)modlist, &ll,
             lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);

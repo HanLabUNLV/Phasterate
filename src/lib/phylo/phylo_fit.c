@@ -1372,31 +1372,52 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   /*This model should only work when used along with the -O branches, -x -G*/
   if(pf->subst_mod == F84E){
     if(pf->gaps_as_bases == 0)
-      die("Error: F84E Model requires -G for gaps as bases.");
+      die("Error: F84E Model requires -G for gaps as bases.\n");
     if(pf->extendedFlag == 0)
-      printf("Warning: You probably want to use -x for extended model.");
+      printf("Warning: You probably want to use -x for extended model.\n");
     if(pf->nooptstr != NULL){
       if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
         die("Error: F84E Model requires -O branches.");
     }
     else
-      die("Error: F84E Model requires -O branches.");
+      die("Error: F84E Model requires -O branches.\n");
   }
+  
+  if(pf->nooptstr == NULL)
+      die("Error: Multifit requires -O branches option\n");
+
   /*F84 Model check, we do not use branch lengths when optimizing. I guess we could?*/
   if(pf->subst_mod == F84){
     if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
-      die("Error: F84E Model requires -O branches.");
+      die("Error: F84E Model requires -O branches.\n");
   }
   /*Extended Flag only works with F84E*/
   if(pf->extendedFlag == 1){
     if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
-      die("Error: -x only works with F84E Model.");
+      die("Error: -x only works with F84E Model.\n");
   }
-  //Get subsitution mod of input files!
-  int substMod = ((TreeModel*)lst_get_ptr(pf->input_mods, 0))->subst_mod;
+  //Make sure the folder is not empty.
+  void* ptr = lst_get_ptr(pf->input_mods, 0);
+  if(ptr == NULL)
+    die("\nError: One of the folders is empty!\n");
+  
+  int substMod = ((TreeModel*)ptr)->subst_mod;
   if(pf->subst_mod == F84E && pf->subst_mod != substMod)
-      die("\nError: F84E can only be used with F84E mod files.");
+      die("\nError: F84E can only be used with F84E mod files.\n");
 
+  /*Make sure all the mod file are of the same substitution model.*/  
+  for (i = 1; i < lst_size(pf->msas); i ++){
+    ptr = lst_get_ptr(pf->input_mods, i);
+    int otherSubstMod = ((TreeModel*)ptr)->subst_mod;
+    if(substMod != otherSubstMod)
+      die("\nError: Not all models in the model Directory are the same!\n");
+  }
+  
+  /*As of now users must use -O flag.*/
+  if(pf->nooptstr != NULL)
+    if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
+      die("Error: Multifit requires -O branches.\n");
+  
   if (pf->no_freqs)
     pf->init_backgd_from_data = FALSE;
 
@@ -2116,7 +2137,7 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   /** Geometric Distribution Parameter. */
   fprintf(fout, "Geometric Distribution parameter (p):\n");
   fprintf(fout, "%f\n", p);
-  
+   phast_fclose(fout);
   return;
 }
 //==========================================================================================

@@ -200,7 +200,7 @@ void phyloP(struct phyloP_struct *p) {
   }
 
   if((p->extended == 1) && (mod->subst_mod != F84E || method != LRT))
-    die("Extended prunning algorithm only works with F84 and LRT\n");
+    die("Extended prunning algorithm only works with F84E and LRT\n");
 
   if (msa == NULL && !prior_only)
     die("Need either --prior-only or an alignment\n");
