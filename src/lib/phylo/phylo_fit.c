@@ -1570,9 +1570,11 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   for (i=0; i<lst_size(pf->msas); i++) {
     MSA *msa = lst_get_ptr(pf->msas, i);
     TreeModel *mod = lst_get_ptr(mods, i);
+    
     printmodMulti(pf, mod, msa, cats_to_do,i);
     /*If this is the F84[E] algorithm we must print some extra information,
      *           mainly the matrix parameters we calculated.*/
+    
     if(mod->subst_mod == F84 || mod->subst_mod == F84E){
       //Print all needed info from model here!
       char temp1[100];
@@ -2137,7 +2139,8 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   /** Geometric Distribution Parameter. */
   fprintf(fout, "Geometric Distribution parameter (p):\n");
   fprintf(fout, "%f\n", p);
-   phast_fclose(fout);
+  
+  phast_fclose(fout);
   return;
 }
 //==========================================================================================

@@ -2808,11 +2808,19 @@ double tm_likelihood_wrapper(Vector *params, void *data) {
 
 double tmMultiGapAwareLikelihoodWrapper(Vector *params, void *data) {
   List *modlist = (List*)data;
-  double ll=0;
+  int size = lst_size(modlist);
+  double ll[size];
+  double llReturn = 0;
   int i;
-  for (i=0; i < lst_size(modlist); i++)
-    ll += gapAwareLikelihoodWrapper(params, lst_get_ptr(modlist, i));
-  return ll;
+  
+  #pragma omp parallel for
+    for (i=0; i < size; i++)
+      ll[i] = gapAwareLikelihoodWrapper(params, lst_get_ptr(modlist, i));
+  
+  for(i = 0; i < size; i++)
+    llReturn += ll[i];
+  
+  return llReturn;
 }
 
 double tm_multi_likelihood_wrapper(Vector *params, void *data) {
@@ -4454,7 +4462,7 @@ List *tm_new_from_dir(char *dir) {
 
         tmpmods[mods_num] = tm;
         mods_num++;
-        fclose(f);
+        phast_fclose(f);
       }
     }
   }

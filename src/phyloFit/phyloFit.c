@@ -417,7 +417,7 @@ MSA* read_msa(struct phyloFit_struct *pf, char * msa_fname, msa_format_type inpu
 
   strcpy(msa->fileName,getFileName(msa_fname));
   /*Close file handle, otherwise too many open handles error :)*/
-  fclose(infile);
+  phast_fclose(infile);
   return msa;
 }
 
