@@ -101,6 +101,7 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->input_mods = NULL;
   pf->extendedFlag = 0;
   pf->results = rphast ? lol_new(2) : NULL;
+  pf->trees = NULL;
   return pf;
 }
 
