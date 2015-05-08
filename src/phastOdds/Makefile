@@ -16,7 +16,7 @@ HELP = $(addsuffix .help,$(basename $(wildcard *.help_src)))
 all: ${EXEC}
 
 %.o: %.c ${HELP} ../make-include.mk
-	$(CC) $(CFLAGS) -c $< -o $@ 
+	$(CC) $(CFLAGS) -c $< -o $@
 
 ${EXEC}: ${OBJS} ${PHAST}/lib/libphast.a
 	${CC} ${LFLAGS} ${LIBPATH} -o $@ ${OBJS} ${LIBS} 

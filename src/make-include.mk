@@ -25,9 +25,9 @@ ifeq ($(TARGETOS), Windows)
   AR = /usr/bin/i586-mingw32msvc-ar
 else
   ifeq ($(TARGETOS), LSB)
-    CC = lsbcc -fno-stack-protector    
+    CC = lsbcc -fno-stack-protector
   else
-    CC = gcc
+    CC = gcc -fopenmp
   endif
   AR = ar
 endif
@@ -45,7 +45,7 @@ ifneq ($(TARGETOS), Windows)
  #for debugging
  CFLAGS = -g -fno-inline -Wall -DPHAST_DEBUG
  # for best performance
- #CFLAGS = -O3 
+ #CFLAGS = -O3
  # some other options
  #CFLAGS = -mcpu=opteron -O3
  #CFLAGS = -mcpu=pentiumpro -O3 

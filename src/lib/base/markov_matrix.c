@@ -663,10 +663,10 @@ void mm_diagonalize_real(MarkovMatrix *M) {
 
   /* keep temp storage around -- this function will be called many
      times repeatedly */
-  static Zmatrix *evecs_z = NULL;
-  static Zmatrix *evecs_inv_z = NULL;
-  static Zvector *evals_z = NULL;
-  static int size = -1;
+  Zmatrix *evecs_z = NULL;
+  Zmatrix *evecs_inv_z = NULL;
+  Zvector *evals_z = NULL;
+  int size = -1;
 
   if (evecs_z == NULL || size != M->size) {
     if (evecs_z != NULL) {

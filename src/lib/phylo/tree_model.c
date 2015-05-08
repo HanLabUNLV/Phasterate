@@ -3023,11 +3023,6 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
   tm_set_rate_matrix_sel_bgc(mod, params, mod->ratematrix_idx,
 			     mod->selection, 0.0);
 
-  /*This is not necessary for the extended algorithm as we don not
-   use it directly like the other models.*/
-  if(mod->extended == F84E)
-    return;
-
   /* diagonalize, if necessary */
   if ((mod->subst_mod != JC69 && mod->subst_mod != F81) ||
       mod->selection != 0.0) {

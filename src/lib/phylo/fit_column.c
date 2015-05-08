@@ -769,7 +769,7 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
     /* first check for actual substitution data in column; if none,
      * don't waste time computing likelihoods. Extended model cares about
      * gaps which are considered missing data */
-    if (!col_has_data(mod, msa, i) && mod->extended == 0){
+    if (!col_has_data(mod, msa, i) && mod->subst_mod != F84E){
       delta_lnl = 0;
       this_scale = 1;
     }
