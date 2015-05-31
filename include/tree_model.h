@@ -220,7 +220,6 @@ struct tm_struct {
 				 if TM_SCALE and alt_subst_mods!=NULL */
   int **iupac_inv_map;          /**< Inverse map for IUPAC ambiguity characters */
   char fileName[1000];          /**< Name of file where this alignment came from, useful for failures*/
-  int extended;                 /**< Whether we are using extended prunning algorithm. */
   double geometricParameter;     /**< The geometric substitution parameter used by the
                                  * extended prunning algorithm.*/
   int isPhyloP;               /**<If we are in phyloP we will do things slightly differently

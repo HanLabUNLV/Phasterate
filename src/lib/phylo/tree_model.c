@@ -1767,8 +1767,8 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
           vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.000);
         else
           vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.001);
-      }
     }
+  }
   }
   /* Also do not let rate matrix parameters get too small (this was
      causing some errors diagonalizing the rate matrix, although the
@@ -2023,7 +2023,7 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
   double ll;
   Vector *lower_bounds, *upper_bounds, *opt_params;
   int i, retval = 0, npar, numeval;
-
+  
   if (msa->ss == NULL) {
     if (msa->seqs == NULL)
       die("ERROR tm_fit: msa->ss and msa->seqs are both NULL\n");
@@ -3024,7 +3024,8 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
 			     mod->selection, 0.0);
 
   /* diagonalize, if necessary */
-  if ((mod->subst_mod != JC69 && mod->subst_mod != F81) ||
+  if ((mod->subst_mod != JC69 && mod->subst_mod != F81 && mod->subst_mod != F84E
+          && mod->subst_mod != F84) ||
       mod->selection != 0.0) {
     if (!mat_equal(oldMatrix, mod->rate_matrix->matrix))
       mm_diagonalize(mod->rate_matrix);
@@ -4497,6 +4498,7 @@ double gapAwareLikelihoodWrapper(Vector *params, void *data) {
  * @return value (not used by program).
  */
 double scaleRateMatrixExtended(TreeModel *mod) {
+  return 0;
   double normalizedFreqs[5];
   double gapFreq = vec_get(mod->backgd_freqs, 4);
   double gapMultiplier = 1.0 - gapFreq;

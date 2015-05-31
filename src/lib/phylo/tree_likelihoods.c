@@ -40,6 +40,12 @@ int tuple_index_missing_data(char *tuple, int *inv_alph, int *is_missing,
 double tl_compute_log_likelihood(TreeModel *mod, MSA *msa, 
                                  double *col_scores, double *tuple_scores,
 				 int cat, TreePosteriors *post) {
+/*TO DELETE: Testing program, set the rate parameters arbitrarly!*/
+  int m = mod->ratematrix_idx;
+  double* params = & (mod->all_params->data[m]);
+  params[0] = 0.0000;
+  params[1] = 1.0000;
+  tm_set_subst_matrices(mod);
 
   int i, j;
   double retval = 0;
@@ -447,7 +453,7 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
       if (total_prob - 1.0 < 1.0e-6) total_prob = 1.0;
       else die("got total_prob=%.10g\n", total_prob);
       }*/
-    total_prob = log2(total_prob);
+    total_prob = log(total_prob);
     /*TO DELETE HERE OMAR*//*
     printf("Total Probability: %f\n", total_prob);
 */
@@ -461,7 +467,8 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
                    msa->ss->counts[tupleidx]); /* log space */
     /*TO DELETE HERE OMAR*/
     /*printf("Total Probability: %f\n", total_prob);*/
-
+    printf("For Column %s\n", msa->ss->col_tuples[tupleidx]);
+    printf("Total Probability: %f\n", total_prob);
     retval += total_prob;     /* log space */
         
   } /* for tupleidx */
@@ -1095,6 +1102,15 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
   double retval = 0;
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
+  
+  /*TO DELETE: Testing program, set the rate parameters arbitrarly!*/
+  int m = mod->ratematrix_idx;
+  double* params = & (mod->all_params->data[m]);
+  params[0] = 0.0001;
+  params[1] = 0.0001;
+  params[2] = 0.0;
+  params[3] = 1.0;
+  tm_set_subst_matrices(mod);
 
   /*Iterate over every column in MSA, compute likelihood L(i) for ith column. Add all
    *likelihoods for overall tree. Plus one since we need to take into account an "all
@@ -1158,28 +1174,31 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
     }
     
     total_prob = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
-    /*
+    
     int j;
-    for(i = 0; i < lst_size(traversal); i++)
+    for(i = 0; i < lst_size(traversal); i++){
+      printf("For Node[%d]: {", i);
       for (j = 0; j < 5; j++)
-        printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
+        printf("%f ", pL[j][i]);
+      printf("}\n");
+    }
     printf("\n\n");
-     */
+    
     /*Multiply by the amount of times this column appeared in the alignment.*/
     if(tupleidx != msa->ss->ntuples)
-      retval += log2(total_prob) * msa->ss->counts[tupleidx];
+      retval += log(total_prob) * msa->ss->counts[tupleidx];
     else /*Case for all gaps column.*/
       allGapProb = total_prob;
-    /*
-    printf("Total Probability: %f\n", log2(total_prob));*/
+
+    printf("Total Probability: %f\n", log(total_prob)  * msa->ss->counts[tupleidx]);
   }
   /* Calculate total probability for site in alignment, second modification of
    * extended pruning algorithm.*/
   retval = getProbZeroL(mod, p, allGapProb, retval);
-  /*
-  printf("retval: %f\n", retval);*/
+  
+  printf("retval: %f\n", retval);
   /*Debugging print info:*/
-  /*
+  
   int paramIndex = mod->ratematrix_idx;
   double* paramArray = &(mod->all_params->data[paramIndex]);
   printf("Current Rates:\n");
@@ -1191,20 +1210,21 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
   printf("Likelihood: %f\n", retval);
   printf("\n\n");
   
-   printf("Current Rate Matrix values:\n");
-    printMatrix(mod->rate_matrix->matrix,5);
-    printf("\n\n");
+  printf("Current Rate Matrix values:\n");
+  tm_set_rate_matrix(mod, mod->all_params, mod->ratematrix_idx);
+  printMatrix(mod->rate_matrix->matrix,5);
+  printf("\n\n");
     
 
-    printf("Current background frequencies:\n");
-    double* freq = mod->backgd_freqs->data;
-    printf("A : %f\n", freq[0]);
-    printf("C : %f\n", freq[1]);
-    printf("G : %f\n", freq[2]);
-    printf("T : %f\n", freq[3]);
-    printf("- : %f\n", freq[4]);
-    printf("\n\n");
-   */
+  printf("Current background frequencies:\n");
+  double* freq = mod->backgd_freqs->data;
+  printf("A : %f\n", freq[0]);
+  printf("C : %f\n", freq[1]);
+  printf("G : %f\n", freq[2]);
+  printf("T : %f\n", freq[3]);
+  printf("- : %f\n", freq[4]);
+  printf("\n\n");
+  
   return retval;
 }
 /* =====================================================================================*/
@@ -1239,10 +1259,10 @@ double getProbZeroL(TreeModel* mod, double p, double allGapProb, double probAllC
   double mu = mod->all_params->data[paramIndex + 1];
   double totalProb = 0;
 
-  double extraColumn = log2(probExtraColumn(mod,mu,lambda,p));
+  double extraColumn = log(probExtraColumn(mod,mu,lambda,p));
   /*Probability of all-gaps column using equation (25) minus one. Since we are working
    * in log though, we instead negate the value.*/
-  double marginalizeValue = log2(1 - allGapProb);
+  double marginalizeValue = log(1 - allGapProb);
   
   totalProb = probAllColumns - marginalizeValue + extraColumn;
   
@@ -1555,7 +1575,7 @@ double xi(double branchLength,double mu,double lambda){
   double muAndLambda = mu + lambda;
   double value;
   
-  if(muAndLambda < 0.0002)
+  if(muAndLambda == 0)
     return 0;
  
   value = lambda / muAndLambda * ( 1 - exp(- muAndLambda * branchLength) );
@@ -1575,7 +1595,7 @@ double gammaML(double branchLength,double mu,double lambda){
   double muAndLambda = mu + lambda;
   double value;
 
-  if(muAndLambda < 0.0002)
+  if(muAndLambda == 0)
     return 0;
 
   value = mu / muAndLambda * (1 - exp(- muAndLambda * branchLength));
