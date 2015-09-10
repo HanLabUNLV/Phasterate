@@ -270,14 +270,6 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
               MarkovMatrix *lsubst_mat = mod->P[n->lchild->id][rcat];
               MarkovMatrix *rsubst_mat = mod->P[n->rchild->id][rcat];
 
-              /* Debug info, delete at some point maybe.*//*
-              printf("Rate Matrix:\n");
-              printMatrix(mod->rate_matrix->matrix,4);
-              printf("Conditional Matrix:\n");
-              printMatrix(lsubst_mat->matrix,4);
-              printMatrix(rsubst_mat->matrix,4);
-              printf("End ofConditional Matrix:\n");
-                                                           */
               for (i = 0; i < nstates; i++) {
                 double totl = 0, totr = 0;
                 for (j = 0; j < nstates; j++) 
@@ -292,14 +284,7 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
               }
             }
           }
-          /* Debug info, delete at some point maybe.*/
-          /*
-          int j;
-          for(i = 0; i < lst_size(traversal); i++)
-              for (j = 0; j < mod->rate_matrix->size; j++)
-                  printf("Likelihood at pL[%d][%d] = %f\n",j,i,pL[j][i]);
-          printf("\n\n");
-          */
+
           if (post != NULL && pass == 0) {
             MarkovMatrix *subst_mat;
             double this_total, denom;
@@ -453,10 +438,7 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
 
     total_prob *= (cat >= 0 ? msa->ss->cat_counts[cat][tupleidx] : 
                    msa->ss->counts[tupleidx]); /* log space */
-    /*TO DELETE HERE OMAR*/
-    /*printf("Total Probability: %f\n", total_prob);*/
-    printf("For Column %s\n", msa->ss->col_tuples[tupleidx]);
-    printf("Total Probability: %f\n", total_prob);
+
     retval += total_prob;     /* log space */
         
   } /* for tupleidx */
@@ -1088,15 +1070,6 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
   int rootNodeId = mod->tree->id;
   int length = msa->ss->ntuples;
 
-  /*TO DELETE: Testing program, set the rate parameters arbitrarly!*/
-  int m = mod->ratematrix_idx;
-  double* params = & (mod->all_params->data[m]);
-/*  params[0] = 0.002665;
-  params[1] = 0.997335;
-  params[2] = 0.543038;
-  params[3] = 0.456962;*/
-  tm_set_subst_matrices(mod);
-
   /*Get traversal order so we iterate over nodes instead of recursing.*/
   List* traversal = tr_postorder(mod->tree);
 
@@ -1161,67 +1134,19 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
     }
 
     columnProbability = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-    /*
-    int j;
-    for(i = 0; i < lst_size(traversal); i++){
-      printf("For Node[%d]: {", i);
-      for (j = 0; j < 5; j++)
-        printf("%f ", likelihoodTable[j][i]);
-      printf("}\n");
-    }
-     */
+
     /*Multiply by the amount of times this column appeared in the alignment.*/
-    if(currentColumn != length){
+    if(currentColumn != length)
       totalLikelihood += log(columnProbability) * msa->ss->counts[currentColumn];
-      printf("Total Likelihood[%d] : %f\n", currentColumn, log(columnProbability));
-    }
     else /*Case for all gaps column.*/
       allGapProbUnloged = columnProbability;
-
-/*    if(currentColumn != length){
-    printf("Total Probability: %f\n", log(columnProbability)  * msa->ss->counts[currentColumn]);
-    printf("For Column %s\n", msa->ss->col_tuples[currentColumn]);
-    printf("Total Probability: %f\n\n", log(columnProbability));
-    if(columnProbability == 0.0)
-      exit(0);
-    }  */
   }
   
   /* Calculate total probability for site in alignment, second modification of
    * extended pruning algorithm.*/
-  printf("Final Sum %f\n", totalLikelihood);
   double averageLength = getAverageLength(msa);
   totalLikelihood = getTotalAlignmentProb(mod, p, totalLikelihood, allGapProbUnloged,
           averageLength);
-  
-  printf("retval: %f\n", totalLikelihood);
-  /*Debugging print info:*/
-  
-  int paramIndex = mod->ratematrix_idx;
-  double* paramArray = &(mod->all_params->data[paramIndex]);
-  printf("Current Rates:\n");
-  printf("Lambda: %f\n", paramArray[0]);
-  printf("Mu: %f\n", paramArray[1]);
-  printf("Alpha: %f\n", paramArray[2]);
-  printf("Betta: %f\n", paramArray[3]);
-  printf("Geometric Distribution: %f\n",mod->geometricParameter);
-  printf("Likelihood: %f\n", totalLikelihood);
-  printf("\n\n");
-  
-  printf("Current Rate Matrix values:\n");
-  tm_set_rate_matrix(mod, mod->all_params, mod->ratematrix_idx);
-  printMatrix(mod->rate_matrix->matrix,5);
-  printf("\n\n");
-    
-
-  printf("Current background frequencies:\n");
-  double* freq = mod->backgd_freqs->data;
-  printf("A : %f\n", freq[0]);
-  printf("C : %f\n", freq[1]);
-  printf("G : %f\n", freq[2]);
-  printf("T : %f\n", freq[3]);
-  printf("- : %f\n", freq[4]);
-  printf("\n\n");
   
   return totalLikelihood;
 }
@@ -1265,11 +1190,8 @@ double getTotalAlignmentProb(TreeModel* mod, double p, double summedColumnsProb,
   /*Probability of all-gaps column using equation (25) minus one. Since we are working
    * in log though, we instead negate the value.*/
   double marginalizeValue = log(1 - gapColumnProb);
-  
-  totalProb = summedColumnsProb - marginalizeValue + log(immortalColumnProb);
-  printf("Marginalized Value: %f\n", marginalizeValue);
-  printf("Immortal Column Probability: %f\n", log(immortalColumnProb));
-  printf("Before division: %f\n", totalProb);
+    totalProb = summedColumnsProb - marginalizeValue + log(immortalColumnProb);
+
   /*Divide likelihood by the ancestral length probability.*/
   totalProb -= log(1 - p) + averageLength * log(p);
   

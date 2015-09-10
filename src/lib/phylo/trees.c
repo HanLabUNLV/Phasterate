@@ -1022,7 +1022,7 @@ void tr_scale(TreeNode *t, double scale_const) {
     TreeNode *n = lst_get_ptr(t->nodes, i);
     if (n->parent != NULL) 
       n->dparent *= scale_const;
-    printf("dParent %f\n", n->dparent);
+
   }
 }
 
