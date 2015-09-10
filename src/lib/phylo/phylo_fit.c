@@ -673,6 +673,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   double gapFreq = -1.0;
   int residuesSize = -1;
   double gapDivisor = -1.0;
+  double fracChange = -1.0;
 
   /*Error Checking*/
   /*This model should only work when used along with the -O branches, -x -G*/
@@ -1239,7 +1240,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           double alpha = params->data[m + 2];
           double betta = params->data[m + 3];
 
-          double fracChange = computeFracChange(lambda, mu, alpha, betta,
+          fracChange = computeFracChange(lambda, mu, alpha, betta,
                   freq[0], freq[1], freq[2], freq[3], freq[4]);
           
           /*Divide all branches by fracChange and re-root tree.*/
@@ -1293,6 +1294,11 @@ int run_phyloFit(struct phyloFit_struct *pf) {
         if(mod->subst_mod == F84 || mod->subst_mod == F84E)
           //Print all needed info from model here!
           printExtendedInfo("phyloFit.infoX", mod);
+
+        /*Un-normalize the tree but keep it midpoint rooted. */
+        if(pf->dnaMlTree)
+          /*Divide all branches by fracChange and re-root tree.*/
+          tr_scale(mod->tree, fracChange);
         
         tm_print(F, mod);
 	phast_fclose(F);
