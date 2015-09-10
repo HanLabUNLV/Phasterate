@@ -21,6 +21,8 @@
 #define MAX_LINE_LEN 10000
 /** Maximum number of trees */
 #define MAX_TREE_NUM 30000
+/** Starting number for list sizes used by rerooting functions.*/
+#define EXPECTED_MAX_NODES 200
 
 #include <stdio.h>
 #include <lists.h>
@@ -75,7 +77,19 @@ struct tree_node {
                                    postorder traversal from the
                                    root (Only guaranteed to be defined for
      				   the TreeNode at the root of a tree)*/
+  List* childList;             /**<List of children below this node. This is used a set
+                                 * implementation for computing the common ancestor. Used
+                                 * by @findCommonAncestor(). */
+
 };
+
+/** Pair used by @findMostDistanceNode(). Keeps the id of the two nodes plus their
+ distance.*/
+typedef struct{
+  TreeNode* node1;
+  TreeNode* node2;
+  double distance;
+} Pair;
 
 /** \name Tree allocation functions 
 \{ */
@@ -268,6 +282,13 @@ double tr_distance_to_root(TreeNode *node);
   @result NULL if not found, otherwise tree node specified by name
 */
 TreeNode *tr_get_node(TreeNode *t, const char *name);
+
+/** Return node having specified id.
+  @param t Tree containing node to return.
+  @param id of node to return.
+  @result NULL if not found, otherwise tree node specified by id.
+*/
+TreeNode *tr_get_node_id(TreeNode *t, int id);
 
 /** \name Tree scale functions 
 \{*/
@@ -471,4 +492,40 @@ void tr_get_labelled_nodes(TreeNode *tree, const char *label, List *rv);
  */
 char* tr_only_from_file(const char* string);
 
+/**
+ * Given a tree it will do a midpoint rooting. That is, consider the two branches on
+ * each side, add their values and make the root the middle of these two distances based
+ * on the longest branch. This function destroys the original root. The passed in node
+ * should never be used again! Instead set your tree to the return value:
+ * tree = midPointRooting(tree);
+ * @param tree, root node of the tree to midpoint root. This will be permanently destroyed
+ * and set NULL.
+ * return, the new root to use for the tree.
+ */
+TreeNode* midpointRooting(TreeNode* tree);
+
+/**
+ * Given two nodes it will find the common ancestor between these two nodes and return it.
+ * Every TreeNode has a List object called commonAncestor. This function those two passes
+ * through the tree. First pass populates the list, second pass finds the set that
+ * contains both nodes.
+ * @param treeRoot: Root of our tree.
+ * @param nodeOneIndex: Child one to find common ancestor to with respect to child two.
+ * @param nodeTwoIndex: Child two to find common ancestor to with respect to child two.
+ * @return index of Common ancest
+ */
+int findCommonAncestor(TreeNode* root, int nodeOneIndex, int nodeTwoIndex);
+
+/**
+ * Given a TreeNode, find the most distant pair of leaves in the whole tree.
+ * We must find the distance between all leaves and pick the max. For n leafs
+ * that is n*n different paths we have to compare. To calculate the distance
+ * for (a,b) by summing up the distance from the a to the common ancestor
+ * of a and b with the distance of b to the common ancestor. We then pick the
+ * maximum. Note this is only meant to work on roots! Mainly cause of the use of the
+ * preorder function.
+ * @param root: Root of tree.
+ * @return Pair containing the index of the two nodes furthest from each other.
+ */
+Pair findMostDistantNode(TreeNode* root);
 #endif 

@@ -1641,7 +1641,7 @@ int col_has_data_sub(TreeModel *mod, MSA *msa, int tupleidx, List *inside,
  * basically does the work of computing for one column.
 */
   
-double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL){
+double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likelihoodTable){
   int i;
   int nstates = mod->rate_matrix->size;
   double totalProb;
@@ -1668,29 +1668,34 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL){
 
       thischar = ss_get_char_tuple(msa, tupleidx, sequenceNumber, 0);
       observedState = mod->rate_matrix->inv_states[(int)thischar];
-      /*Iterate over all bases setting probability based on base case*/
-      for (i = 0; i < alph_size; i++)
-        pL[i][n->id] = probabilityOfLeaf(thischar,observedState,i);   
+      
+      /*Special Case where we have a N at this spot:*/
+      if(observedState == -1)
+        for (i = 0; i < alph_size; i++)
+          likelihoodTable[i][n->id] = 1;
+      else
+        /*Iterate over all bases setting probability based on base case*/
+        for (i = 0; i < alph_size; i++)
+          likelihoodTable[i][n->id] = probabilityOfLeaf(observedState,i);   
     }
-    else{/* General recursive case. Calculate probabilities at inner node for all bases.*/
+    else{
+      /* General recursive case. Calculate probabilities at inner node for all bases.*/
       /*Get matrices for left and right side.*/
-      int cat = 0; /*No rate categories allowed!*/
       int lChild = n->lchild->id;
       int rChild = n->rchild->id;
-      double** lMatrix = mod->P[lChild][cat]->matrix->data;
-      double** rMatrix = mod->P[rChild][cat]->matrix->data;
+      double** lMatrix = mod->P[lChild][0]->matrix->data;
+      double** rMatrix = mod->P[rChild][0]->matrix->data;
       
       for (i = 0; i < nstates - 1; i++)
         /*pL[k][n] :: Probability of base K given, node n.*/
-        pL[i][n->id] = probForNodeResidue(i, pL, lMatrix, rMatrix, lChild, rChild,
+        likelihoodTable[i][n->id] = probForNodeResidue(i, likelihoodTable, lMatrix, rMatrix, lChild, rChild,
                 msa, n, tupleidx);
-      
       /*Handle gap according to different formula.*/
-      pL[4][n->id] = probForNodeGap(pL, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
+      likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
     }
   }
   
-  totalProb = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
+  totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
   
   return totalProb;
 }

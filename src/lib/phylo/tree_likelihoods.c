@@ -40,12 +40,6 @@ int tuple_index_missing_data(char *tuple, int *inv_alph, int *is_missing,
 double tl_compute_log_likelihood(TreeModel *mod, MSA *msa, 
                                  double *col_scores, double *tuple_scores,
 				 int cat, TreePosteriors *post) {
-/*TO DELETE: Testing program, set the rate parameters arbitrarly!*/
-  int m = mod->ratematrix_idx;
-  double* params = & (mod->all_params->data[m]);
-  params[0] = 0.0000;
-  params[1] = 1.0000;
-  tm_set_subst_matrices(mod);
 
   int i, j;
   double retval = 0;
@@ -449,14 +443,8 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
     if (mod->order > 0 && mod->use_conditionals == 1 && !skip_fels) 
       total_prob /= marg_tot; 
 
-    /*    if (total_prob > 1.0) {
-      if (total_prob - 1.0 < 1.0e-6) total_prob = 1.0;
-      else die("got total_prob=%.10g\n", total_prob);
-      }*/
     total_prob = log(total_prob);
-    /*TO DELETE HERE OMAR*//*
-    printf("Total Probability: %f\n", total_prob);
-*/
+
     if (curr_tuple_scores != NULL && 
         (cat < 0 || msa->ss->cat_counts[cat][tupleidx] > 0))
       curr_tuple_scores[tupleidx] = total_prob;
@@ -1046,7 +1034,7 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
       post->rcat_expected_nsites[rcat] = 0;
 
   /**Do work here!*/
-  retval = computeTotalTreeLikelihood(mod,msa,cat,post,inside_joint);
+  retval = computeTotalTreeLikelihood(mod, msa, inside_joint);
 
   for (j = 0; j < nstates; j++) {
     sfree(inside_joint[j]);
@@ -1089,114 +1077,124 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
  * Note this is only guaranteed to work and tested on models of order zero with no column
  * offset and no rate categories set. */
   
-double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors* post,
-        double **inside_joint){
-  int tupleidx, i;
+double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint){
+  int currentColumn, i;
   int nstates = mod->rate_matrix->size;
-  double total_prob;
-  List* traversal;
-  int nodeidx;
-  double allGapProb;
-  TreeNode *n;
+  int currentNode;
+  double allGapProbUnloged;
   int alph_size = strlen(mod->rate_matrix->states);
-  double retval = 0;
+  double totalLikelihood = 0;
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
-  
+  int length = msa->ss->ntuples;
+
   /*TO DELETE: Testing program, set the rate parameters arbitrarly!*/
   int m = mod->ratematrix_idx;
   double* params = & (mod->all_params->data[m]);
-  params[0] = 0.0001;
-  params[1] = 0.0001;
-  params[2] = 0.0;
-  params[3] = 1.0;
+/*  params[0] = 0.002665;
+  params[1] = 0.997335;
+  params[2] = 0.543038;
+  params[3] = 0.456962;*/
   tm_set_subst_matrices(mod);
+
+  /*Get traversal order so we iterate over nodes instead of recursing.*/
+  List* traversal = tr_postorder(mod->tree);
 
   /*Iterate over every column in MSA, compute likelihood L(i) for ith column. Add all
    *likelihoods for overall tree. Plus one since we need to take into account an "all
    * gap" column probability. */
-  for (tupleidx = 0; tupleidx < msa->ss->ntuples + 1; tupleidx ++) {
-    checkInterruptN(tupleidx, 1000);
+  for (currentColumn = 0; currentColumn < length + 1; currentColumn++){
+    double columnProbability = 0;
+    double** likelihoodTable = inside_joint;
 
-    total_prob = 0;
-
-    double **pL = inside_joint;
-
-    /*Get traversal order so we iterate over nodes instead of recursing.*/
-    traversal = tr_postorder(mod->tree);
     /* Iterate over traversal hitting all nodes in a post order matter.*/
-    for (nodeidx = 0; nodeidx < lst_size(traversal); nodeidx++) {
-      n = lst_get_ptr(traversal, nodeidx);
+    for (currentNode = 0; currentNode < lst_size(traversal); currentNode++) {
+      TreeNode* n = lst_get_ptr(traversal, currentNode);
 
       /* Leaf: base case of recursion */
       if (n->lchild == NULL) {
-
         int sequenceNumber = mod->msa_seq_idx[n->id];
         /*Integer version of character in our alignment.*/
         int observedState;
         char thischar;
 
-        if(tupleidx != msa->ss->ntuples)
-          thischar = (int)ss_get_char_tuple(msa, tupleidx, sequenceNumber, 0);
+        /*Get character from MSA based on position and specie.*/
+        if(currentColumn != length)
+          thischar = ss_get_char_tuple(msa, currentColumn, sequenceNumber, 0);
         else
           thischar = '-'; /*All gap column case for extended algorithm.*/
 
         observedState = mod->rate_matrix->inv_states[(int)thischar];
-
-        /*Iterate over all bases setting probability based on base case*/
-        for (i = 0; i < alph_size; i++)
-          pL[i][n->id] = probabilityOfLeaf(thischar,observedState,i);
-
+        
+        /*Special Case where we have a N at this spot:*/
+        if(observedState == -1)
+          for (i = 0; i < alph_size; i++)
+            likelihoodTable[i][n->id] = 1;
+        else
+          /*Iterate over all bases setting probability based on base cases.*/
+          for (i = 0; i < alph_size; i++)
+            likelihoodTable[i][n->id] = probabilityOfLeaf(observedState, i);
       }
-      else{/* General recursive case. Calculate probabilities at inner node for all bases.*/
-        /*Get matrices for left and right side.*/
+      /* General recursive case. Calculate probabilities at inner node for all bases.*/
+      else{
+        /*Get matrices for left and right side. No rate categories used for this model!*/
         int lChild = n->lchild->id;
         int rChild = n->rchild->id;
-        /*No rate categories used for this model!*/
         double** lMatrix = mod->P[lChild][0]->matrix->data;
         double** rMatrix = mod->P[rChild][0]->matrix->data;
         
-        for (i = 0; i < nstates-1; i++){
+        for (i = 0; i < nstates - 1; i++){
           /*Case where this is not the extra (all gaps) column.*/
-          if(tupleidx != msa->ss->ntuples)
+          if(currentColumn != length)
             /*pL[k][n] :: Probability of base K given, node n.*/
-            pL[i][n->id] = probForNodeResidue(i, pL, lMatrix, rMatrix, lChild, rChild,
-                    msa, n, tupleidx);
+            likelihoodTable[i][n->id] = probForNodeResidue(i, likelihoodTable, lMatrix, rMatrix, lChild, rChild,
+                    msa, n, currentColumn);
           else /* Extra (all gap) column case*/
-            pL[i][n->id] = probForNodeResidueAllGap(i, pL, lMatrix, rMatrix, lChild, rChild);
+            likelihoodTable[i][n->id] = probForNodeResidueAllGap(i, likelihoodTable, lMatrix, rMatrix, lChild, rChild);
         }
         /*Handle gap according to different formula.*/
-        if(tupleidx != msa->ss->ntuples)
-          pL[4][n->id] = probForNodeGap(pL, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
+        if(currentColumn != length)
+          likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, currentColumn);
         else
-          pL[4][n->id] = probForNodeGapAllGap(pL, lMatrix, rMatrix, lChild, rChild);
+          likelihoodTable[4][n->id] = probForNodeGapAllGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild);
       }
     }
-    
-    total_prob = totalProbOfSite(pL, mod->backgd_freqs->data, rootNodeId, p);
-    
+
+    columnProbability = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
+    /*
     int j;
     for(i = 0; i < lst_size(traversal); i++){
       printf("For Node[%d]: {", i);
       for (j = 0; j < 5; j++)
-        printf("%f ", pL[j][i]);
+        printf("%f ", likelihoodTable[j][i]);
       printf("}\n");
     }
-    printf("\n\n");
-    
+     */
     /*Multiply by the amount of times this column appeared in the alignment.*/
-    if(tupleidx != msa->ss->ntuples)
-      retval += log(total_prob) * msa->ss->counts[tupleidx];
+    if(currentColumn != length){
+      totalLikelihood += log(columnProbability) * msa->ss->counts[currentColumn];
+      printf("Total Likelihood[%d] : %f\n", currentColumn, log(columnProbability));
+    }
     else /*Case for all gaps column.*/
-      allGapProb = total_prob;
+      allGapProbUnloged = columnProbability;
 
-    printf("Total Probability: %f\n", log(total_prob)  * msa->ss->counts[tupleidx]);
+/*    if(currentColumn != length){
+    printf("Total Probability: %f\n", log(columnProbability)  * msa->ss->counts[currentColumn]);
+    printf("For Column %s\n", msa->ss->col_tuples[currentColumn]);
+    printf("Total Probability: %f\n\n", log(columnProbability));
+    if(columnProbability == 0.0)
+      exit(0);
+    }  */
   }
+  
   /* Calculate total probability for site in alignment, second modification of
    * extended pruning algorithm.*/
-  retval = getProbZeroL(mod, p, allGapProb, retval);
+  printf("Final Sum %f\n", totalLikelihood);
+  double averageLength = getAverageLength(msa);
+  totalLikelihood = getTotalAlignmentProb(mod, p, totalLikelihood, allGapProbUnloged,
+          averageLength);
   
-  printf("retval: %f\n", retval);
+  printf("retval: %f\n", totalLikelihood);
   /*Debugging print info:*/
   
   int paramIndex = mod->ratematrix_idx;
@@ -1207,7 +1205,7 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
   printf("Alpha: %f\n", paramArray[2]);
   printf("Betta: %f\n", paramArray[3]);
   printf("Geometric Distribution: %f\n",mod->geometricParameter);
-  printf("Likelihood: %f\n", retval);
+  printf("Likelihood: %f\n", totalLikelihood);
   printf("\n\n");
   
   printf("Current Rate Matrix values:\n");
@@ -1225,12 +1223,13 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors
   printf("- : %f\n", freq[4]);
   printf("\n\n");
   
-  return retval;
+  return totalLikelihood;
 }
 /* =====================================================================================*/
 /**
- * Recusively print tree starting from passed in note.
+ * Recusively print tree starting from passed in node.
  * @param node
+ * @return: None, void function. Prints to screen.
  */
 void printTree(TreeNode* node){
   if(node->lchild == NULL)
@@ -1246,37 +1245,47 @@ void printTree(TreeNode* node){
 }
 /* =====================================================================================*/
 /** According to the paper the score must be multiplied by the extra column contribution.
- * Formula (29).
+ * Formula (29) as well as divided by the ancestral length probability.
  * @param mod, Tree model for out alignment.
  * @param p, parameter of geometric substitution.
- * @param probAllColumns, probability of all individual columns multiplied
- * @param allGapProb, the un-log(ed) probability of the all gap column.
+ * @param summedColumnsProb, probability of all individual columns added instead of
+ * multiplied since we are working in log.
+ * @param gapColumnProb, the unloged probability of the all gap column.
+ *  * @param averageLength, the average length of the msa as computed by @getAverageLength().
  * @return total likelihood for whole function.
  */
-double getProbZeroL(TreeModel* mod, double p, double allGapProb, double probAllColumns){
+double getTotalAlignmentProb(TreeModel* mod, double p, double summedColumnsProb,
+        double gapColumnProb, double averageLength){
   int paramIndex = mod->ratematrix_idx;
   double lambda = mod->all_params->data[paramIndex];
   double mu = mod->all_params->data[paramIndex + 1];
   double totalProb = 0;
 
-  double extraColumn = log(probExtraColumn(mod,mu,lambda,p));
+  double immortalColumnProb = probExtraColumn(mod,mu,lambda,p);
   /*Probability of all-gaps column using equation (25) minus one. Since we are working
    * in log though, we instead negate the value.*/
-  double marginalizeValue = log(1 - allGapProb);
+  double marginalizeValue = log(1 - gapColumnProb);
   
-  totalProb = probAllColumns - marginalizeValue + extraColumn;
+  totalProb = summedColumnsProb - marginalizeValue + log(immortalColumnProb);
+  printf("Marginalized Value: %f\n", marginalizeValue);
+  printf("Immortal Column Probability: %f\n", log(immortalColumnProb));
+  printf("Before division: %f\n", totalProb);
+  /*Divide likelihood by the ancestral length probability.*/
+  totalProb -= log(1 - p) + averageLength * log(p);
   
   return totalProb;
 }
 /* =====================================================================================*/
 /**
  * Given the MSA which already has had it's sufficient statistics computed it will return
- * the parameter of geometric distribution p.
+ * the average length of the sequence by counting the number of non-gap characters and
+ * dividing this number by the number of species. Notice with this information the
+ * parameter of geometric substitution can be trivial computed. See
+ * @getGeometricDistribution().
  * @param msa, our MSA for the file.
- * @return parameter of geometric distribution p.
+ * @return averageLength of MSA.
  */
-double getGeometricDistribution(MSA* msa){
-  double p;
+double getAverageLength(MSA* msa){
   /*Unique sites in our sufficient statistics.*/
   int uniqueSites = msa->ss->ntuples;
   /*Array holding the amount of times each unique column appears.*/
@@ -1304,8 +1313,19 @@ double getGeometricDistribution(MSA* msa){
   }
   
   averageLength = (double) totalSum / (double) numberOfSpecies;
+  
+  return averageLength;
+}
+/* =====================================================================================*/
+/**
+ * Given the average length of an MSA it will return the parameter of geometric
+ * distribution. See @getAverageLength() for computing the average length.
+ * @param averageLength, the average length of the MSA.
+ * @return p, geometric parameter.
+ */
+double getGeometricDistribution(double averageLength){
   /*This is the way it's done in dnaML, it ignores the rate categories though.*/
-  p = averageLength / (averageLength + 1.0);
+  double p = averageLength / (averageLength + 1.0);
 
   return p;
 }
@@ -1409,7 +1429,7 @@ double probForNodeResidue(int i,double** pL,double** lMatrix, double** rMatrix,
     sSum +=  pL[q][rChild] * rMatrix[i][q];
   }
   
- qDelta = deltaGap(k->lchild, msa, currSite) * lMatrix[i][gapChar]; 
+ qDelta = deltaGap(k->lchild, msa, currSite) * lMatrix[i][gapChar];
  sDelta = deltaGap(k->rchild, msa, currSite) * rMatrix[i][gapChar];
  
   return (qSum + qDelta) * (sSum + sDelta);
@@ -1575,7 +1595,7 @@ double xi(double branchLength,double mu,double lambda){
   double muAndLambda = mu + lambda;
   double value;
   
-  if(muAndLambda == 0)
+  if(muAndLambda == 0.0000)
     return 0;
  
   value = lambda / muAndLambda * ( 1 - exp(- muAndLambda * branchLength) );
@@ -1594,8 +1614,9 @@ double xi(double branchLength,double mu,double lambda){
 double gammaML(double branchLength,double mu,double lambda){
   double muAndLambda = mu + lambda;
   double value;
-
-  if(muAndLambda == 0)
+  /*Technically this will never happen as we set our lower bound for lambda and
+   mu to be 0.0001 just how dnaMl does...*/
+  if(muAndLambda == 0.0000)
     return 0;
 
   value = mu / muAndLambda * (1 - exp(- muAndLambda * branchLength));
@@ -1631,7 +1652,7 @@ double epsilonProbability(int j,int i,double t,double* freqs,double* params){
 
   /*If first mu + lambda is zero then we use the regular Q conditional probabilities
    else we use the extended one.*/
-  if(muAndLambda == 0){
+  if(muAndLambda == 0.0000){
     /*Formula (11) Case*/
     firstPart = freqs[j];
     firstEigenPart = (bigDeltaVal - freqs[j]) * exp(-betta * t);
@@ -1731,19 +1752,18 @@ char getCharacterForSpecie(char* name,MSA* msa,int index){
   return myChar;
 }
 /* =====================================================================================*/
-/* P_u(L_k,i) = { 1, if leak k has residue i at position u;
+/* P_u(L_k,i) = { 1, if leaf k has residue i at position u;
  *              { 0, otherwise;
  * For gaps: P_u(L_k,'-') = 0  // Equation 18 on paper.
  */
-int probabilityOfLeaf(char currentChar,int observedState,int iResidue){
+int probabilityOfLeaf(int observedState,int iResidue){
   /*Gap case:*/
-  if (currentChar == '-')
+  if (observedState == 4)
     return 0;
   /*Case where residue matches what we see.*/
-  else if (observedState < 0 || iResidue == observedState) /*When would this ever be less than zero??*/
+  if (iResidue == observedState)
     return 1;
-  else
-    return 0;
+  return 0;
 }
 /* =====================================================================================*/
 /*EOO (End of Omar)*/

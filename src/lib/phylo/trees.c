@@ -36,6 +36,72 @@ static int idcounter = 0;
 /* bottom-right y */
 #define BR_Y 700                
                                 
+/*Local Functions declarations. Should not be seen through the header file.*/
+/**
+ * Recurse through the tree setting all lists for common ancestors. This function
+ * allocates memory that needs freeing! 
+ * Like always we assume the tree is properly formed.
+ * @param currentNode: node of tree to set @childrenSet for.
+ * @return void: Sets the @childrenSet field for all nodes.
+ */
+void populateCommonAncestor(TreeNode* currentNode);
+
+/**
+ * Helper function for @findCommonAncestor. Does the work recursively. Finds and returns
+ * the common ancestor for a tree that has ran @populateCommonAncestor.
+ * @param currentNode: Current node we are recursing over. User should probably pass root.
+ * @param nodeOneIndex: Child one to find common ancestor to with respect to child two.
+ * @param nodeTwoIndex: Child two to find common ancestor to with respect to child two.
+ * @return index of Common ancestor.
+ */
+int findCommonAncestorHelper(TreeNode* currentNode, int nodeOneIndex, int nodeTwoIndex);
+
+/**
+ * Given a node and a common ancestor of that node. It will iterate up adding values to
+ * find the distance from our node to the ancestor.
+ * @param node
+ * @param commonAncestorId
+ * @return 
+ */
+double addUpToCommonAncestor(TreeNode* node, int commonAncestorId);
+
+/**
+ * Given an allocated node. Populate by copying the important values of the original root.
+ * @param root: Original Root of tree.
+ * @param newRoot: new root to copy values to.
+ * return: void.
+ */
+void initNewRoot(TreeNode* root, TreeNode* newRoot);
+
+/**
+ * Given the tree information it will iterate from the leaf until the common ancestor
+ * attempting to insert the new root. If successful the new root is returned and the
+ * lengths of the two children to the new root are permanently altered. We cannot know
+ * ahead of time which nodes are changed (that's what this function computes!). Anyway
+ * if you are here then that's what you wanted. If it fails to insert then we return NULL
+ * and nothing is changed. Else we also populate newLeftDistance and newRightDistance with
+ * the correct lengths.
+ * @param root: The root of the entire tree.
+ * @param leaf: Leaf to start attempting insertion from.
+ * @param maxDistance: Distance from leaf to other leaf. This should be the total distance
+ * as it will be halved.
+ * @param commonAncestor: Common ancestor to attempt insertion up to.
+ * @param newLeftDistance: will filled  with new length if successful in inserting root.
+ * @param newRightDistance: will filled  with new length if successful in inserting root.
+ * @return: new root if successful otherwise NULL.
+ */
+TreeNode* attemptInsert(TreeNode* root, TreeNode* leaf, double maxDistance,
+        int commonAncestor, double* newLeftDistance, double* newRightDistance);
+
+/**
+ * Helper function to @midPointRooting() should not be used otherwise! This function
+ * fixes the messed up length of some children and nodes as explained in
+ * @midPointRooting(). It does so by recusively descending through the tree making sure
+ * the lengths and parents are set properly.
+ * @param node: Tree to recurse through fixing lengths.
+ * @return: void, operates on passed tree.
+ */
+void fixParentsAndLengths(TreeNode* node);
 
 /** Parse a tree from a file in Newick (New Hampshire) format */
 TreeNode *tr_new_from_file(FILE *f) { 
@@ -213,6 +279,7 @@ TreeNode *tr_new_node() {
   n->label = NULL;
   n->nodes = n->preorder = n->inorder = n->postorder = NULL;
   n->hold_constant = 0;
+  n->childList = NULL;
   return(n);
 }
 
@@ -937,6 +1004,16 @@ TreeNode *tr_get_node(TreeNode *t, const char *name) {
   return NULL;
 }
 
+/** Return node having specified id. */
+TreeNode *tr_get_node_id(TreeNode *t, int id){
+  int i;
+  for (i = 0; i < t->nnodes; i++) {
+    TreeNode *n = lst_get_ptr(t->nodes, i);
+    if(n->id == id)
+      return n;
+  }
+  return NULL;
+}
 
 /** Scale all branch lengths by constant factor. */
 void tr_scale(TreeNode *t, double scale_const) {
@@ -945,6 +1022,7 @@ void tr_scale(TreeNode *t, double scale_const) {
     TreeNode *n = lst_get_ptr(t->nodes, i);
     if (n->parent != NULL) 
       n->dparent *= scale_const;
+    printf("dParent %f\n", n->dparent);
   }
 }
 
@@ -1666,5 +1744,454 @@ char* tr_only_from_file(const char* string){
     }else
         return NULL;   
 }
+/* =====================================================================================*/
+/**
+ * Given a tree it will do a midpoint rooting. That is, consider the two branches on
+ * each side, add their values and make the root the middle of these two distances based
+ * on the longest branch. This function destroys the original root. The passed in node
+ * should never be used again! Instead set your tree to the return value:
+ * tree = midPointRooting(tree);
+ * @param tree, root node of the tree to midpoint root. This will be permanently destroyed
+ * and set NULL.
+ * return, the new root to use for the tree.
+ */
+TreeNode* midpointRooting(TreeNode* tree){
+  
+  /*Find the most distant nodes and their distance.*/
+  Pair myPair = findMostDistantNode(tree);
+  TreeNode* newRoot;
+  /*Parameters passed to @attempInsert() to know newLengths for children of newRoot.*/
+  double newLeftDistance, newRightDistance;
 
+  /* We need this total distance, the two species and their common ancestor.*/
+  double maxDistance = myPair.distance;
+  TreeNode* leaf1 = myPair.node1;
+  TreeNode* leaf2 = myPair.node2;
 
+  int commonAncestor = findCommonAncestor(tree, leaf1->id, leaf2->id);
+  
+  /* Let's start with leaf1 from here we shall check distances all the way up the tree
+   * until the common ancestor to see if we insert the new root here.*/
+  newRoot = attemptInsert(tree, leaf1, maxDistance, commonAncestor, &newLeftDistance,
+          &newRightDistance);
+
+  /* Check if we were successful! Otherwise we will succeed from the other side: */
+  if(newRoot == NULL)
+    newRoot = attemptInsert(tree, leaf2, maxDistance, commonAncestor, &newLeftDistance,
+            &newRightDistance);
+
+  /* From here we know for sure that we inserted a new node. Now newRoot->left holds the
+   * parent, P and newRoot->right holds the child. */
+  TreeNode* p = newRoot->lchild;
+  TreeNode* c = newRoot->rchild;
+
+  /*General case where the new node wasn't inserted between a child of the root and the
+   root.*/
+  if(p->id != tree->id){
+    /*Go through all nodes up to the root flipping vertices.*/
+    while(p->id != tree->id){
+      if(p->lchild->id == c->id)
+        p->lchild = p->parent;
+      else
+        p->rchild = p->parent;
+      
+      c = p;
+      p = p->parent;
+    }
+
+    /* C holds the node on the side we came from that needs to link to the opposite side of
+     * the root. Now we delete the old root and do this linking. */
+    /*Left side case:*/
+    if(c->lchild->id == tree->id){
+      /* If we are here we connect this node to the left side of C, but are we on the
+       right side of the root or left? Let's check! */
+      TreeNode* correctChild = (tree->lchild->id == c->id) ? tree->rchild : tree->lchild;
+      c->lchild = correctChild;
+      correctChild->parent = c;
+      /* Add distances to nodes.*/
+      correctChild->dparent = c->dparent + correctChild->dparent;
+    }
+    else{ /*Right side case:*/
+      /*If we are here we connect this node to the right side of C. */
+      TreeNode* correctChild = (tree->lchild->id == c->id) ? tree->rchild : tree->lchild;
+      c->rchild = correctChild;
+      correctChild->parent = c;
+      /* Add distances to nodes.*/
+      correctChild->dparent = c->dparent + correctChild->dparent;
+    }
+    newRoot->lchild->parent = newRoot;
+    newRoot->rchild->parent = newRoot;
+    /* The tree is connected properly! But notice that every node knows who their parent is.
+     * Yet when we inverted the root we didn't set these right, or the branch lengths. So we
+     * do one last pass through the tree to fix this. */
+    fixParentsAndLengths(newRoot);
+    /*Set the lengths for the children of the new root. */
+  newRoot->lchild->dparent = newLeftDistance;
+  newRoot->rchild->dparent = newRightDistance;
+  }
+  /*Special Case where we inserted right below the root.*/
+  else{
+    /*Set the parent and lengths for the children of the new root. Notice this case needs
+     * it done before we do work, the previous case needs it after... */
+    newRoot->lchild->parent = newRoot;
+    newRoot->rchild->parent = newRoot;
+    newRoot->lchild->dparent = newLeftDistance;
+    newRoot->rchild->dparent = newRightDistance;
+
+    /*Figure out whether we are on the right side or the left side.*/
+    TreeNode* correctChild = (p->lchild->id == c->id) ? tree->rchild : tree->lchild;
+    /*We are on the left side. */
+    newRoot->lchild = correctChild;
+    /*Add up distances for final distance.*/
+    correctChild->dparent = newLeftDistance + correctChild->dparent;
+    correctChild->parent = newRoot;
+  }
+
+  /*Not sure the proper way to delete the root... but that's okay...*/
+  free(tree);
+  lst_set_ptr(newRoot->nodes, 0, newRoot);
+  
+  return newRoot;
+}
+/* =====================================================================================*/
+/**
+ * Helper function to @midPointRooting() should not be used otherwise! This function
+ * fixes the messed up length of some children and nodes as explained in
+ * @midPointRooting(). It does so by recusively descending through the tree making sure
+ * the lengths and parents are set properly.
+ * @param node: Tree to recurse through fixing lengths.
+ * @return: void, operates on passed tree.
+ */
+void fixParentsAndLengths(TreeNode* node){
+  /*Base Case: This is a leaf. Do nothing!*/
+  if(node->lchild == NULL)
+    return;
+
+  /*Recurse on left and right sides!*/
+  fixParentsAndLengths(node->rchild);
+  fixParentsAndLengths(node->lchild);
+  
+  /* General Case. Attempt to fix node and recurse on children. For both sides, check if
+   * our child knows we are their parent. */
+  if(node->lchild->parent->id != node->id){
+    node->lchild->parent = node;
+    node->lchild->dparent = node->dparent;
+  }
+  /* Do same for the right side. */
+  if(node->rchild->parent->id != node->id){
+    node->rchild->parent = node;
+    node->rchild->dparent = node->dparent;
+  }
+  
+  return;
+}
+/* =====================================================================================*/
+/**
+ * Given the tree information it will iterate from the leaf until the common ancestor
+ * attempting to insert the new root. If successful the new root is returned and the
+ * lengths of the two children to the new root are permanently altered. We cannot know
+ * ahead of time which nodes are changed (that's what this function computes!). Anyway
+ * if you are here then that's what you wanted. If it fails to insert then we return NULL
+ * and nothing is changed. Else we also populate newLeftDistance and newRightDistance with
+ * the correct lengths.
+ * @param root: The root of the entire tree.
+ * @param leaf: Leaf to start attempting insertion from.
+ * @param maxDistance: Distance from leaf to other leaf. This should be the total distance
+ * as it will be halved.
+ * @param commonAncestor: Common ancestor to attempt insertion up to.
+ * @param newLeftDistance: will filled  with new length if successful in inserting root.
+ * @param newRightDistance: will filled  with new length if successful in inserting root.
+ * @return: new root if successful otherwise NULL.
+ */
+TreeNode* attemptInsert(TreeNode* root, TreeNode* leaf, double maxDistance,
+        int commonAncestor, double* newLeftDistance, double* newRightDistance){
+  TreeNode* newRoot = NULL;
+
+  /* We need to insert the new root exactly half way. */
+  double halfDistance = maxDistance / 2.0;
+  /*Round off threshold.*/
+  double epsilon = 0.00001;
+  TreeNode* current;
+  double distanceSoFar = 0;
+
+  for(current = leaf;                /* Start at leaf2. */
+      current->id != commonAncestor; /* Iterate until we hit the common ancestor. */
+      current = current->parent){    /* Continue up the tree until the parent. */
+
+    distanceSoFar += current->dparent;
+    /*Two cases: 1: For sure the root goes here (distanceSoFar > halfDistance).
+     * Case 2: The node falls exactly here (due to floating point arithmetic we use an
+     * epsilon value  to check for this. 
+     * Root goes between these two nodes!*/
+    if( (distanceSoFar > halfDistance) ||
+        (fabs(distanceSoFar - halfDistance) < epsilon) ){
+      /* We know for sure this function call should create a new root! Create and init!*/
+      newRoot = tr_new_node();
+      initNewRoot(root, newRoot);
+
+      /* We are in vertex (P, c) where P is the parent, and is the child node. We alway
+       * let the left side of the root point to the parent and the right side to the
+       * child. */
+      newRoot->lchild = current->parent;
+      newRoot->rchild = current;
+
+       /* Compute distances and set them to nodes. Note: We got in here through either of
+        * the above methods. Do the proper thing according to the case. */
+      (*newLeftDistance) = (distanceSoFar > halfDistance) ?
+        (distanceSoFar - halfDistance) :
+        0.0001;
+      
+      (*newRightDistance) = halfDistance - distanceSoFar + current->dparent;
+      /*We are done!*/
+      break;
+    }
+  }
+
+  return newRoot;
+}
+/* =====================================================================================*/
+/**
+ * Given a TreeNode, find the most distant pair of leaves in the whole tree.
+ * We must find the distance between all leaves and pick the max. For n leafs
+ * that is n*n different paths we have to compare. To calculate the distance
+ * for (a,b) by summing up the distance from the a to the common ancestor
+ * of a and b with the distance of b to the common ancestor. We then pick the
+ * maximum. Note this is only meant to work on roots! Mainly cause of the use of the
+ * preorder function.
+ * @param root: Root of tree.
+ * @return Pair containing the index of the two nodes furthest from each other.
+ */
+Pair findMostDistantNode(TreeNode* root){
+  Pair maxPair;
+  List* allNodeList = tr_preorder(root);
+  
+  int i, j;
+    /*Create List with of nodes containing all children.*/
+  List* childrenList = lst_new_ptr(EXPECTED_MAX_NODES);
+
+  /*If the node is a child, add it's index to our childrenList.*/
+  for(i = 0; i < lst_size(allNodeList); i++){
+    TreeNode* n = lst_get_ptr(allNodeList, i);
+
+    if(n->lchild == NULL)
+      lst_push_ptr(childrenList, (void*)n);
+  }
+  /*Get distance and create distance matrix.*/
+  int size = lst_size(childrenList);
+  double childDistances[size][size];
+  
+  /*Initialize all nodes..*/
+  for(i = 0; i < size; i++)
+    for(j = 0; j < size; j++)
+      childDistances[i][j] = -1;
+  
+  /*For all children find maximum distance to all other children. This is done by finding
+   * the common ancestor of the two nodes and then adding up the lengths of the node up
+   * to the common ancestor then adding these two values together. (This could be done
+   * more efficiently, but meh. */
+  for(i = 0; i < size; i++)
+    for(j = 0; j < size; j++){
+      /*Skip finding distance to oneself*/
+      if(i == j) continue;
+      /*Skip if we already found distance of [i]-[j] and we are now in [j]-[i]*/
+      if(childDistances[i][j] != -1) continue;
+      
+      TreeNode* node1 = lst_get_ptr(childrenList, i);
+      TreeNode* node2 = lst_get_ptr(childrenList, j);
+      
+      /*We find the common ancestor id. Now add the lengths from the node to the common
+       ancestor.*/
+      int commonAncestorId = findCommonAncestor(root, node1->id, node2->id);
+      
+      double sum1 = addUpToCommonAncestor(node1, commonAncestorId);
+      double sum2 = addUpToCommonAncestor(node2, commonAncestorId);
+      /*Set distances for nodes both ways.*/
+      childDistances[i][j] = sum1 + sum2;
+      childDistances[j][i] = sum1 + sum2;
+    }
+  
+  /* Iterate until we find the max.*/
+  double max = -1;
+  for(i = 0; i < size; i++)
+    for(j = 0; j < size; j++){
+      /*Extract the proper ids and set equal to node.*/
+      if(max < childDistances[i][j]){
+        max = childDistances[i][j];
+
+        maxPair.node1 = lst_get_ptr(childrenList, i);
+        maxPair.node2 = lst_get_ptr(childrenList, j);
+        maxPair.distance = max;
+      }
+    }
+  
+  /*Max pair now holds the max distance and correct nodes. :)*/
+  return maxPair;
+  }
+/* =====================================================================================*/
+/**
+ * Given a node and a common ancestor of that node. It will iterate up adding values to
+ * find the distance from our node to the ancestor.
+ * @param node
+ * @param commonAncestorId
+ * @return 
+ */
+double addUpToCommonAncestor(TreeNode* node, int commonAncestorId){
+  TreeNode* current;
+  double sum = 0;
+  
+  /*Starting at current node, iterate up until common ancestor.*/
+  for(current = node; current->id != commonAncestorId; current = current->parent){
+    /*Error checking. Make sure we are in fact a child of our common ancestor.*/
+    if(current == NULL){
+      char* error =
+      "Error: addUpToCommonAncestor(): node [%d] does not have node[%d]"
+       "as a common ancestor!\n";
+      die(error, node->id, commonAncestorId);
+     }
+      
+    sum += current->dparent;
+  }
+  
+  return sum;
+}
+/* =====================================================================================*/
+/**
+ * Given two leaf it will find the common ancestor between these two nodes and return it.
+ * Every TreeNode has a List object called commonAncestor. This function those two passes
+ * through the tree. First pass populates the list, second pass finds the set that
+ * contains both nodes.
+ * @param treeRoot: Root of our tree.
+ * @param nodeIndex1: Child one to find common ancestor to with respect to child two.
+ * @param nodeIndex2: Child two to find common ancestor to with respect to child two.
+ * @return index of common ancestor, else -1 on failure.
+ */
+int findCommonAncestor(TreeNode* root, int nodeIndex1, int nodeIndex2){
+  /*Error Checking...*/
+  TreeNode* node1 = tr_get_node_id(root,nodeIndex1);
+  TreeNode* node2 = tr_get_node_id(root,nodeIndex2);
+  
+  if(nodeIndex1 == nodeIndex2)
+   die("ERROR: Invalid call to findCommonAncestor. Nodes [%d] are the same.\n",
+           nodeIndex1);
+  if(node1 == NULL || node2 == NULL){
+    char* error =
+    "ERROR: Invalid call to findCommonAncestor. Nodes [%d] [%d] not in tree.\n";
+     die(error, nodeIndex1, nodeIndex2);
+  }
+  if(node1->lchild != NULL || node2->rchild != NULL){
+    char* error =
+    "ERROR: Invalid call to findCommonAncestor. Nodes [%d] or [%d] not leafs!\n";
+    die(error, nodeIndex1, nodeIndex2);
+  }
+  
+  /*First set all node's lists for their children. */
+  populateCommonAncestor(root);
+  
+  int commonAncestor = findCommonAncestorHelper(root, nodeIndex1, nodeIndex2);
+  return commonAncestor;
+}
+/* =====================================================================================*/
+/**
+ * Helper function for @findCommonAncestor. Does the work recursively. Finds and returns
+ * the common ancestor for a tree that has ran @populateCommonAncestor.
+ * @param currentNode: Current node we are recursing over. User should probably pass root.
+ * @param nodeIndex1: Child one to find common ancestor to with respect to child two.
+ * @param nodeIndex2: Child two to find common ancestor to with respect to child two.
+ * @return index of Common ancestor.
+ */
+int findCommonAncestorHelper(TreeNode* node, int nodeIndex1, int nodeIndex2){
+  /*Base case: We hit a leaf. Leaf cannot be common ancestor return -1.*/
+  if(node->lchild == NULL)
+    return -1;
+  
+  /*Recursive Case: Check if either children found common ancestor. If yes then pass the
+   id up. Else try to see if we are the common ancestor! Note it must be done this way
+   as if the child finds it first but we don't check for this first, we automatically
+   already have both numbers in our childrenSet but we are not the common ancestor.*/
+  int leftResult = findCommonAncestorHelper(node->lchild, nodeIndex1, nodeIndex2);
+  int rightResult = findCommonAncestorHelper(node->rchild, nodeIndex1, nodeIndex2);
+  
+  /*Left or right node found common ancestor! Pass the news up the tree!*/
+  if(leftResult != -1)
+    return leftResult;
+  if(rightResult != -1)
+    return rightResult;
+  
+  /*Else we check if we are the common ancestor. Check if our list contains both nodes.*/
+  if(lst_find_int(node->childList,nodeIndex1) != -1 &&
+     lst_find_int(node->childList,nodeIndex2) != -1 ){
+    /*We are the common ancestor. Let the world know...*/
+    return node->id;
+  }
+
+  /*Else we are not... */
+    return -1;
+}
+/* =====================================================================================*/
+/**
+ * Recurse through the tree setting all lists for common ancestors. This function
+ * allocates memory that needs freeing!
+ * Like always we assume the tree is properly formed.
+ * @param node: node of tree to set @childrenSet for.
+ * @return void: Sets the @childrenSet field for all nodes.
+ */
+void populateCommonAncestor(TreeNode* node){
+  TreeNode* leftChild = node->lchild;
+  TreeNode* rightChild = node->rchild;
+  int i;
+  
+  /*Free old list and create a new one! */
+  if(node->childList != NULL)
+    lst_free(node->childList);
+  /*Create a new list.*/
+  node->childList = lst_new_int(EXPECTED_MAX_NODES);
+      
+  /*Base case: We hit a leaf set the list to just yourself.*/
+  if(leftChild == NULL){
+    lst_push_int(node->childList, node->id);
+    return;
+  }
+
+  /*Recursive Case: Recurse on left and right child. This set it the union of left
+   *and right children's sets. */
+  populateCommonAncestor(leftChild);
+  populateCommonAncestor(rightChild);
+  
+  /*Now set this set to the union of the two children sets.*/
+  int leftSize = lst_size(leftChild->childList);
+  int rightSize = lst_size(rightChild->childList);
+  
+  /*Iterate over children's lists to create the parent list as the union of the children's
+   list.*/
+  for(i = 0; i < leftSize; i++){
+    int currentIndex = lst_get_int(leftChild->childList, i);
+    lst_push_int(node->childList, currentIndex);
+  }
+  for(i = 0; i < rightSize; i++){
+    int currentIndex = lst_get_int(rightChild->childList, i);
+    lst_push_int(node->childList, currentIndex);
+  }
+  
+  return;
+}
+/* =====================================================================================*/
+/**
+ * Given an allocated node. Populate by copying the important values of the original root.
+ * @param root: Original Root of tree.
+ * @param newRoot: new root to copy values to.
+ * return: void.
+ */
+void initNewRoot(TreeNode* root, TreeNode* newRoot){
+  newRoot->id = 0;
+  newRoot->hold_constant = root->hold_constant;
+  newRoot->dparent = root->dparent;
+  newRoot->label = root->label;
+  newRoot->nnodes = root->nnodes;
+  newRoot->parent = root->parent;
+  newRoot->lchild = root->lchild;
+  newRoot->rchild = root->rchild;
+  newRoot->nodes = root->nodes;
+  
+  return;
+  }
+/* =====================================================================================*/

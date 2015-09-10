@@ -1760,13 +1760,7 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
   if (mod->estimate_backgd) {
     for (i = 0; i < mod->backgd_freqs->size; i++) {
       if (mod->param_map[mod->backgd_idx+i] >= 0){
-        if(mod->subst_mod == F84E)
-          /*Else we are using the extended model. Here it is fine for
-           * our rates to go to zero. We are assuming you cannot estimate
-           * frequencies with this model*/
-          vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.000);
-        else
-          vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.001);
+          vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.0001);
     }
   }
   }
@@ -1775,12 +1769,14 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
      errors were ultimately due to not enough data)*/
   if (mod->estimate_ratemat) {
     for (i = 0; i < tm_get_nratematparams(mod); i++) {
-      if (mod->param_map[mod->backgd_idx+i] >= 0){
-        if(mod->subst_mod == F84E)
-          /*Else we are using the extended model. Here it is fine for
-           * our rates to go to zero. We are assuming you cannot estimate
-           * frequencies with this model*/
-          vec_set(lower_bounds, mod->param_map[mod->backgd_idx+i], 0.000);
+      if (mod->param_map[mod->ratematrix_idx+i] >= 0){
+        if(mod->subst_mod == F84E){
+          /*DnaMl sets this as the lower bounds for the values. */
+          vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 0.0001);
+          /*Also set an upper bound for our variables. This will stop Betta from
+           * going negative. */
+          vec_set(upper_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0);
+        }
         else
           vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0e-6);
       }
@@ -2084,16 +2080,21 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
     }
   }
 
-  if (!quiet) fprintf(stderr, "numpar = %i\n", opt_params->size);
-  if(mod->subst_mod == F84E)
+  if (!quiet)
+    fprintf(stderr, "numpar = %i\n", opt_params->size);
+  
+  if(mod->subst_mod == F84E){
     retval = opt_bfgs(gapAwareLikelihoodWrapper, opt_params, (void*)mod, &ll,lower_bounds,
                       upper_bounds, logf, NULL, precision,NULL, &numeval);
-  else
+    mod->lnL = -ll;
+  }
+  else{
     retval = opt_bfgs(tm_likelihood_wrapper, opt_params, (void*)mod, &ll, lower_bounds,
                       upper_bounds, logf, NULL, precision, NULL, &numeval);
-
-  mod->lnL = ll * -1 * log(2);  /* make negative again and convert to
-                                   natural log scale */
+      /* make negative again and convert to natural log scale */
+    mod->lnL = ll * -1 * log(2);
+  }
+                            
   if (!quiet) fprintf(stderr, "Done.  log(likelihood) = %f numeval=%i\n", mod->lnL, numeval);
   tm_unpack_params(mod, opt_params, -1);
   vec_copy(params, mod->all_params);
@@ -2184,8 +2185,10 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   
   /*Set global geometric parameter for all models now that the sufficient stats are set.*/
   double totalP = 0;
-  for(i = 0; i < nmsa; i ++)
-    totalP += getGeometricDistribution(msa[i]);
+  for(i = 0; i < nmsa; i ++){
+    double averageLength = getAverageLength(msa[i]);
+    totalP += getGeometricDistribution(averageLength);
+  }
   totalP /= (double)nmsa;
   for(i = 0; i < nmsa; i ++)
     mod[i]->geometricParameter = totalP;

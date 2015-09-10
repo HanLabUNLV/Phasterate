@@ -207,25 +207,38 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
  * Note this is only guaranteed to work and tested on models of order zero with no column
  * offset and no rate categories set. */
   
-double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa,int cat,TreePosteriors* post,
-        double **inside_joint);
+double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint);
 
 /** According to the paper the score must be multiplied by the extra column contribution.
- * 
+ * Formula (29) as well as divided by the ancestral length probability.
  * @param mod, Tree model for out alignment.
  * @param p, parameter of geometric substitution.
- * @param probAllColumns, probability of all individual columns multiplied.
+ * @param gapColumnProb, probability of all individual columns multiplied
+ * @param summedColumnsProb, the un-log(ed) probability of the all gap column.
+ * @param averageLength, the average length of the msa as computed by @getAverageLength().
  * @return total likelihood for whole function.
  */
-double getProbZeroL(TreeModel* mod,double p, double allgapProb, double probAllColumns);
+double getTotalAlignmentProb(TreeModel* mod, double p, double gapColumnProb,
+        double summedColumnsProb, double averageLength);
 
 /**
  * Given the MSA which already has had it's sufficient statistics computed it will return
- * the parameter of geometric distribution p.
+ * the average length of the sequence by counting the number of non-gap characters and
+ * dividing this number by the number of species. Notice with this information the
+ * parameter of geometric substitution can be trivial computed. See
+ * @getGeometricDistribution().
  * @param msa, our MSA for the file.
- * @return parameter of geometric distribution p.
+ * @return averageLength of MSA.
  */
-double getGeometricDistribution(MSA* msa);
+double getAverageLength(MSA* msa);
+
+/**
+ * Given the average length of an MSA it will return the parameter of geometric
+ * distribution. See @getAverageLength() for computing the average length.
+ * @param averageLength, the average length of the MSA.
+ * @return p, geometric parameter.
+ */
+double getGeometricDistribution(double averageLength);
 
 /**
  * Calculates the extra column probability as described in dnaML-erate paper.
@@ -394,11 +407,11 @@ int isGap(char c);
  */
 char getCharacterForSpecie(char* name,MSA* msa,int index);
 
-/* Pu(L_k,i) = { 1, if leak k has residue i at position u;
+/* P_u(L_k,i) = { 1, if leaf k has residue i at position u;
  *              { 0, otherwise;
- * For gaps: Pu(L_k,'-') = 0  // Equation 18 on paper.
+ * For gaps: P_u(L_k,'-') = 0  // Equation 18 on paper.
  */
-int probabilityOfLeaf(char currentChar,int observedState,int iResidue);
+int probabilityOfLeaf(int observedState,int iResidue);
 
  
 

@@ -102,6 +102,7 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->extendedFlag = 0;
   pf->results = rphast ? lol_new(2) : NULL;
   pf->trees = NULL;
+  pf->dnaMlTree = 0;
   return pf;
 }
 
@@ -1158,7 +1159,8 @@ int run_phyloFit(struct phyloFit_struct *pf) {
                        pf->cats_to_do_str != NULL ? cats_to_do : NULL, 
                        NULL, NULL, -1, subst_mod_is_codon_model(mod->subst_mod));
 
-          mod->geometricParameter = getGeometricDistribution(msa);
+          double averageLength = getAverageLength(msa);
+          mod->geometricParameter = getGeometricDistribution(averageLength);
           /* (sufficient stats obtained only for categories of interest) */
       
           if (msa->length > 1000000) { /* throw out original data if
@@ -1205,16 +1207,16 @@ int run_phyloFit(struct phyloFit_struct *pf) {
          */
         if (mod->backgd_freqs == NULL && pf->extendedFlag == 1){
           tm_init_backgd(mod, msa, cat);
-          residuesSize = mod->backgd_freqs->size-1;
-          gapFreq = vec_get(mod->backgd_freqs,4);
+          residuesSize = mod->backgd_freqs->size - 1;
+          gapFreq = vec_get(mod->backgd_freqs, 4);
           /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
            *             reciprocal to divide all our frequencies by.*/
-          gapDivisor = 1.0/(1.0-gapFreq);
+          gapDivisor = 1.0 / (1.0 - gapFreq);
           
-          for (k=0; k< residuesSize; k++){
+          for (k = 0; k < residuesSize; k++){
             double currentFreq = vec_get(mod->backgd_freqs, k);
             double normalizedFreq = currentFreq * gapDivisor;
-            vec_set(params, mod->backgd_idx+k, normalizedFreq);
+            vec_set(params, mod->backgd_idx + k, normalizedFreq);
             /*Now that they're computed copy them from the parameter vector to the model.*/
             mod->backgd_freqs->data[k] = normalizedFreq;
          }
@@ -1224,7 +1226,27 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 
           /* We needed the background frequencies properly initialized for this model. Now
            * that we have them rerun the initiate model function.*/
-          params = tm_params_init(mod, .1, 5, pf->alpha);
+          params = tm_params_init(mod, .1, 5, pf->alpha);  
+        }
+        
+        /*If user selected option for dnaMlTree we must compute the "average ration of
+         * changes just how dnaMl does it. Then we re-root the tree if needed. */
+        if(pf->dnaMlTree){
+          double* freq = mod->backgd_freqs->data;
+          int m = mod->ratematrix_idx;
+          double lambda = params->data[m + 0];
+          double mu = params->data[m + 1];
+          double alpha = params->data[m + 2];
+          double betta = params->data[m + 3];
+
+          double fracChange = computeFracChange(lambda, mu, alpha, betta,
+                  freq[0], freq[1], freq[2], freq[3], freq[4]);
+          
+          /*Divide all branches by fracChange and re-root tree.*/
+          tr_scale(mod->tree, 1.0 / fracChange);
+
+          /*Do midpoint rooting.*/
+          mod->tree = midpointRooting(mod->tree);
         }
         
         if(mod->subst_mod == F84){
@@ -1374,8 +1396,9 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   if(pf->subst_mod == F84E){
     if(pf->gaps_as_bases == 0)
       die("Error: F84E Model requires -G for gaps as bases.\n");
-    if(pf->extendedFlag == 0)
-      printf("Warning: You probably want to use -x for extended model.\n");
+    if(pf->extendedFlag == 0){
+      die("Flag -x must be used for extended model.\n");
+    }
     if(pf->nooptstr != NULL){
       if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
         die("Error: F84E Model requires -O branches.");
@@ -2143,6 +2166,41 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   
   phast_fclose(fout);
   return;
+}
+//==========================================================================================
+/**
+ * Give the matrix rate parameters and the background frequencies including gaps return
+ * the fractional rate of change as done by dnaMl.
+ * @param lambda
+ * @param mu
+ * @param alpha
+ * @param betta
+ * @param freqA
+ * @param freqC
+ * @param freqG
+ * @param freqT
+ * @param freqGap
+ * @return computed frac change.
+ */
+double computeFracChange(double lambda, double mu, double alpha, double betta,
+        double freqA, double freqC, double freqG, double freqT, double freqGap){
+  double fracChange = 0;
+  double aAndG = 0;
+  double cAndT = 0;
+  
+  /*If we have frequencies then divide else leave at zero. */
+  if(freqA + freqG > 0.0)
+    aAndG = freqG / (freqA + freqG);
+  if(freqC + freqT > 0.0)
+    cAndT = freqT / (freqC + freqT);
+  
+  fracChange = alpha * (2.0 * freqA * aAndG + 2.0 * freqC * cAndT) +
+          betta * (1.0 - freqA * freqA - freqC * freqC - freqG * freqG - freqT * freqT);
+  
+  /*Add indel rates.*/
+  fracChange = (1.0 - freqGap) * (fracChange + mu) + freqGap * lambda;
+  
+  return fracChange;
 }
 //==========================================================================================
 

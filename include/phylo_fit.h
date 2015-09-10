@@ -67,7 +67,9 @@ struct phyloFit_struct {
   FILE *logf;
   int extendedFlag;             /**< Boolean detalining whether the extended prunning
                                  * algorithm should be used or not.*/
-
+  int dnaMlTree;              /**<Flag leting us know user has selected tree to be computed
+                               * how dnaML does. That is, all branchlengths are divided by
+                               * the fracChange and tree is midpoint rooted. */
   //results go here if not-null
   ListOfLists *results;
 };
@@ -96,6 +98,22 @@ void print_post_prob_stats(TreeModel *mod, MSA *msa, char *output_fname_root,
  */
 void printExtendedInfo(char* fileName, TreeModel* tm);
 
+/**
+ * Give the matrix rate parameters and the background frequencies including gaps return
+ * the fractional rate of change as done by dnaMl.
+ * @param lambda
+ * @param mu
+ * @param alpha
+ * @param betta
+ * @param freqA
+ * @param freqC
+ * @param freqG
+ * @param freqT
+ * @param freqGap
+ * @return 
+ */
+double computeFracChange(double lambda, double mu, double alpha, double betta,
+        double freqA, double freqC, double freqG, double freqT, double freqGap);
 
 #define BRANCH_TYPE 0
 #define SUBTREE_TYPE 1

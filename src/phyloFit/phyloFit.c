@@ -46,7 +46,6 @@ int main(int argc, char *argv[]) {
   String *optstr;
   List *tmplist = NULL; 
   struct phyloFit_struct *pf;
-  FILE *infile;
   
   struct option long_opts[] = {
     {"tree-only",1,0,'T'}, /*Tree only model, gets the mod file to get information from
@@ -102,6 +101,7 @@ int main(int argc, char *argv[]) {
     {"bound", 1, 0, 'u'},
     {"seed", 1, 0, 'D'},
     {"extended-model",1,0,'x'},
+    {"dnaMlTree", 0, 0, 0},
     {0, 0, 0, 0}
   };
 
@@ -320,6 +320,9 @@ int main(int argc, char *argv[]) {
       else if (strcmp(long_opts[opt_idx].name, "selection") == 0) {
 	pf->selection = get_arg_dbl(optarg);
 	pf->use_selection = TRUE;
+      }
+      else if (strcmp(long_opts[opt_idx].name, "dnaMlTree") == 0) {
+        pf->dnaMlTree = 1;
       }
       else {
 	die("ERROR: unknown option.  Type 'phyloFit -h' for usage.\n");
