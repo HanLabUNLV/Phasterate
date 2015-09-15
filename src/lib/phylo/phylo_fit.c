@@ -99,10 +99,10 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->selection = 0.0;
   pf->max_em_its = -1;
   pf->input_mods = NULL;
-  pf->extendedFlag = 0;
   pf->results = rphast ? lol_new(2) : NULL;
   pf->trees = NULL;
-  pf->dnaMlTree = 0;
+  pf->dnaMlNormalize = 0;
+  pf->reroot = 0;
   return pf;
 }
 
@@ -674,32 +674,27 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   int residuesSize = -1;
   double gapDivisor = -1.0;
   double fracChange = -1.0;
+  TreeNode* originalTree;
 
   /*Error Checking*/
   /*This model should only work when used along with the -O branches, -x -G*/
   if(pf->subst_mod == F84E){
     if(pf->gaps_as_bases == 0)
-      die("Error: F84E Model requires -G for gaps as bases.");
-    if(pf->extendedFlag == 0)
-      printf("Warning: You probably want to use -x for extended model.");
+      die("Error: F84E Model requires -G for gaps as bases.\n");
     if(pf->nooptstr != NULL){
       if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
-        die("Error: F84E Model requires -O branches.");
+        die("Error: F84E Model requires -O branches.\n");
     }
     else
-      die("Error: F84E Model requires -O branches.");
+      die("Error: F84E Model requires -O branches.\n");
   }
   /*F84 Model check, we do not use branch lengths when optimizing. I guess we could?*/
   if(pf->subst_mod == F84){
     if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
       die("Error: F84E Model requires -O branches.");
   }
-  /*Extended Flag only works with F84E*/
-  if(pf->extendedFlag == 1){
-    if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
-      die("Error: -x only works with F84E Model.");
-  }
-
+  if(pf->dnaMlNormalize && !(pf->subst_mod == F84E))
+    die("ERROR: dnaMlNormalize can only be used with F84E.\n");
 
   if (pf->no_freqs)
     pf->init_backgd_from_data = FALSE;
@@ -1206,7 +1201,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
          * frequencies the same way as usual. We do A,C,G,T out of 100% and Gaps
          * out of 100% also. So they do not add up to 1.0.
          */
-        if (mod->backgd_freqs == NULL && pf->extendedFlag == 1){
+        if (mod->backgd_freqs == NULL && pf->subst_mod == F84E){
           tm_init_backgd(mod, msa, cat);
           residuesSize = mod->backgd_freqs->size - 1;
           gapFreq = vec_get(mod->backgd_freqs, 4);
@@ -1230,9 +1225,15 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           params = tm_params_init(mod, .1, 5, pf->alpha);  
         }
         
+        /*Save original tree first, then do midpoint rooting.*/
+        originalTree = tr_create_copy(mod->tree); 
+          
+        if(pf->reroot)
+          mod->tree = midpointRooting(mod->tree);
+
         /*If user selected option for dnaMlTree we must compute the "average ration of
          * changes just how dnaMl does it. Then we re-root the tree if needed. */
-        if(pf->dnaMlTree){
+        if(pf->dnaMlNormalize){
           double* freq = mod->backgd_freqs->data;
           int m = mod->ratematrix_idx;
           double lambda = params->data[m + 0];
@@ -1245,9 +1246,6 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           
           /*Divide all branches by fracChange and re-root tree.*/
           tr_scale(mod->tree, 1.0 / fracChange);
-
-          /*Do midpoint rooting.*/
-          mod->tree = midpointRooting(mod->tree);
         }
         
         if(mod->subst_mod == F84){
@@ -1295,10 +1293,8 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           //Print all needed info from model here!
           printExtendedInfo("phyloFit.infoX", mod);
 
-        /*Un-normalize the tree but keep it midpoint rooted. */
-        if(pf->dnaMlTree)
-          /*Divide all branches by fracChange and re-root tree.*/
-          tr_scale(mod->tree, fracChange);
+        /*Replace for the original tree as this is what we want to print out.*/
+        mod->tree = originalTree;
         
         tm_print(F, mod);
 	phast_fclose(F);
@@ -1402,9 +1398,6 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   if(pf->subst_mod == F84E){
     if(pf->gaps_as_bases == 0)
       die("Error: F84E Model requires -G for gaps as bases.\n");
-    if(pf->extendedFlag == 0){
-      die("Flag -x must be used for extended model.\n");
-    }
     if(pf->nooptstr != NULL){
       if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
         die("Error: F84E Model requires -O branches.");
@@ -1420,11 +1413,6 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   if(pf->subst_mod == F84){
     if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
       die("Error: F84E Model requires -O branches.\n");
-  }
-  /*Extended Flag only works with F84E*/
-  if(pf->extendedFlag == 1){
-    if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
-      die("Error: -x only works with F84E Model.\n");
   }
   //Make sure the folder is not empty.
   void* ptr = lst_get_ptr(pf->input_mods, 0);
@@ -1526,6 +1514,9 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
 
   if (pf->label_str != NULL || pf->label_type != NULL)
     die("ERROR: --label-branches or --label-subtree not allowed with multiple input models.\n");
+  
+  if(pf->dnaMlNormalize && !(pf->subst_mod == F84E))
+    die("ERROR: dnaMlNomalize can only be used with F84E.\n");
 
   for (i=0; i<lst_size(pf->msas); i++) {
     MSA *msa = lst_get_ptr(pf->msas, i);
@@ -1587,9 +1578,30 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   lst_free(tofree);
   lst_free(toSkipList);
   toSkipList = NULL;
+  int nmod = lst_size(mods);
+  /*Original trees if user pick --dnaMlTree, trees are rooted and copy is kept :)*/
+  TreeNode* originalTrees[nmod];
+  TreeModel** myMods = (TreeModel**)mods->array;
+  
+  /*Save all trees for printing. */
+  for(i = 0; i < nmod; i++){
+    /*Note this does leak memory...*/
+    originalTrees[i] = tr_create_copy(myMods[i]->tree);
+    /*Do midpoint rooting.*/
+    myMods[i]->tree = midpointRooting(myMods[i]->tree);
+  }
+  
+  /*Tell all models to normalize, this must be done later as we have to calculate the
+   * average frequencies before we can do this. */
+  if(pf->dnaMlNormalize)
+    for(i = 0; i < lst_size(mods); i++)
+      myMods[i]->dnaMlNormalize = 1;
   
   // fit model
-  tm_fit_multi((TreeModel **)mods->array, lst_size(mods), (MSA **)msas->array, lst_size(msas), newparams, OPT_VERY_HIGH_PREC, NULL, 1);
+  tm_fit_multi(myMods, nmod, (MSA **)msas->array, lst_size(msas), newparams, OPT_VERY_HIGH_PREC, NULL, 1);
+  
+  for(i = 0; i < nmod; i++)
+    myMods[i]->tree = originalTrees[i];
   
   /*Write results to always to this directory.*/
   /*Maybe should not be hardcoded?*/

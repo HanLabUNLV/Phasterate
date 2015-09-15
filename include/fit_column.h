@@ -349,6 +349,15 @@ Matrix *col_get_fim_sub(FimGrid *g, double scale);
  */
 int col_has_data(TreeModel *mod, MSA *msa, int tupleidx);
 
+/**
+ * Given a column returns true if the gap is not all columns. Else false.
+ * @param mod: model.
+ * @param msa: the msa to check.
+ * @param tupleidx: the index of the column we are loooking at.
+ * @return true or false.
+ */
+int columnHasDataGaps(TreeModel *mod, MSA *msa, int tupleidx);
+
 /**  Check if a column has enough data in the subtree of interest to perform an analysis.
     @param mod Tree Model
     @param msa Multiple Sequence Alignment sequence data

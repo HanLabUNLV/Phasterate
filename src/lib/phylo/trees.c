@@ -1756,6 +1756,7 @@ char* tr_only_from_file(const char* string){
  * return, the new root to use for the tree.
  */
 TreeNode* midpointRooting(TreeNode* tree){
+  printf("Rerooting Tree!\n");
   
   /*Find the most distant nodes and their distance.*/
   Pair myPair = findMostDistantNode(tree);

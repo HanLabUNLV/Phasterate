@@ -29,6 +29,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <omp.h>
+#include "phylo_fit.h"
 
 #define ALPHABET_TAG "ALPHABET:"
 #define BACKGROUND_TAG "BACKGROUND:"
@@ -171,6 +172,7 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
   /*Init to all nulls.*/
   for(i = 0; i < 1000; i ++)
     tm->fileName[i] = 0;
+  tm->dnaMlNormalize = 0;
   return tm;
 }
 
@@ -2091,10 +2093,13 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
   else{
     retval = opt_bfgs(tm_likelihood_wrapper, opt_params, (void*)mod, &ll, lower_bounds,
                       upper_bounds, logf, NULL, precision, NULL, &numeval);
-      /* make negative again and convert to natural log scale */
-    mod->lnL = ll * -1 * log(2);
+    /* make negative again and convert to natural log scale */
+    if(mod->subst_mod != F84)
+      mod->lnL = ll * -1 * log(2);
+    else
+      mod->lnL = ll * -1;
   }
-                            
+
   if (!quiet) fprintf(stderr, "Done.  log(likelihood) = %f numeval=%i\n", mod->lnL, numeval);
   tm_unpack_params(mod, opt_params, -1);
   vec_copy(params, mod->all_params);
@@ -2159,7 +2164,6 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
      Or maybe it makes more sense to say "optimize these trees using all parameters
      the same except the following".  For us, the only different one is bgc, and bgc weight, and bgc
      is not even used in the non-bgc model.  So when we go to unpack it, it should just work...
-
 */
   double ll;
   Vector *lower_bounds, *upper_bounds, *opt_params;
@@ -2313,6 +2317,26 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   for (j=1; j < nmod; j++)
     tm_set_boundaries(lower_bounds, upper_bounds, mod[j]);
   tm_check_boundaries(opt_params, lower_bounds, upper_bounds);
+  
+  /*If user selected option for dnaMlTree we must compute the "average ration of
+   * changes just how dnaMl does it. Then we re-root the tree if needed. */
+  if(mod[0]->dnaMlNormalize){
+    double* freq = mod[0]->backgd_freqs->data;
+    int m = mod[0]->ratematrix_idx;
+    Vector* params = mod[0]->all_params;
+    double lambda = params->data[m + 0];
+    double mu = params->data[m + 1];
+    double alpha = params->data[m + 2];
+    double betta = params->data[m + 3];
+    
+    double fracChange = computeFracChange(lambda, mu, alpha, betta,
+            freq[0], freq[1], freq[2], freq[3], freq[4]);
+    
+    for(i = 0; i < nmod; i++){
+      /*Divide all branches by fracChange*/
+      tr_scale(mod[i]->tree, 1.0 / fracChange);
+    }
+  }
   //always scale during opt when optimizing multiple models at once; otherwise
   // it is problematic if models are sharing scale or rate matrix parameters
   for (i=0; i < nmod; i++)
@@ -2328,14 +2352,18 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   if(mod[0]->subst_mod == F84E){
     retval = opt_bfgs(tmMultiGapAwareLikelihoodWrapper, opt_params, (void*)modlist, &ll,
             lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);
-    for (j=0; j < nmod; j++)
-      mod[j]->lnL = gapAwareLikelihoodWrapper(opt_params, mod[j]) * -1.0 * log(2);
+    for (j=0; j < nmod; j++){
+      mod[j]->lnL = gapAwareLikelihoodWrapper(opt_params, mod[j]);
+    }
   }
   else{ /*Just regular model!*/
     retval = opt_bfgs(tm_multi_likelihood_wrapper, opt_params, (void*)modlist, &ll,
             lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);
     for (j=0; j < nmod; j++)
+      if(mod[0]->subst_mod != F84)
       mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0 * log(2); 
+      else
+        mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0;
   }
   
   lst_free(modlist);
@@ -2358,7 +2386,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
 
   if (retval != 0)
     fprintf(stderr, "WARNING: BFGS algorithm reached its maximum number of iterations.\n");
-
+    
   return retval;
 }
 
@@ -3047,6 +3075,11 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
    fitting procedure.
 */
 double tm_scale_rate_matrix(TreeModel *mod) {
+  if(mod->subst_mod == F84 || mod->subst_mod == F84E){
+    printf("Error: Model F84 should never be called here!\n");
+    printf("It is already scaled.\n");
+    exit(1);
+  }
   double scale = 0;
   int i, j;
   for (i = 0; i < mod->rate_matrix->size; i++) {

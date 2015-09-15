@@ -224,6 +224,8 @@ struct tm_struct {
                                  * extended prunning algorithm.*/
   int isPhyloP;               /**<If we are in phyloP we will do things slightly differently
                                * exponentiating the matrix. */
+  int dnaMlNormalize;              /**Whether or not to normalize and reroot based on user option
+                               * no by default. */
 };
 
 // Collect trees from files in a directory

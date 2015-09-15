@@ -380,11 +380,11 @@ void tm_set_rate_matrix(TreeModel *mod, Vector *params, int i) {
   default:
     die("ERROR tm_set_rate_matrix: unknown substitution model\n");
   }
-
-  if(mod->subst_mod == F84E)
-    scaleRateMatrixExtended(mod);
-  else if (mod->scale_during_opt && mod->subst_mod!=JC69 && mod->subst_mod != F81)
+ 
+  if (mod->scale_during_opt && mod->subst_mod!=JC69 && mod->subst_mod != F81 &&
+          mod->subst_mod != F84 && mod->subst_mod != F84E)
     tm_scale_rate_matrix(mod);
+ 
   return;
 }
 

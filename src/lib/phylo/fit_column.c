@@ -70,9 +70,9 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
       n = lst_get_ptr(traversal, nodeidx);      
       if (n->lchild == NULL) { 
         /* leaf: base case of recursion */
-        int state = mod->rate_matrix->
-          inv_states[(int)ss_get_char_tuple(msa, tupleidx, 
-                                            mod->msa_seq_idx[n->id], 0)];
+        char c = ss_get_char_tuple(msa, tupleidx, mod->msa_seq_idx[n->id], 0);
+        int state = mod->rate_matrix->inv_states[(int)c];
+
         for (i = 0; i < nstates; i++) {
           if (state < 0 || i == state) 
             pL[i][n->id] = 1;
@@ -769,12 +769,11 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
     /* first check for actual substitution data in column; if none,
      * don't waste time computing likelihoods. Extended model cares about
      * gaps which are considered missing data */
-    if (!col_has_data(mod, msa, i) && mod->subst_mod != F84E){
-      delta_lnl = 0;
-      this_scale = 1;
-    }
-
-    else {                      /* compute null and alt lnl */
+    if (
+         col_has_data(mod, msa, i) ||
+         ( mod->subst_mod == F84E && columnHasDataGaps(mod, msa, i) )
+       ){
+      /* compute null and alt lnl */
       mod->scale = 1;
       tm_set_subst_matrices(mod);
 
@@ -798,6 +797,10 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 	die("ERROR col_lrts: delta_lnl = %e < -0.01\n", delta_lnl);
       if (delta_lnl < 0) delta_lnl = 0;
     } /* end estimation of delta_lnl */
+    else{
+      delta_lnl = 0;
+      this_scale = 1;
+    }
 
     /* compute p-vals via chi-sq */
     if (tuple_pvals != NULL) {
@@ -1581,6 +1584,23 @@ int col_has_data(TreeModel *mod, MSA *msa, int tupleidx) {
   return(nbases >= 2);
 }
 
+/**
+ * Given a column returns true if the gap is not all columns. Else false.
+ * @param mod: model.
+ * @param msa: the msa to check.
+ * @param tupleidx: the index of the column we are loooking at.
+ * @return true or false.
+ */
+int columnHasDataGaps(TreeModel *mod, MSA *msa, int tupleidx) {
+  int i, nbases = 0;
+  for (i = 0; i < msa->nseqs && nbases < 2; i++) {
+    char c = ss_get_char_tuple(msa, tupleidx, i, 0);
+    if (c != 'N')
+      nbases++;
+  }
+  return(nbases >= 2);
+}
+
 /* returns TRUE if column has at least one base in the subtree of
    interest, at least one in the supertree of interest, and at least
    three bases total (the minimum required for a meaningful subtree
@@ -1694,6 +1714,12 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
       likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
     }
   }
+
+  for(i = 0; i < lst_size(traversal); i++)
+      printf("Value at Node [%d] = {%f, %f, %f, %f, %f}\n", i, likelihoodTable[0][i],
+              likelihoodTable[1][i], likelihoodTable[2][i], likelihoodTable[3][i],
+              likelihoodTable[4][i]);
+  exit(0);
   
   totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
   

@@ -100,8 +100,8 @@ int main(int argc, char *argv[]) {
     {"selection", 1, 0, 0},
     {"bound", 1, 0, 'u'},
     {"seed", 1, 0, 'D'},
-    {"extended-model",1,0,'x'},
-    {"dnaMlTree", 0, 0, 0},
+    {"dnaMlNormalize", 0, 0, 0},
+    {"reroot", 0 , 0, 0},
     {0, 0, 0, 0}
   };
 
@@ -321,8 +321,11 @@ int main(int argc, char *argv[]) {
 	pf->selection = get_arg_dbl(optarg);
 	pf->use_selection = TRUE;
       }
-      else if (strcmp(long_opts[opt_idx].name, "dnaMlTree") == 0) {
-        pf->dnaMlTree = 1;
+      else if (strcmp(long_opts[opt_idx].name, "dnaMlNormalize") == 0) {
+        pf->dnaMlNormalize = 1;
+      }
+      else if (strcmp(long_opts[opt_idx].name, "reroot") == 0) {
+        pf->reroot = 1;
       }
       else {
 	die("ERROR: unknown option.  Type 'phyloFit -h' for usage.\n");
@@ -340,10 +343,6 @@ int main(int argc, char *argv[]) {
     case 'h':
       printf("%s", HELP);
       exit(0);
-    /*Extended Felsenstein's Peeling Algorithm.*/
-    case 'x':
-      pf->extendedFlag = 1;
-      break;
     case '?':
       die("ERROR: illegal argument.     Type 'phyloFit -h' for usage.\n");
     }

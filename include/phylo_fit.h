@@ -65,11 +65,10 @@ struct phyloFit_struct {
   List *input_mods;
   List *mod_file_names;
   FILE *logf;
-  int extendedFlag;             /**< Boolean detalining whether the extended prunning
-                                 * algorithm should be used or not.*/
-  int dnaMlTree;              /**<Flag leting us know user has selected tree to be computed
+  int dnaMlNormalize;              /**<Flag leting us know user has selected tree to be computed
                                * how dnaML does. That is, all branchlengths are divided by
                                * the fracChange and tree is midpoint rooted. */
+  int reroot;                      /**<reroot tree if user choses for it to do so. */
   //results go here if not-null
   ListOfLists *results;
 };
