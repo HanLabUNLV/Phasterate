@@ -1426,6 +1426,8 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   /*Make sure all the mod file are of the same substitution model.*/  
   for (i = 1; i < lst_size(pf->msas); i ++){
     ptr = lst_get_ptr(pf->input_mods, i);
+    if(ptr == NULL)
+      die("\nError: Unequal number of files in both folders.\n");
     int otherSubstMod = ((TreeModel*)ptr)->subst_mod;
     if(substMod != otherSubstMod)
       die("\nError: Not all models in the model Directory are the same!\n");
@@ -1587,8 +1589,11 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   for(i = 0; i < nmod; i++){
     /*Note this does leak memory...*/
     originalTrees[i] = tr_create_copy(myMods[i]->tree);
-    /*Do midpoint rooting.*/
-    myMods[i]->tree = midpointRooting(myMods[i]->tree);
+    if(pf->reroot == 1){
+      /*Do midpoint rooting.*/
+      printf("About to reroot: %s\n", myMods[i]->fileName);
+      myMods[i]->tree = midpointRooting(myMods[i]->tree);
+    }
   }
   
   /*Tell all models to normalize, this must be done later as we have to calculate the
