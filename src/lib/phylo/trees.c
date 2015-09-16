@@ -2003,7 +2003,7 @@ Pair findMostDistantNode(TreeNode* root){
       /*We find the common ancestor id. Now add the lengths from the node to the common
        ancestor.*/
       int commonAncestorId = findCommonAncestor(root, node1->id, node2->id);
-      
+
       double sum1 = addUpToCommonAncestor(node1, commonAncestorId);
       double sum2 = addUpToCommonAncestor(node2, commonAncestorId);
       /*Set distances for nodes both ways.*/
@@ -2104,7 +2104,7 @@ int findCommonAncestorHelper(TreeNode* node, int nodeIndex1, int nodeIndex2){
   /*Base case: We hit a leaf. Leaf cannot be common ancestor return -1.*/
   if(node->lchild == NULL)
     return -1;
-  
+
   /*Recursive Case: Check if either children found common ancestor. If yes then pass the
    id up. Else try to see if we are the common ancestor! Note it must be done this way
    as if the child finds it first but we don't check for this first, we automatically
@@ -2119,8 +2119,8 @@ int findCommonAncestorHelper(TreeNode* node, int nodeIndex1, int nodeIndex2){
     return rightResult;
   
   /*Else we check if we are the common ancestor. Check if our list contains both nodes.*/
-  if(lst_find_int(node->childList,nodeIndex1) != -1 &&
-     lst_find_int(node->childList,nodeIndex2) != -1 ){
+  if(myListFindInt(node->childList,nodeIndex1) != -1 &&
+     myListFindInt(node->childList,nodeIndex2) != -1 ){
     /*We are the common ancestor. Let the world know...*/
     return node->id;
   }

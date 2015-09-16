@@ -127,7 +127,7 @@ int lst_find(List *l, void* ptr) {
     for (i = 0; i < lst_size(l); i++)
       if (*((void**)lst_get(l, i)) == *((void**)ptr))
 	return i;
-  }
+    }
   else {
     for (i = 0; i < lst_size(l); i++)
       if (memcmp(lst_get(l, i), ptr, l->elementsz) == 0)
@@ -342,4 +342,16 @@ void* lst_get_ptr_non_inline(List* l, int i) {
 double lst_get_dbl_non_inline(List* l, int i) {
   double *ptr =  (double*)lst_get(l, i);
   return (ptr == NULL ? 0 : *ptr);
+}
+
+int myListFindInt(List *l, int num1){
+  int i;
+  for (i = 0; i < lst_size(l); i++){
+    int num2 = lst_get_int(l,i);
+
+    if (num1 == num2)
+      return i;
+  }
+
+  return -1;
 }

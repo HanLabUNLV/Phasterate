@@ -781,7 +781,10 @@ void lst_dbl_quantiles(List *l, double *quantiles, int nquantiles,
 
 
 /** \} */
+int myListFindInt(List *l, int i);
 
+/*Do not use any of these functions, they have a bug. When optimized the compiler removes
+ int i, therefore passing it's address is invalid causing bad behavior.*/
 static PHAST_INLINE
 int lst_find_int(List *l, int i) 
 { return lst_find(l, &i); }
