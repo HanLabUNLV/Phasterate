@@ -1714,12 +1714,6 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
       likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
     }
   }
-
-  for(i = 0; i < lst_size(traversal); i++)
-      printf("Value at Node [%d] = {%f, %f, %f, %f, %f}\n", i, likelihoodTable[0][i],
-              likelihoodTable[1][i], likelihoodTable[2][i], likelihoodTable[3][i],
-              likelihoodTable[4][i]);
-  exit(0);
   
   totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
   
