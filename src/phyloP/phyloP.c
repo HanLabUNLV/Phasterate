@@ -169,6 +169,9 @@ int main(int argc, char *argv[]) {
 
   p->mod = tm_new_from_file(phast_fopen(p->mod_fname, "r"), 1);
   p->mod->isPhyloP = 1;
+  
+  if(p->mod->subst_mod == F84 && !p->extended)
+    die("ERROR: F84 Model requires -x with *.infoX file!\n");
   /*Extended Likelihood algorithm requires the TreeModel all_params->data
    and the mod->rateMatrix_idx to be set as it is used, we simulate that
    here.*/
@@ -302,6 +305,6 @@ void setExtendedMod(TreeModel* mod, char* fileName){
     mod->all_params = vec_new_from_array(params, 2);
     
   }
-  
+  phast_fclose(fin);
   return;
 }

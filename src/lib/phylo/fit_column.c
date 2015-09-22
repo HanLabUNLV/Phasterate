@@ -758,6 +758,11 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
   int i;
   ColFitData *d;
   double null_lnl, alt_lnl, delta_lnl, this_scale = 1;
+  char* fileNameNull = "nullLikelihoods.txt";
+  char* fileNameAlt = "altLikelihoods.txt";
+
+  FILE* foutNull= phast_fopen(fileNameNull, "w");
+  FILE* foutAlt= phast_fopen(fileNameAlt, "w");
 
   /* init ColFitData */
   d = col_init_fit_data(mod, msa, ALL, mode, FALSE);
@@ -791,6 +796,10 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 
       alt_lnl *= -1;
       this_scale = d->params->data[0];
+      
+      /*Write values to file: */
+      fprintf(foutNull, "%.3f\n", null_lnl);
+      fprintf(foutAlt, "%.3f\n", alt_lnl);
 
       delta_lnl = alt_lnl - null_lnl;
       if (delta_lnl <= -0.01)
@@ -824,6 +833,8 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
     if (tuple_llrs != NULL) tuple_llrs[i] = delta_lnl;
   }
   
+  phast_fclose(foutNull);
+  phast_fclose(foutAlt);
   col_free_fit_data(d);
 }
 
