@@ -1075,22 +1075,23 @@ void tm_set_subst_matrices(TreeModel *tm) {
 	/* treat as if infinitely long */
         tm_set_probs_independent(tm, tm->P[i][j]);
 
-      if(subst_mod == F84E)
-        probsF84EModels(tm, i, j, n, branch_scale);
+      //if(subst_mod == F84E)
+        //probsF84EModels(tm, i, j, n, branch_scale);
       /* for simple models, full matrix exponentiation is not necessary */
-      else if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
+      /*else */if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
         tm_set_probs_JC69(tm, tm->P[i][j],
                           n->dparent * branch_scale * tm->rK[j]);
       else if (subst_mod == F81 && selection == 0.0 && bgc == 0.0)
         tm_set_probs_F81(backgd_freqs, tm->P[i][j], curr_scaling_const,
                          n->dparent * branch_scale * tm->rK[j]);
-      else  if(subst_mod == F84)
-        probsF84Models(tm, i, j, n, branch_scale);
+      //else  if(subst_mod == F84)
+        //probsF84Models(tm, i, j, n, branch_scale);
       else                     /* full matrix exponentiation */
         mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);
     }
   }
-
+  printMatrix(tm->P[1][0]->matrix, 5);
+  exit(1);
   return;
 }
 

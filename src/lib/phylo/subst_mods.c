@@ -3081,7 +3081,7 @@ double bigDelta(int j, int i, double* frequencies){
   return alphaValue;
 }
 //======================================================================================
-/*Used by matrix computation on diagonal, simply return 1 if in diagonal, else 1;*/
+/*Used by matrix computation on diagonal, simply return 1 if in diagonal, else 0;*/
 int kronecker(int firstResidue,int secondResidue){
   if(firstResidue == secondResidue)
     return 1;
