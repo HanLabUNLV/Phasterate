@@ -165,6 +165,8 @@ struct tm_struct {
                                    if value is TM_BRANCHLENS_NONE, do
                                    not estimate branch lengths */
   double scale;                 /**< Current scale factor */
+  double scaleTwo;              /**<Secondary scale factor used for extended F84E model
+                                 * to separetly optimize substitutions and indels. */
   double scale_sub;             /**< Scale factor for subtree, when
                                    estimating separate scale factors
                                    for subtree and supertree */
@@ -333,6 +335,19 @@ TreeModel *tm_create_copy(TreeModel *src);
    @param tm Tree Model to setup substitution matrix for
 */
 void tm_set_subst_matrices(TreeModel *tm);
+
+/**
+ * Given a proper F84E matrix and the two scale paremeters from PhyloP it will scale the
+ * substitution matrix using scaleOne and the indel outer column and row using scaleTwo.
+ * It returns the scaled matrix, this memory should be deallocated!
+ * @param matrix: Matrix to scale.
+ * @param scaleOne: scale parameter for substitution 4x4 submatrix.
+ * @param scaleTwo: scale parameter for outer column and row.
+ * @param tm: our tree model to extract lambda, mu and our frequencies.
+ * @return: scaled matrix.
+ */
+MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scaleOne,
+        double scaleTwo, TreeModel* tm);
 
 /**
  * Given the Tree model the current matrix we are computing and the current node.

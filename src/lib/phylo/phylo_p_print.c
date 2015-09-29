@@ -586,9 +586,11 @@ void print_feats_sph_subtree(FILE *outfile, p_value_joint_stats *stats,
 void print_wig(FILE *outfile, MSA *msa, double *vals, char *chrom, 
 	       int refidx, int log_trans, ListOfLists *result) {
   int last, j, k;
-  double val;
+  double val, nullScore, altScore, scale;
   List *posList=NULL, *scoreList=NULL;
-
+  char* fileName = "computedLikelihoods.txt";
+  FILE* foutScores = phast_fopen(fileName, "w");
+  
   if (result != NULL) {
     posList = lst_new_int(msa->length);
     scoreList = lst_new_dbl(msa->length);
@@ -598,13 +600,21 @@ void print_wig(FILE *outfile, MSA *msa, double *vals, char *chrom,
   if (!(refidx >= 0 && refidx <= msa->nseqs))
     die("ERROR print_wig: bad refidx (%i)\n", refidx);
   for (j = 0, k = 0; j < msa->length; j++) {
+    int const l = msa->ss->tuple_idx[j];
     checkInterruptN(j, 1000);
     if (refidx == 0 || msa_get_char(msa, refidx-1, j) != GAP_CHAR) {
       if (refidx == 0 || !msa_missing_col(msa, refidx, j)) {
         if (k > last + 1 && outfile != NULL) 
           fprintf(outfile, "fixedStep chrom=%s start=%d step=1\n", chrom, 
 		  k + msa->idx_offset + 1);
-        val = vals[msa->ss->tuple_idx[j]];
+        val = vals[l];
+        /*Get scores from likelihood calculation and print them to our file!*/
+        nullScore = msa->nullScores[l];
+        altScore = msa->altScores[l];
+        scale = msa->scales[l];
+        
+        fprintf(foutScores, "%f\t%f\t%f\n", nullScore, altScore, scale);
+                
         if (log_trans) {
           int sign = 1;
           if (val < 0) {
@@ -630,6 +640,12 @@ void print_wig(FILE *outfile, MSA *msa, double *vals, char *chrom,
     lol_set_class(group, "data.frame");
     lol_push_lol(result, group, "wig");
   }
+  
+  free(msa->nullScores);
+  free(msa->altScores);
+  free(msa->scales);
+  phast_fclose(foutScores);
+  return;
 }
 
 

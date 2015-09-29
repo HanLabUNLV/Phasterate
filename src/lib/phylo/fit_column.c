@@ -758,11 +758,11 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
   int i;
   ColFitData *d;
   double null_lnl, alt_lnl, delta_lnl, this_scale = 1;
-  char* fileNameNull = "nullLikelihoods.txt";
-  char* fileNameAlt = "altLikelihoods.txt";
-
-  FILE* foutNull= phast_fopen(fileNameNull, "w");
-  FILE* foutAlt = phast_fopen(fileNameAlt, "w");
+  int size = msa->ss->ntuples;
+  /*Allocate memory to save the results for printing.*/
+  msa->nullScores = (double*)malloc(sizeof(double) * size);
+  msa->altScores = (double*)malloc(sizeof(double) * size);
+  msa->scales = (double*)malloc(sizeof(double) * size);
 
   /* init ColFitData */
   d = col_init_fit_data(mod, msa, ALL, mode, FALSE);
@@ -796,12 +796,14 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 
       alt_lnl *= -1;
       this_scale = d->params->data[0];
-      
-      /*Write values to file: */
-      fprintf(foutNull, "%.5f\n", null_lnl);
-      fprintf(foutAlt, "%.5f\n", alt_lnl);
 
       delta_lnl = alt_lnl - null_lnl;
+      
+      /*Save values as we will want to print them later in the printing function.*/
+      msa->nullScores[i] = null_lnl;
+      msa->altScores[i] = alt_lnl;
+      msa->scales[i] = this_scale;
+      
       if (delta_lnl <= -0.01)
 	die("ERROR col_lrts: delta_lnl = %e < -0.01\n", delta_lnl);
       if (delta_lnl < 0) delta_lnl = 0;
@@ -833,8 +835,6 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
     if (tuple_llrs != NULL) tuple_llrs[i] = delta_lnl;
   }
   
-  phast_fclose(foutNull);
-  phast_fclose(foutAlt);
   col_free_fit_data(d);
 }
 

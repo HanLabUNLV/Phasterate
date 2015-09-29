@@ -148,6 +148,7 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
   tm->estimate_backgd = 0;
   tm->estimate_branchlens = TM_BRANCHLENS_ALL;
   tm->scale = 1;
+  tm->scaleTwo = 1.0;
   tm->subtree_root = NULL;
   tm->scale_sub = 1;
   tm->scale_sub_bound = NB;
@@ -1074,25 +1075,99 @@ void tm_set_subst_matrices(TreeModel *tm) {
       if (tm->ignore_branch != NULL && tm->ignore_branch[i])
 	/* treat as if infinitely long */
         tm_set_probs_independent(tm, tm->P[i][j]);
-
-      //if(subst_mod == F84E)
-        //probsF84EModels(tm, i, j, n, branch_scale);
+      
+      /*If we are in PhyloP and using F84E model we scale the rate matrix based on two
+       * parameters and pass it to mm_exp. */
+      if(subst_mod == F84E && tm->isPhyloP){
+        /*Right now it's hardcoded to only scale the gap columns and rows.*/
+        MarkovMatrix* tempMatrix =
+                scaleF84EMatrixBySections(rate_matrix, 1.0, tm->scale, tm);
+        mm_exp(tm->P[i][j], tempMatrix, n->dparent);
+        mm_free(tempMatrix);
+        continue;
+      }
       /* for simple models, full matrix exponentiation is not necessary */
-      /*else */if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
+      if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
         tm_set_probs_JC69(tm, tm->P[i][j],
                           n->dparent * branch_scale * tm->rK[j]);
       else if (subst_mod == F81 && selection == 0.0 && bgc == 0.0)
         tm_set_probs_F81(backgd_freqs, tm->P[i][j], curr_scaling_const,
                          n->dparent * branch_scale * tm->rK[j]);
-      //else  if(subst_mod == F84)
-        //probsF84Models(tm, i, j, n, branch_scale);
-      else                     /* full matrix exponentiation */
-        mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);
+
+      /*For phyloFit we hand calculate this values as it's more accurate.*/
+      else if(subst_mod == F84){
+        probsF84Models(tm, i, j, n, branch_scale);
+      }
+      else  if(subst_mod == F84E){
+        probsF84EModels(tm, i, j, n, branch_scale);
+      }
+      else
+          mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);        
     }
   }
-  printMatrix(tm->P[1][0]->matrix, 5);
-  exit(1);
   return;
+}
+
+/**
+ * Given a proper F84E matrix and the two scale paremeters from PhyloP it will scale the
+ * substitution matrix using scaleOne and the indel outer column and row using scaleTwo.
+ * It returns the scaled matrix, this memory should be deallocated!
+ * @param matrix: Matrix to scale.
+ * @param scaleOne: scale parameter for substitution 4x4 submatrix.
+ * @param scaleTwo: scale parameter for outer column and row.
+ * @param tm: our tree model to extract lambda, mu and our frequencies.
+ * @return: scaled matrix.
+ */
+MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scaleOne,
+        double scaleTwo, TreeModel* tm){
+  
+  MarkovMatrix* returnMatrix = mm_create_copy(matrix);
+  int const innerMatrixSize = 4;
+  int const k = 4;
+  /*Get our parameter vector.*/
+  int const m = tm->ratematrix_idx;
+  double* params = & (tm->all_params->data[m]);
+  double const lambda = params[0];
+  double const mu = params[1];
+  /*Get our frequencies.*/
+  double* freqs = tm->backgd_freqs->data;
+  int i, j;
+  /*printf("Scaling Parameters %f %f\nOriginal Matrix:\n", scaleOne, scaleTwo);
+  printMatrix(matrix->matrix, 5);*/
+  
+  /*Hold sums for the rows except the diagonal.*/
+  double sumArray[5] = {0, 0, 0, 0, 0};
+  
+  /*We will first scale the inner substitution submatrix by multiplying by our scaleOne*/
+  for(i = 0; i < innerMatrixSize; i++){
+    for(j = 0; j < innerMatrixSize; j++){
+      /*Skip diagonal for now...*/
+      if(i == j)
+        continue;
+      double value = mm_get(returnMatrix, i, j);
+      mm_set(returnMatrix, i, j, value * scaleOne);
+      sumArray[i] += value * scaleOne;
+    }
+  }
+  
+  /*Scale 5th row.*/
+  for(i = 0; i < innerMatrixSize; i++){
+    mm_set(returnMatrix, i, k, mu * scaleTwo);
+    sumArray[i] += mu * scaleTwo;
+  }
+  sumArray[4] = lambda * scaleTwo;
+
+  /*Scale 5 column.*/
+  for(i = 0; i < innerMatrixSize; i++)
+    mm_set(returnMatrix, k, i, lambda * freqs[i] * scaleTwo);
+  
+  /*Set diagonal: */
+  for(i = 0; i < 5; i++)
+    mm_set(returnMatrix, i, i, -sumArray[i]);
+
+/*printf("Output matrix\n");
+ * printMatrix(returnMatrix->matrix, 5);*/
+  return returnMatrix;
 }
 
 /**
@@ -1141,12 +1216,18 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   int k, l;
   double* freqs = tm->backgd_freqs->data;
   double branchLength = n->dparent;
+  double sum = 0;
 
   //Both Models share this in common:
   for(k = 0; k < matrixSize; k++)
     for(l = 0; l < matrixSize; l++)
       matrixA[k][l] = singleEventCondProb(l, k, branchLength * scale, freqs, params);
 
+  for(k = 0; k < matrixSize; k++)
+    sum += matrixA[4][k];
+  
+  matrixA[4][4] = 1 - sum;
+  
   return;
 }
 

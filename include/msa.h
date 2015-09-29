@@ -54,6 +54,12 @@ typedef struct {
                                    sequences are to be considered
                                    "informative", e.g., for
                                    phylogenetic analysis */
+  /**<These threee variables are used by phyloP to keep track of what the scores where
+   * so we can compute our own p-values based on the null and alt model, we also need
+   * the scale for each tuple to decide if the scaling was 0 < x < 1 or x > 1. */
+  double* nullScores;            
+  double* altScores;
+  double* scales;
 } MSA;
 
 /** Size of lookup tables */
