@@ -288,7 +288,15 @@ void col_score_tests_sub(TreeModel *mod, MSA *msa, mode_type mode,
                          double *tuple_derivs, double *tuple_sub_derivs, 
                          double *tuple_teststats, FILE *logf);
 
+/* Create object with metadata and scratch memory for fitting scale
+ * factors. This is used by the F84E Model as it needs two parameters to optimize
+ * against.
+ */
+ColFitData* createColFitDataTwoParams(TreeModel *mod, MSA *msa, scale_type stype,
+                              mode_type mode);
 
+void columnLrtF84E(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals, 
+              double *tuple_scales, double *tuple_llrs, FILE *logf);
 
 /** Perform a GERP-like computation to compute conservation scores
    for each tuple.

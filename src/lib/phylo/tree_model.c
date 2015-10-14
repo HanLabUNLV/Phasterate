@@ -174,6 +174,7 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
   for(i = 0; i < 1000; i ++)
     tm->fileName[i] = 0;
   tm->dnaMlNormalize = 0;
+  tm->isPhyloP = 0;
   return tm;
 }
 
@@ -1086,6 +1087,13 @@ void tm_set_subst_matrices(TreeModel *tm) {
         mm_free(tempMatrix);
         continue;
       }
+      /*Here we scale the rate matrix based on a parameters and pass it to mm_exp. */
+      if(subst_mod == HKY85G && tm->isPhyloP){
+        MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale);
+        mm_exp(tm->P[i][j], tempMatrix, n->dparent);
+        mm_free(tempMatrix);
+        continue;
+      }
       /* for simple models, full matrix exponentiation is not necessary */
       if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
         tm_set_probs_JC69(tm, tm->P[i][j],
@@ -1109,12 +1117,47 @@ void tm_set_subst_matrices(TreeModel *tm) {
 }
 
 /**
+ * Given a HKYG85 matrix and a scale paremeter from PhyloP it will scale the
+ * substitution matrix using scaleO for the insertion rate and scaleTwo for the deletion
+ * rate. It returns the scaled matrix, this memory should be deallocated!
+ * @param matrix: Matrix to scale.
+ * @param scaleOne: scale parameter for insertions.
+ * @return: scaled matrix.
+ */
+MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
+  MarkovMatrix* returnMatrix = mm_create_copy(matrix);
+  int const size = 5;
+  int const innerSize = 4;
+  int const k = 4;
+  int i;
+ 
+  /*For each row, scale the diagonal and 5th column.*/
+  for(i = 0; i < innerSize; i++){
+    double val = mm_get(returnMatrix, k, i);
+    double diagonal = mm_get(returnMatrix, i, i);
+    
+    diagonal = diagonal + val * (1 - scale);
+    mm_set(returnMatrix, i, k, val * scale);
+    mm_set(returnMatrix, i, i, diagonal);
+  }
+  
+  /*Scale 5 row.*/
+  for(i = 0; i < size; i++){
+    double val = mm_get(returnMatrix, k, i);
+    mm_set(returnMatrix, k, i, scale * val);
+  }
+ 
+  return returnMatrix;
+}
+
+/**
  * Given a proper F84E matrix and the two scale paremeters from PhyloP it will scale the
- * substitution matrix using scaleOne and the indel outer column and row using scaleTwo.
+ * substitution matrix using scaleOne for the insertion rate and scaleTwo for the deletion
+ * rate.
  * It returns the scaled matrix, this memory should be deallocated!
  * @param matrix: Matrix to scale.
- * @param scaleOne: scale parameter for substitution 4x4 submatrix.
- * @param scaleTwo: scale parameter for outer column and row.
+ * @param scaleOne: scale parameter for insertions.
+ * @param scaleTwo: scale parameter for deletions.
  * @param tm: our tree model to extract lambda, mu and our frequencies.
  * @return: scaled matrix.
  */
@@ -1131,42 +1174,33 @@ MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scaleOne,
   double const mu = params[1];
   /*Get our frequencies.*/
   double* freqs = tm->backgd_freqs->data;
-  int i, j;
+  int i;
   /*printf("Scaling Parameters %f %f\nOriginal Matrix:\n", scaleOne, scaleTwo);
   printMatrix(matrix->matrix, 5);*/
-  
-  /*Hold sums for the rows except the diagonal.*/
-  double sumArray[5] = {0, 0, 0, 0, 0};
-  
-  /*We will first scale the inner substitution submatrix by multiplying by our scaleOne*/
-  for(i = 0; i < innerMatrixSize; i++){
-    for(j = 0; j < innerMatrixSize; j++){
-      /*Skip diagonal for now...*/
-      if(i == j)
-        continue;
-      double value = mm_get(returnMatrix, i, j);
-      mm_set(returnMatrix, i, j, value * scaleOne);
-      sumArray[i] += value * scaleOne;
-    }
-  }
-  
-  /*Scale 5th row.*/
-  for(i = 0; i < innerMatrixSize; i++){
-    mm_set(returnMatrix, i, k, mu * scaleTwo);
-    sumArray[i] += mu * scaleTwo;
-  }
-  sumArray[4] = lambda * scaleTwo;
-
-  /*Scale 5 column.*/
+   
+  /*Scale 5th column.*/
   for(i = 0; i < innerMatrixSize; i++)
-    mm_set(returnMatrix, k, i, lambda * freqs[i] * scaleTwo);
+    mm_set(returnMatrix, i, k, mu * scaleTwo);
+
+  /*Scale 5 row.*/
+  double lambdaAndScale = lambda * scaleOne;
+  double sum = 0;
+  for(i = 0; i < innerMatrixSize; i++){
+    sum += lambdaAndScale * freqs[i];
+    mm_set(returnMatrix, k, i, lambdaAndScale * freqs[i]);
+  }
+  mm_set(returnMatrix, 4, 4, -sum);
   
   /*Set diagonal: */
-  for(i = 0; i < 5; i++)
-    mm_set(returnMatrix, i, i, -sumArray[i]);
+  for(i = 0; i < 4; i++){
+    double val = mm_get(returnMatrix, i, i);
+    double newVal= val + mu * ( 1 - scaleTwo);
+    mm_set(returnMatrix, i, i, newVal);
+  }
+  
+ /* printf("Output matrix\n");
+  printMatrix(returnMatrix->matrix, 5);*/
 
-/*printf("Output matrix\n");
- * printMatrix(returnMatrix->matrix, 5);*/
   return returnMatrix;
 }
 

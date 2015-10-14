@@ -680,9 +680,13 @@ double col_likelihood_wrapper(Vector *params, void *data) {
   ColFitData *d = (ColFitData*)data;
 
   d->mod->scale = vec_get(params, 0);
+  
   if (d->stype == SUBTREE) 
     d->mod->scale_sub = vec_get(params, 1);
-
+  
+  if(d->mod->subst_mod == F84E)
+    d->mod->scaleTwo = vec_get(params, 1);
+    
   /* reestimate subst models on edges */
   tm_set_subst_matrices(d->mod); 
   
@@ -774,10 +778,11 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
     /* first check for actual substitution data in column; if none,
      * don't waste time computing likelihoods. Extended model cares about
      * gaps which are considered missing data */
-    if (
-         col_has_data(mod, msa, i) ||
-         ( mod->subst_mod == F84E && columnHasDataGaps(mod, msa, i) )
-       ){
+    if(
+       col_has_data(mod, msa, i) ||
+       (mod->subst_mod == F84E && columnHasDataGaps(mod, msa, i)) ||
+       (mod->subst_mod == HKY85G && columnHasDataGaps(mod, msa, i))
+      ){
       /* compute null and alt lnl */
       mod->scale = 1;
       tm_set_subst_matrices(mod);
@@ -790,7 +795,7 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 
       opt_newton_1d(col_likelihood_wrapper_1d, &d->params->data[0], d, 
                     &alt_lnl, SIGFIGS, d->lb->data[0], d->ub->data[0], 
-                    logf, NULL, NULL);   
+                    logf, NULL, NULL);
       /* turns out to be faster (roughly 15% in limited experiments)
          to use numerical rather than exact derivatives */
 
@@ -1708,7 +1713,7 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
         /*Iterate over all bases setting probability based on base case*/
         for (i = 0; i < alph_size; i++)
           likelihoodTable[i][n->id] = probabilityOfLeaf(observedState,i);   
-    }
+      }
     else{
       /* General recursive case. Calculate probabilities at inner node for all bases.*/
       /*Get matrices for left and right side.*/
@@ -1725,9 +1730,9 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
       likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
     }
   }
-  
+
   totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-  
+
   return totalProb;
 }
 /* =====================================================================================*/

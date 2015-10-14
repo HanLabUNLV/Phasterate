@@ -475,7 +475,7 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
     }
     sfree(subst_probs);
   }
-  
+
   return(retval);
 }
 
@@ -1050,6 +1050,7 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
     }
     sfree(subst_probs);
   }
+
   return(retval);
 }
 /* =====================================================================================*/
@@ -1069,7 +1070,7 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
   int length = msa->ss->ntuples;
-
+  
   /*Get traversal order so we iterate over nodes instead of recursing.*/
   List* traversal = tr_postorder(mod->tree);
 
@@ -1079,7 +1080,8 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
   for (currentColumn = 0; currentColumn < length + 1; currentColumn++){
     double columnProbability = 0;
     double** likelihoodTable = inside_joint;
-
+    int numberOfOcurrances[6] = {0, 0, 0, 0, 0, 0};
+    
     /* Iterate over traversal hitting all nodes in a post order matter.*/
     for (currentNode = 0; currentNode < lst_size(traversal); currentNode++) {
       TreeNode* n = lst_get_ptr(traversal, currentNode);
@@ -1100,13 +1102,17 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
         observedState = mod->rate_matrix->inv_states[(int)thischar];
         
         /*Special Case where we have a N at this spot:*/
-        if(observedState == -1)
+        if(observedState == -1){
+          numberOfOcurrances[5]++;
           for (i = 0; i < alph_size; i++)
             likelihoodTable[i][n->id] = 1;
-        else
+        }
+        else{
           /*Iterate over all bases setting probability based on base cases.*/
           for (i = 0; i < alph_size; i++)
             likelihoodTable[i][n->id] = probabilityOfLeaf(observedState, i);
+          numberOfOcurrances[observedState]++;
+        }
       }
       /* General recursive case. Calculate probabilities at inner node for all bases.*/
       else{
@@ -1134,7 +1140,9 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
     }
 
     columnProbability = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-
+    printf("[%d]: %f\tA:%d\tC:%d\tG:%d\tT:%d\t-:%d\tN:%d\n", currentColumn, log(columnProbability),
+            numberOfOcurrances[0], numberOfOcurrances[1], numberOfOcurrances[2], numberOfOcurrances[3],
+            numberOfOcurrances[4], numberOfOcurrances[5]);
     /*Multiply by the amount of times this column appeared in the alignment.*/
     if(currentColumn != length)
       totalLikelihood += log(columnProbability) * msa->ss->counts[currentColumn];

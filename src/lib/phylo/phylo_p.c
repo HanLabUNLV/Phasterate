@@ -503,7 +503,12 @@ void phyloP(struct phyloP_struct *p) {
         scales = smalloc(msa->ss->ntuples * sizeof(double));
       }
       if (subtree_name == NULL && branch_name == NULL) { /* no subtree case */
+        
+        /*if(mod->subst_mod == F84E)
+          columnLrtF84E(mod, msa, mode, pvals, scales, llrs, logf);
+        else*/
         col_lrts(mod, msa, mode, pvals, scales, llrs, logf);
+        
         if (output_wig) 
           print_wig(outfile, msa, pvals, chrom, refidx, TRUE, NULL);
 	if (results != NULL || !output_wig)

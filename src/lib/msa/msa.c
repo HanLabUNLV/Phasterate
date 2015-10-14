@@ -73,6 +73,9 @@ MSA *msa_new(char **seqs, char **names, int nseqs, int length, char *alphabet) {
   msa->alloc_len = msa->length; /* assume alloc equals length */
   msa->idx_offset = 0;
   msa->is_informative = NULL;
+  msa->nullScores = NULL;
+  msa->altScores = NULL;
+  msa->scales = NULL;
 
   if (alphabet != NULL) {
     msa->alphabet = (char*)smalloc((strlen(alphabet) + 1) * sizeof(char));

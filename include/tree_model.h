@@ -349,6 +349,8 @@ void tm_set_subst_matrices(TreeModel *tm);
 MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scaleOne,
         double scaleTwo, TreeModel* tm);
 
+MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale);
+
 /**
  * Given the Tree model the current matrix we are computing and the current node.
  * It will calculate the conditional probabilities for these models.
