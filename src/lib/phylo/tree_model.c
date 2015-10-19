@@ -1126,11 +1126,11 @@ void tm_set_subst_matrices(TreeModel *tm) {
  */
 MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
   MarkovMatrix* returnMatrix = mm_create_copy(matrix);
-  int const size = 5;
   int const innerSize = 4;
   int const k = 4;
   int i;
-  
+  double counter = 0;
+
   /*For each row, scale the diagonal and 5th column.*/
   for(i = 0; i < innerSize; i++){
     double val = mm_get(returnMatrix, i, k);
@@ -1142,10 +1142,13 @@ MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
   }
   
   /*Scale 5 row.*/
-  for(i = 0; i < size; i++){
+  for(i = 0; i < innerSize; i++){
     double val = mm_get(returnMatrix, k, i);
-    mm_set(returnMatrix, k, i, scale * val);
+    double newVal = scale * val;
+    counter += newVal;
+    mm_set(returnMatrix, k, i, newVal);
   }
+  mm_set(returnMatrix, k, k, -counter);
 
   return returnMatrix;
 }
