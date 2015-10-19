@@ -1130,10 +1130,10 @@ MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
   int const innerSize = 4;
   int const k = 4;
   int i;
- 
+  
   /*For each row, scale the diagonal and 5th column.*/
   for(i = 0; i < innerSize; i++){
-    double val = mm_get(returnMatrix, k, i);
+    double val = mm_get(returnMatrix, i, k);
     double diagonal = mm_get(returnMatrix, i, i);
     
     diagonal = diagonal + val * (1 - scale);
@@ -1146,7 +1146,7 @@ MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
     double val = mm_get(returnMatrix, k, i);
     mm_set(returnMatrix, k, i, scale * val);
   }
- 
+
   return returnMatrix;
 }
 
