@@ -2425,7 +2425,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   /*All models now need to be reinitialized with the proper values based on the global
    * values!*/
   for (i = 0; i < nmod; i++)
-    tm_rate_params_init(mod[i], mod[i]->all_params, mod[i]->ratematrix_idx, 0);
+    tm_rate_params_init(mod[i], mod[i]->all_params, mod[i]->ratematrix_idx, 1.0);
   
   /*No need to iterate over models as they all share the same parameters!*/
   for (i = 0; i < mod[0]->all_params->size; i++)

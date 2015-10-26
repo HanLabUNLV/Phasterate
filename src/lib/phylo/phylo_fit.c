@@ -1424,13 +1424,15 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
       die("\nError: F84E can only be used with F84E mod files.\n");
 
   /*Make sure all the mod file are of the same substitution model.*/  
-  for (i = 1; i < lst_size(pf->msas); i ++){
+  for (i = 0; i < lst_size(pf->msas); i ++){
     ptr = lst_get_ptr(pf->input_mods, i);
     if(ptr == NULL)
       die("\nError: Unequal number of files in both folders.\n");
     int otherSubstMod = ((TreeModel*)ptr)->subst_mod;
     if(substMod != otherSubstMod)
-      die("\nError: Not all models in the model Directory are the same!\n");
+      die("\nError: Not all models in the model directory are the same!\n");
+    if(pf->subst_mod != otherSubstMod)
+      die("\nError: Model in model directory does not match given model in arguments!\n");
   }
   
   /*As of now users must use -O flag.*/
@@ -1444,7 +1446,7 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
   if (pf->parsimony_cost_fname != NULL)
     parsimony_cost_file = phast_fopen(pf->parsimony_cost_fname, "w");
 
-  if (pf->use_conditionals && pf->use_em) 
+  if (pf->use_conditionals && pf->use_em)
     die("ERROR: Cannot use --markov with --EM.    Type %s for usage.\n",
 	pf->see_for_help);
   
@@ -2002,14 +2004,13 @@ List* setupmod(struct phyloFit_struct *pf, TreeModel *input_mod, MSA *msa, TreeN
 	if (pf->init_parsimony)
 	  tm_params_init_branchlens_parsimony(params, mod, msa, cat);
 
-        if (input_mod != NULL && mod->backgd_freqs != NULL && !pf->no_freqs && pf->init_backgd_from_data) {
-          /* in some cases, the eq freqs are needed for
+        /*if (input_mod != NULL && mod->backgd_freqs != NULL && !pf->no_freqs && pf->init_backgd_from_data) {
+          /in some cases, the eq freqs are needed for
              initialization, but now they should be re-estimated --
-             UNLESS user specifies --no-freqs */
+             UNLESS user specifies --no-freqs
 	  vec_free(mod->backgd_freqs);
 	  mod->backgd_freqs = NULL;
-        }
-
+        }*/
 
         if (i == 0) 
           ss_collapse_missing(msa, !pf->gaps_as_bases);
