@@ -1126,20 +1126,25 @@ void tm_set_subst_matrices(TreeModel *tm) {
  */
 MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
   MarkovMatrix* returnMatrix = mm_create_copy(matrix);
+  int const size = 5;
   int const innerSize = 4;
   int const k = 4;
-  int i;
+  int i,j;
   
   /*For each row, scale the diagonal and 5th column.*/
   for(i = 0; i < innerSize; i++){
+    double rowSum = 0;
     double val = mm_get(returnMatrix, i, k);
-    double diagonal = mm_get(returnMatrix, i, i);
-    double scaledVal = scale * val;
-    diagonal = diagonal + val - scaledVal;
-    mm_set(returnMatrix, i, k, scaledVal);
-    mm_set(returnMatrix, i, i, diagonal);
+    mm_set(returnMatrix, i, k, scale * val);
 
+    for(j = 0; j < size; j++){
+      if(i == j)
+        continue;
+      rowSum += mm_get(returnMatrix, i, j);
+    }
+    mm_set(returnMatrix, i, i, -rowSum);
   }
+
   double counter = 0;  
   /*Scale 5 row.*/
   for(i = 0; i < innerSize; i++){
@@ -1149,6 +1154,20 @@ MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
     mm_set(returnMatrix, k, i, newVal);
   }
   mm_set(returnMatrix, k, k, -counter);
+  
+  /*Assert we add up to zero:*/
+  
+  for(i = 0; i < size; i++){
+   double rowSum = 0;
+   for(j = 0; j < size; j++)
+     rowSum += mm_get(returnMatrix, i, j);
+   double comp = (rowSum < 0) ? -rowSum : rowSum;
+   if(comp >= 0.0001){
+     printf("Error: scaleHkygBySections failed to add row %d to zero:\n", i);
+     printMatrix(returnMatrix->matrix, 5);
+     exit(0);
+   }
+  }
 
   return returnMatrix;
 }
@@ -2272,18 +2291,6 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
  */
 int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_params,
 		 opt_precision_type precision, FILE *logf, int quiet){
-  /* thoughts: what is params?  Probably the vector of parameters to optimize.  Need
-     to also send in lower and upper, in that case.  Is there any way to flexibly
-     indicate which parameters we want to share, or should we just assume this has been
-     done before the function is called?
-
-     Possibly share: backgd, rate matrix params (possibly only certain ones)?
-     branch lengths, tree scale, selection, alt model parameters...
-
-     Or maybe it makes more sense to say "optimize these trees using all parameters
-     the same except the following".  For us, the only different one is bgc, and bgc weight, and bgc
-     is not even used in the non-bgc model.  So when we go to unpack it, it should just work...
-*/
   double ll;
   Vector *lower_bounds, *upper_bounds, *opt_params;
   int i, j, retval = 0, npar, nstate, numeval;
@@ -2982,7 +2989,6 @@ double tm_multi_likelihood_wrapper(Vector *params, void *data) {
   double llReturn = 0;
   int i;
   
-#pragma omp parallel for
   for (i=0; i < lst_size(modlist); i++)
     ll[i] = tm_likelihood_wrapper(params, lst_get_ptr(modlist, i));
   

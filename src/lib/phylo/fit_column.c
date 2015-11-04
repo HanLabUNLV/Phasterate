@@ -39,7 +39,6 @@
    variation. */
 double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
                                   double **scratch) {
-
   int i, j, k, nodeidx, rcat;
   int nstates = mod->rate_matrix->size;
   TreeNode *n;
@@ -72,7 +71,7 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
         /* leaf: base case of recursion */
         char c = ss_get_char_tuple(msa, tupleidx, mod->msa_seq_idx[n->id], 0);
         int state = mod->rate_matrix->inv_states[(int)c];
-
+        
         for (i = 0; i < nstates; i++) {
           if (state < 0 || i == state) 
             pL[i][n->id] = 1;
@@ -127,6 +126,12 @@ double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
   else
     results = log(col_compute_likelihood(mod, msa, tupleidx, scratch));
   
+  if(isnan(results)){
+    const char* msg = "ERROR: the probability went to zero. Could not compute log-likelihood.\n\
+You may not be able to get p-values for this column with this model.\n";
+    die(msg);
+  }
+
   return results;
 }
 
@@ -774,7 +779,6 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
   /* iterate through column tuples */
   for (i = 0; i < msa->ss->ntuples; i++) {
     checkInterruptN(i, 100);
-
     /* first check for actual substitution data in column; if none,
      * don't waste time computing likelihoods. Extended model cares about
      * gaps which are considered missing data */
@@ -792,13 +796,11 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 
       vec_set(d->params, 0, d->init_scale);
       d->tupleidx = i;
-
-      opt_newton_1d(col_likelihood_wrapper_1d, &d->params->data[0], d, 
-                    &alt_lnl, SIGFIGS, d->lb->data[0], d->ub->data[0], 
-                    logf, NULL, NULL);
+      int sigFigs = 8;
+      opt_newton_1d(col_likelihood_wrapper_1d, &d->params->data[0], d, &alt_lnl,
+              sigFigs, d->lb->data[0], d->ub->data[0], logf, NULL, NULL);
       /* turns out to be faster (roughly 15% in limited experiments)
          to use numerical rather than exact derivatives */
-
       alt_lnl *= -1;
       this_scale = d->params->data[0];
 
@@ -1167,8 +1169,8 @@ ColFitData *col_init_fit_data(TreeModel *mod, MSA *msa, scale_type stype,
   d->params = vec_new(dim);
   d->lb = vec_new(dim);
   d->ub = vec_new(dim);
-  vec_set(d->lb, 0, 0);
-  vec_set(d->ub, 0, INFTY);
+  vec_set(d->lb, 0, 0.000001);
+  vec_set(d->ub, 0, 1000);
   d->init_scale = d->init_scale_sub = 1;
 
   if (stype == ALL) {
@@ -1601,7 +1603,7 @@ int col_has_data(TreeModel *mod, MSA *msa, int tupleidx) {
 }
 
 /**
- * Given a column returns true if the gap is not all columns. Else false.
+ * Given a column returns true if the column is not all N's. Else false.
  * @param mod: model.
  * @param msa: the msa to check.
  * @param tupleidx: the index of the column we are loooking at.
