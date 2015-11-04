@@ -2398,7 +2398,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
     for(j = 0; j < residues; j++)
       totalFreqs[j] += tempFreqs[j];
      
-    if(mod[i]->subst_mod == F84E)
+    if(mod[i]->subst_mod == F84E || mod[i]->allow_gaps)
       gapTotalFreq += tempFreqs[4];
   }
   
@@ -2407,7 +2407,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   for(j = 0; j < residues; j++)
     totalFreqs[j] /= total;
   
-  if(mod[0]->subst_mod == F84E)
+  if(mod[0]->subst_mod == F84E || mod[0]->allow_gaps)
     gapTotalFreq /= total;
 
   /*Set frequencies and geometric distribution with a deep copy!*/
@@ -2418,14 +2418,16 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
       modFreqs[j] = totalFreqs[j];
       vec_set(mod[i]->all_params, mod[i]->backgd_idx + j, modFreqs[j]);
     }
-    if(mod[0]->subst_mod == F84E){
+    if(mod[0]->subst_mod == F84E || mod[0]->allow_gaps){
       modFreqs[4] = gapTotalFreq;
       vec_set(mod[i]->all_params, mod[i]->backgd_idx + 4, gapTotalFreq);
       
     }
   }
-  
-  if (npar <= 0)
+  double* modFreqs = mod[0]->backgd_freqs->data;
+  printf("Background Freq: %f %f %f %f %f\n", modFreqs[0], modFreqs[1], modFreqs[2], modFreqs[3], modFreqs[4]);
+
+          if (npar <= 0)
     die("ERROR tm_fit npar=%i.  Nothing to optimize!\n", npar);
   opt_params = vec_new(npar);
   

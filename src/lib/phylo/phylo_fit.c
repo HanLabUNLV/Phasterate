@@ -1368,24 +1368,17 @@ int run_phyloFit(struct phyloFit_struct *pf) {
 
 
 /*A*/
-int run_phyloFit_multi(struct phyloFit_struct *pf) {
-  //FILE *F, *WINDOWF=NULL;
+int run_phyloFit_multi(struct phyloFit_struct *pf){
   int i,j;
-  //String *mod_fname;
-  //MSA *source_msa;
   String *tmpstr = str_new(STR_SHORT_LEN);
   List *cats_to_do=NULL;
   double *gc=NULL;
-  //char tmpchstr[STR_MED_LEN];
   FILE *parsimony_cost_file = NULL;
   int free_cm = FALSE, free_cats_to_do_str=FALSE, free_tree=FALSE,
     free_window_coords = FALSE;
 
   //copy some heavily used variables directly from pf for easy access
-  //MSA *msa = pf->msa;
   List *msas = pf->msas;
-  //int subst_mod = pf->subst_mod;
-  //TreeNode *tree = pf->tree;
   List *trees = pf->trees;
   GFF_Set *gff = pf->gff;
   int quiet = pf->quiet;
@@ -1506,8 +1499,9 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
     if (mods != NULL) {
       pf->trees = lst_new_ptr(lst_size(pf->input_mods));
       for (i=0; i < lst_size(pf->input_mods); i++) {
-        void* tree = lst_get_ptr(pf->input_mods, i);
-        lst_set_ptr(pf->trees, i, tree);  
+        TreeModel* currentMod = (TreeModel*)lst_get_ptr(pf->input_mods, i);
+        void* tree = currentMod->tree;
+        lst_push_ptr(pf->trees, tree);
       }
     }
   }
@@ -1550,10 +1544,13 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
     TreeModel *input_mod = lst_get_ptr(pf->input_mods, i);
     MSA *msa = lst_get_ptr(pf->msas, i);
     TreeNode *tree = lst_get_ptr(pf->trees, i);
-    List* tmpmods = setupmod(pf, input_mod, msa, tree, cats_to_do, newparams,i,toSkipList);
+    List* tmpmods = setupmod(pf, NULL, msa, tree, cats_to_do, newparams,i,toSkipList);
 
     for (j=0; j<lst_size(tmpmods); j++) {
-        lst_push_ptr(newmods, lst_get_ptr(tmpmods, j));
+      TreeModel* tempMod = lst_get_ptr(tmpmods, j);
+      memcpy(tempMod->fileName, input_mod->fileName, sizeof(input_mod->fileName));
+      tm_init_backgd(tempMod, msa, tempMod->category);
+      lst_push_ptr(newmods, tempMod);
     }
   }
   
@@ -1562,7 +1559,6 @@ int run_phyloFit_multi(struct phyloFit_struct *pf) {
    *   This happens when some of the files in the folder don't have enough information
    *   to be relevant and PhyloFit says "insufficient statistics" we have to throw this
    *   files out of the final results:
-   
    */
   for(i=0; i < lst_size(toSkipList);i++){
       int index = lst_get_int(toSkipList,i);
@@ -1782,14 +1778,9 @@ List* setupmsa(struct phyloFit_struct *pf, MSA* msa)
 List* setupmod(struct phyloFit_struct *pf, TreeModel *input_mod, MSA *msa, TreeNode *tree, List* cats_to_do, List* newparams,int toSkip,List* toSkipList) {
   List * newmods = lst_new_ptr(1);
   int i, j, win, root_leaf_id = -1;
-  //String *mod_fname;
   String *tmpstr = str_new(STR_SHORT_LEN);
-  //List *cats_to_do=NULL;
   FILE *parsimony_cost_file = NULL;
-
-  //int subst_mod = pf->subst_mod;
   int quiet = pf->quiet;
-
 
   /* now estimate models (window by window, if necessary) */
   MSA *source_msa = msa;
@@ -1919,19 +1910,10 @@ List* setupmod(struct phyloFit_struct *pf, TreeModel *input_mod, MSA *msa, TreeN
       pruned_names = lst_new_ptr(msa->nseqs);
       tm_prune(mod, msa, pruned_names);
       
-
-        
       if (lst_size(pruned_names) == (old_nnodes + 1) / 2){
           printf("Failed at file: %s\n",msa->fileName);
           die("Error: no match for leaves of tree in alignment (leaf names must match alignment names).\n");
       }
-      /* So many leafs will be pruned we will not print out the prunned leafs.
-      if (!quiet && lst_size(pruned_names) > 0) {
-        fprintf(stderr, "WARNING: pruned away leaves of tree with no match in alignment (");
-        for (j = 0; j < lst_size(pruned_names); j++)
-          fprintf(stderr, "%s%s", ((String*)lst_get_ptr(pruned_names, j))->chars, 
-                  j < lst_size(pruned_names) - 1 ? ", " : ").\n");
-      }*/
       
       lst_free_strings(pruned_names);
       lst_free(pruned_names);
@@ -1963,7 +1945,6 @@ List* setupmod(struct phyloFit_struct *pf, TreeModel *input_mod, MSA *msa, TreeN
 	str_append_char(tmpstr, ')');
       }
 
-      
       ninf_sites = msa_ninformative_sites(msa, cat);
       if (ninf_sites < pf->nsites_threshold) {
         if (input_mod == NULL) tm_free(mod);
@@ -2003,14 +1984,6 @@ List* setupmod(struct phyloFit_struct *pf, TreeModel *input_mod, MSA *msa, TreeN
 
 	if (pf->init_parsimony)
 	  tm_params_init_branchlens_parsimony(params, mod, msa, cat);
-
-        /*if (input_mod != NULL && mod->backgd_freqs != NULL && !pf->no_freqs && pf->init_backgd_from_data) {
-          /in some cases, the eq freqs are needed for
-             initialization, but now they should be re-estimated --
-             UNLESS user specifies --no-freqs
-	  vec_free(mod->backgd_freqs);
-	  mod->backgd_freqs = NULL;
-        }*/
 
         if (i == 0) 
           ss_collapse_missing(msa, !pf->gaps_as_bases);
