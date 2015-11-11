@@ -337,17 +337,15 @@ TreeModel *tm_create_copy(TreeModel *src);
 void tm_set_subst_matrices(TreeModel *tm);
 
 /**
- * Given a proper F84E matrix and the two scale paremeters from PhyloP it will scale the
- * substitution matrix using scaleOne and the indel outer column and row using scaleTwo.
+ * Given a proper F84E matrix and a scale paremeters from PhyloP it will scale the
+ * insertion and deletion row and column.
  * It returns the scaled matrix, this memory should be deallocated!
  * @param matrix: Matrix to scale.
- * @param scaleOne: scale parameter for substitution 4x4 submatrix.
- * @param scaleTwo: scale parameter for outer column and row.
+ * @param scale: scale parameter.
  * @param tm: our tree model to extract lambda, mu and our frequencies.
  * @return: scaled matrix.
  */
-MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scaleOne,
-        double scaleTwo, TreeModel* tm);
+MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scale, TreeModel* tm);
 
 MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale);
 

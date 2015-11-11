@@ -1533,6 +1533,9 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
   if (pf->error_fname != NULL)
     error_file = phast_fopen(pf->error_fname, "w");
   
+  if(lst_size(pf->input_mods) != lst_size(pf->msas))
+    die("Error: Unequal number of mod files and fa file.\n");
+  
   // setupmod
   List *newmods = lst_new_ptr(1);
   List * newparams = lst_new_ptr(1);

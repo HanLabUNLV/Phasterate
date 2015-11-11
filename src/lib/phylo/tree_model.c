@@ -1082,17 +1082,23 @@ void tm_set_subst_matrices(TreeModel *tm) {
       if(subst_mod == F84E && tm->isPhyloP){
         /*Right now it's hardcoded to only scale the gap columns and rows.*/
         MarkovMatrix* tempMatrix =
-                scaleF84EMatrixBySections(rate_matrix, 1.0, tm->scale, tm);
+                scaleF84EMatrixBySections(rate_matrix, tm->scale, tm);
         mm_exp(tm->P[i][j], tempMatrix, n->dparent);
         mm_free(tempMatrix);
         continue;
       }
       /*Here we scale the rate matrix based on a parameters and pass it to mm_exp. */
       if(subst_mod == HKY85G && tm->isPhyloP){
-        MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale);
+        /*MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale);
         mm_exp(tm->P[i][j], tempMatrix, n->dparent);
         mm_free(tempMatrix);
-        continue;
+        printf("Scale was: %f\n", tm->scale);
+        printMatrix(tm->P[i][j]->matrix, 5);
+        continue;*/
+        mm_exp(tm->P[i][j], rate_matrix, n->dparent);
+        scaleHkygBySections(tm->P[i][j], tm->scale);
+        printf("Scale was: %f\n", tm->scale);
+        printMatrix(tm->P[i][j]->matrix, 5);
       }
       /* for simple models, full matrix exponentiation is not necessary */
       if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
@@ -1173,19 +1179,15 @@ MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
 }
 
 /**
- * Given a proper F84E matrix and the two scale paremeters from PhyloP it will scale the
- * substitution matrix using scaleOne for the insertion rate and scaleTwo for the deletion
- * rate.
+ * Given a proper F84E matrix and a scale paremeters from PhyloP it will scale the
+ * insertion and deletion row and column.
  * It returns the scaled matrix, this memory should be deallocated!
  * @param matrix: Matrix to scale.
- * @param scaleOne: scale parameter for insertions.
- * @param scaleTwo: scale parameter for deletions.
+ * @param scale: scale parameter.
  * @param tm: our tree model to extract lambda, mu and our frequencies.
  * @return: scaled matrix.
  */
-MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scaleOne,
-        double scaleTwo, TreeModel* tm){
-  
+MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scale, TreeModel* tm){
   MarkovMatrix* returnMatrix = mm_create_copy(matrix);
   int const innerMatrixSize = 4;
   int const k = 4;
@@ -1202,10 +1204,10 @@ MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scaleOne,
    
   /*Scale 5th column.*/
   for(i = 0; i < innerMatrixSize; i++)
-    mm_set(returnMatrix, i, k, mu * scaleTwo);
+    mm_set(returnMatrix, i, k, mu * scale);
 
   /*Scale 5 row.*/
-  double lambdaAndScale = lambda * scaleOne;
+  double lambdaAndScale = lambda * scale;
   double sum = 0;
   for(i = 0; i < innerMatrixSize; i++){
     sum += lambdaAndScale * freqs[i];
@@ -1216,7 +1218,7 @@ MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scaleOne,
   /*Set diagonal: */
   for(i = 0; i < 4; i++){
     double val = mm_get(returnMatrix, i, i);
-    double newVal= val + mu * ( 1 - scaleTwo);
+    double newVal= val + mu * ( 1 - scale);
     mm_set(returnMatrix, i, i, newVal);
   }
   
@@ -2369,7 +2371,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   int residues = 4, k;
   double gapFreq, gapDivisor;
   
-  if (mod[0]->subst_mod == F84E){
+  if (mod[0]->subst_mod == F84E){ 
     /*We will normalize the vectors if we have a 5-gap model.*/  
     for (i = 0; i < nmod; i++) {      
       gapFreq = mod[i]->backgd_freqs->data[4];
@@ -2389,11 +2391,9 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
     }
   }
   
-  /*We want to figure out the global background frequencies and geometric parameter
-   so our data shares them.*/
+  /*We want to figure out the global background frequencies so our data shares them.*/
   for (i = 0; i < nmod; i++) {
     double* tempFreqs = mod[i]->backgd_freqs->data;
-    
     /*Iterate over our temporary frequencies and add them to the total!*/
     for(j = 0; j < residues; j++)
       totalFreqs[j] += tempFreqs[j];
@@ -2410,7 +2410,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   if(mod[0]->subst_mod == F84E || mod[0]->allow_gaps)
     gapTotalFreq /= total;
 
-  /*Set frequencies and geometric distribution with a deep copy!*/
+  /*Set frequencies with a deep copy!*/
   for (i = 0; i < nmod; i++){
     double* modFreqs = mod[i]->backgd_freqs->data;
 
@@ -2424,17 +2424,15 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
       
     }
   }
-  double* modFreqs = mod[0]->backgd_freqs->data;
-  printf("Background Freq: %f %f %f %f %f\n", modFreqs[0], modFreqs[1], modFreqs[2], modFreqs[3], modFreqs[4]);
-
-          if (npar <= 0)
+  if (npar <= 0)
     die("ERROR tm_fit npar=%i.  Nothing to optimize!\n", npar);
   opt_params = vec_new(npar);
   
   /*All models now need to be reinitialized with the proper values based on the global
    * values!*/
   for (i = 0; i < nmod; i++)
-    tm_rate_params_init(mod[i], mod[i]->all_params, mod[i]->ratematrix_idx, 1.0);
+    /*Emperically we know to set kappa at about 5.0*/
+    tm_rate_params_init(mod[i], mod[i]->all_params, mod[i]->ratematrix_idx, 5.0);
   
   /*No need to iterate over models as they all share the same parameters!*/
   for (i = 0; i < mod[0]->all_params->size; i++)

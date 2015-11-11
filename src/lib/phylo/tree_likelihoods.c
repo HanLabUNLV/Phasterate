@@ -377,7 +377,12 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
               rcat_prob[rcat] += vec_get(mod->backgd_freqs, i) * 
                 inside_joint[i][mod->tree->id] * mod->freqK[rcat];
             }
-            total_prob += rcat_prob[rcat];
+            double max = pL[0][0];
+            for(i = 0; i < nstates; i++)
+              if(pL[i][0] >= max)
+                max = pL[i][0];
+            total_prob = max;
+            /*total_prob += rcat_prob[rcat];*/
           }
           else { 
             for (i = 0; i < nstates; i++) 
