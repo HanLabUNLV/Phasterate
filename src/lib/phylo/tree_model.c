@@ -1079,21 +1079,20 @@ void tm_set_subst_matrices(TreeModel *tm) {
       
       /*If we are in PhyloP and using F84E model we scale the rate matrix based on two
        * parameters and pass it to mm_exp. */
-      if(subst_mod == F84E && tm->isPhyloP){
-        /*Right now it's hardcoded to only scale the gap columns and rows.*/
+      /*if(subst_mod == F84E && tm->isPhyloP){
         MarkovMatrix* tempMatrix =
-                scaleF84EMatrixBySections(rate_matrix, 1.0, tm->scale, tm);
+                scaleF84EMatrixBySections(rate_matrix, tm->scale, tm->scale, tm);
         mm_exp(tm->P[i][j], tempMatrix, n->dparent);
         mm_free(tempMatrix);
         continue;
-      }
+      }*/
       /*Here we scale the rate matrix based on a parameters and pass it to mm_exp. */
-      if(subst_mod == HKY85G && tm->isPhyloP){
+      /*if(subst_mod == HKY85G && tm->isPhyloP){
         MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale);
         mm_exp(tm->P[i][j], tempMatrix, n->dparent);
         mm_free(tempMatrix);
         continue;
-      }
+      }*/
       /* for simple models, full matrix exponentiation is not necessary */
       if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
         tm_set_probs_JC69(tm, tm->P[i][j],

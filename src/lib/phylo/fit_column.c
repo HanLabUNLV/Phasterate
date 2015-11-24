@@ -45,6 +45,7 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
   double total_prob = 0;
   List *traversal = tr_postorder(mod->tree);  
   double **pL = NULL;
+  /*printf("Column #%d\n", tupleidx);*/
 
   if (msa->ss->tuple_size != 1)
     die("ERROR col_compute_likelihood: need tuple size 1, got %i\n",
@@ -96,6 +97,7 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
           pL[i][n->id] = totl * totr;
         }
       }
+      /*printf("%d[%d]:\t{%.8f, %.8f, %.8f, %.8f, %.8f}\n", nodeidx, n->id, pL[0][n->id], pL[1][n->id], pL[2][n->id], pL[3][n->id], pL[4][n->id]);*/
     }
 
     /* termination (for each rate cat) */
@@ -108,7 +110,7 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
     for (j = 0; j < nstates; j++) sfree(pL[j]);
     sfree(pL);
   }
-
+  /*printf("\n\n");*/
   return(total_prob);
 }
 
@@ -121,9 +123,9 @@ double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
                                   double **scratch) {
   double results;
   
-  if(mod->subst_mod == F84E)
+  /*if(mod->subst_mod == F84E)
     results = log(singleSiteLikelihood(mod, msa, tupleidx, scratch));
-  else
+  else*/
     results = log(col_compute_likelihood(mod, msa, tupleidx, scratch));
   
   if(isnan(results)){
