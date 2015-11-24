@@ -1076,30 +1076,23 @@ void tm_set_subst_matrices(TreeModel *tm) {
       if (tm->ignore_branch != NULL && tm->ignore_branch[i])
 	/* treat as if infinitely long */
         tm_set_probs_independent(tm, tm->P[i][j]);
-      
+
       /*If we are in PhyloP and using F84E model we scale the rate matrix based on two
        * parameters and pass it to mm_exp. */
-      if(subst_mod == F84E && tm->isPhyloP){
-        /*Right now it's hardcoded to only scale the gap columns and rows.*/
+      /*if(subst_mod == F84E && tm->isPhyloP){
         MarkovMatrix* tempMatrix =
-                scaleF84EMatrixBySections(rate_matrix, tm->scale, tm);
+                scaleF84EMatrixBySections(rate_matrix, tm->scale, tm->scale, tm);
         mm_exp(tm->P[i][j], tempMatrix, n->dparent);
         mm_free(tempMatrix);
         continue;
-      }
+      }*/
       /*Here we scale the rate matrix based on a parameters and pass it to mm_exp. */
-      if(subst_mod == HKY85G && tm->isPhyloP){
-        /*MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale);
+      /*if(subst_mod == HKY85G && tm->isPhyloP){
+        MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale);
         mm_exp(tm->P[i][j], tempMatrix, n->dparent);
         mm_free(tempMatrix);
-        printf("Scale was: %f\n", tm->scale);
-        printMatrix(tm->P[i][j]->matrix, 5);
-        continue;*/
-        mm_exp(tm->P[i][j], rate_matrix, n->dparent);
-        scaleHkygBySections(tm->P[i][j], tm->scale);
-        printf("Scale was: %f\n", tm->scale);
-        printMatrix(tm->P[i][j]->matrix, 5);
-      }
+        continue;
+      }*/
       /* for simple models, full matrix exponentiation is not necessary */
       if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
         tm_set_probs_JC69(tm, tm->P[i][j],
