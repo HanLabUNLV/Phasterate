@@ -199,7 +199,7 @@ Vector *get_marginal_eq_freqs (char *alphabet, int tuple_size,
    @result Log likelihood of entire tree model specified
  *  */
 double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *tuple_scores,
-				 int cat, TreePosteriors *post);
+				 int cat, TreePosteriors *post, int flag);
 
 /*Given a TreeModel, an MSA, the cat number, Tree Posteriors. Will return the total
  * likelihood for a tree. The rest of parameters are allocated memory. See gapAwareLikelihood
@@ -208,6 +208,7 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
  * offset and no rate categories set. */
   
 double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint);
+double computeTotalTreeLikelihood2(TreeModel* mod,MSA* msa, double **inside_joint);
 
 /** According to the paper the score must be multiplied by the extra column contribution.
  * Formula (29) as well as divided by the ancestral length probability.
@@ -412,7 +413,7 @@ char getCharacterForSpecie(char* name,MSA* msa,int index);
  * For gaps: P_u(L_k,'-') = 0  // Equation 18 on paper.
  */
 int probabilityOfLeaf(int observedState,int iResidue);
-
+int probabilityOfLeaf2(int observedState,int iResidue);
  
 
 #endif
