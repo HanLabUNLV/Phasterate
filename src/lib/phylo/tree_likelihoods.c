@@ -927,7 +927,7 @@ int tuple_index_missing_data(char *tuple, int *inv_alph, int *is_missing,
    @result Log likelihood of entire tree model.
  *  */
 double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *tuple_scores,
-				 int cat, TreePosteriors *post) {
+				 int cat, TreePosteriors *post, int flag) {
   int i, j,k;
   double retval = 0;
   int nstates = mod->rate_matrix->size;
@@ -1021,7 +1021,10 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
       post->rcat_expected_nsites[rcat] = 0;
 
   /**Do work here!*/
+  if(flag == 0)
   retval = computeTotalTreeLikelihood(mod, msa, inside_joint);
+  else
+    retval = computeTotalTreeLikelihood2(mod, msa, inside_joint);
 
   for (j = 0; j < nstates; j++) {
     sfree(inside_joint[j]);
@@ -1138,6 +1141,101 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
           likelihoodTable[4][n->id] = probForNodeGapAllGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild);
       }
     }
+
+    columnProbability = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
+    /*printf("[%d]: %f\tA:%d\tC:%d\tG:%d\tT:%d\t-:%d\tN:%d\n", currentColumn, log(columnProbability),
+            numberOfOcurrances[0], numberOfOcurrances[1], numberOfOcurrances[2], numberOfOcurrances[3],
+            numberOfOcurrances[4], numberOfOcurrances[5]);*/
+    /*Multiply by the amount of times this column appeared in the alignment.*/
+    if(currentColumn != length)
+      totalLikelihood += log(columnProbability) * msa->ss->counts[currentColumn];
+    else /*Case for all gaps column.*/
+      allGapProbUnloged = columnProbability;
+  }
+  
+  /* Calculate total probability for site in alignment, second modification of
+   * extended pruning algorithm.*/
+  double averageLength = getAverageLength(msa);
+  totalLikelihood = getTotalAlignmentProb(mod, p, totalLikelihood, allGapProbUnloged,
+          averageLength);
+  
+  return totalLikelihood;
+}
+/* =====================================================================================*/
+/*Given a TreeModel, an MSA, the cat number, Tree Posteriors. Will return the total
+ * likelihood for a tree. The rest of parameters are allocated memory. See gapAwareLikelihood
+ * for allocations. This is function does the bulk of the work.
+ * Note this is only guaranteed to work and tested on models of order zero with no column
+ * offset and no rate categories set. */
+  
+double computeTotalTreeLikelihood2(TreeModel* mod,MSA* msa, double **inside_joint){
+  int currentColumn, i;
+  int nstates = mod->rate_matrix->size;
+  int currentNode;
+  double allGapProbUnloged;
+  int alph_size = strlen(mod->rate_matrix->states);
+  double totalLikelihood = 0;
+  double p = mod->geometricParameter;
+  int rootNodeId = mod->tree->id;
+  int length = msa->ss->ntuples;
+  
+  /*Get traversal order so we iterate over nodes instead of recursing.*/
+  List* traversal = tr_postorder(mod->tree);
+
+  /*Iterate over every column in MSA, compute likelihood L(i) for ith column. Add all
+   *likelihoods for overall tree. Plus one since we need to take into account an "all
+   * gap" column probability. */
+  for (currentColumn = 0; currentColumn < length + 1; currentColumn++){
+    double columnProbability = 0;
+    double** likelihoodTable = inside_joint;
+    
+    /* Iterate over traversal hitting all nodes in a post order matter.*/
+    for (currentNode = 0; currentNode < lst_size(traversal); currentNode++) {
+      TreeNode* n = lst_get_ptr(traversal, currentNode);
+
+      /* Leaf: base case of recursion */
+      if (n->lchild == NULL) {
+        int sequenceNumber = mod->msa_seq_idx[n->id];
+        /*Integer version of character in our alignment.*/
+        int observedState;
+        char thischar;
+
+        /*Get character from MSA based on position and specie.*/
+        if(currentColumn != length)
+          thischar = ss_get_char_tuple(msa, currentColumn, sequenceNumber, 0);
+        else
+          thischar = '-'; /*All gap column case for extended algorithm.*/
+
+        observedState = mod->rate_matrix->inv_states[(int)thischar];
+        
+        /*Special Case where we have a N at this spot:*/
+        if(observedState == -1)
+          for (i = 0; i < alph_size; i++)
+            likelihoodTable[i][n->id] = 1;
+        else
+          /*Iterate over all bases setting probability based on base cases.*/
+          for (i = 0; i < alph_size; i++)
+            likelihoodTable[i][n->id] = probabilityOfLeaf2(observedState, i);
+      }
+      /* General recursive case. Calculate probabilities at inner node for all bases.*/
+      else{
+        /*Get matrices for left and right side. No rate categories used for this model!*/
+        int lChild = n->lchild->id;
+        int rChild = n->rchild->id;
+        double** lMatrix = mod->P[lChild][0]->matrix->data;
+        double** rMatrix = mod->P[rChild][0]->matrix->data;
+        
+        for (i = 0; i < nstates; i++){
+            /*pL[k][n] :: Probability of base K given, node n.*/
+            int q; double qSum = 0, sSum = 0;
+            for(q = 0; q < nstates; q++){
+              qSum += likelihoodTable[q][lChild] * lMatrix[i][q];
+              sSum += likelihoodTable[q][rChild] * rMatrix[i][q];
+            }
+            likelihoodTable[i][n->id] = qSum * sSum;
+          }
+        }
+      }
 
     columnProbability = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
     /*printf("[%d]: %f\tA:%d\tC:%d\tG:%d\tT:%d\t-:%d\tN:%d\n", currentColumn, log(columnProbability),
@@ -1696,4 +1794,10 @@ int probabilityOfLeaf(int observedState,int iResidue){
   return 0;
 }
 /* =====================================================================================*/
+int probabilityOfLeaf2(int observedState,int iResidue){
+  /*Case where residue matches what we see.*/
+  if (iResidue == observedState)
+    return 1;
+  return 0;
+}
 /*EOO (End of Omar)*/

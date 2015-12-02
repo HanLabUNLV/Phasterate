@@ -1007,9 +1007,6 @@ void tm_set_subst_matrices(TreeModel *tm) {
   Vector *backgd_freqs = tm->backgd_freqs;
   subst_mod_type subst_mod = tm->subst_mod;
   MarkovMatrix *rate_matrix = tm->rate_matrix;
-  /*Get our parameter vector, used for F84[E] models.*/
-  int const m = tm->ratematrix_idx;
-  double* params = & (tm->all_params->data[m]);
   TreeNode *n;
 
   scaling_const = -1;
@@ -1097,8 +1094,6 @@ void tm_set_subst_matrices(TreeModel *tm) {
 
       /*For phyloFit we hand calculate this values as it's more accurate.*/
       else if(subst_mod == F84){
-        params[0] *= tm->scale;
-        params[1] *= tm->scale;
         probsF84Models(tm, i, j, n, branch_scale);
       }
       else  if(subst_mod == F84E)
@@ -1269,7 +1264,7 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   const double mu = params[1];
   params[0] *= scale;
   params[1] *= scale;
-  
+
   //Both Models share this in common:
   for(k = 0; k < matrixSize; k++)
     for(l = 0; l < matrixSize; l++)
@@ -1277,12 +1272,12 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
 
   for(k = 0; k < matrixSize; k++)
     sum += matrixA[4][k];
-  
+
   matrixA[4][4] = 1 - sum;
-  
+
   params[0] = lambda;
   params[1] = mu;
-  
+
   return;
 }
 
@@ -4643,7 +4638,7 @@ double gapAwareLikelihoodWrapper(Vector *params, void *data) {
   TreeModel *mod = (TreeModel*)data;
   double val;
   tm_unpack_params(mod, params, -1);
-  val = -1 * gapAwareLikelihood(mod, mod->msa, NULL, NULL, mod->category, NULL);
+  val = -1 * gapAwareLikelihood(mod, mod->msa, NULL, NULL, mod->category, NULL, 1);
 
   return val;
 }
