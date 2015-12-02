@@ -1007,6 +1007,9 @@ void tm_set_subst_matrices(TreeModel *tm) {
   Vector *backgd_freqs = tm->backgd_freqs;
   subst_mod_type subst_mod = tm->subst_mod;
   MarkovMatrix *rate_matrix = tm->rate_matrix;
+  /*Get our parameter vector, used for F84[E] models.*/
+  int const m = tm->ratematrix_idx;
+  double* params = & (tm->all_params->data[m]);
   TreeNode *n;
 
   scaling_const = -1;
@@ -1077,15 +1080,6 @@ void tm_set_subst_matrices(TreeModel *tm) {
 	/* treat as if infinitely long */
         tm_set_probs_independent(tm, tm->P[i][j]);
 
-      /*If we are in PhyloP and using F84E model we scale the rate matrix based on two
-       * parameters and pass it to mm_exp. */
-      /*if(subst_mod == F84E && tm->isPhyloP){
-        MarkovMatrix* tempMatrix =
-                scaleF84EMatrixBySections(rate_matrix, tm->scale, tm->scale, tm);
-        mm_exp(tm->P[i][j], tempMatrix, n->dparent);
-        mm_free(tempMatrix);
-        continue;
-      }*/
       /*Here we scale the rate matrix based on a parameters and pass it to mm_exp. */
       /*if(subst_mod == HKY85G && tm->isPhyloP){
         MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale);
@@ -1103,10 +1097,15 @@ void tm_set_subst_matrices(TreeModel *tm) {
 
       /*For phyloFit we hand calculate this values as it's more accurate.*/
       else if(subst_mod == F84){
+        params[0] *= tm->scale;
+        params[1] *= tm->scale;
         probsF84Models(tm, i, j, n, branch_scale);
       }
       else  if(subst_mod == F84E){
+        params[0] *= tm->scale;
+        params[1] *= tm->scale;
         probsF84EModels(tm, i, j, n, branch_scale);
+        printMatrix(tm->P[i][j]->matrix, 5);
       }
       else
           mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);        

@@ -1085,7 +1085,6 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
   for (currentColumn = 0; currentColumn < length + 1; currentColumn++){
     double columnProbability = 0;
     double** likelihoodTable = inside_joint;
-    int numberOfOcurrances[6] = {0, 0, 0, 0, 0, 0};
     
     /* Iterate over traversal hitting all nodes in a post order matter.*/
     for (currentNode = 0; currentNode < lst_size(traversal); currentNode++) {
@@ -1107,17 +1106,13 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
         observedState = mod->rate_matrix->inv_states[(int)thischar];
         
         /*Special Case where we have a N at this spot:*/
-        if(observedState == -1){
-          numberOfOcurrances[5]++;
+        if(observedState == -1)
           for (i = 0; i < alph_size; i++)
             likelihoodTable[i][n->id] = 1;
-        }
-        else{
+        else
           /*Iterate over all bases setting probability based on base cases.*/
           for (i = 0; i < alph_size; i++)
             likelihoodTable[i][n->id] = probabilityOfLeaf(observedState, i);
-          numberOfOcurrances[observedState]++;
-        }
       }
       /* General recursive case. Calculate probabilities at inner node for all bases.*/
       else{
