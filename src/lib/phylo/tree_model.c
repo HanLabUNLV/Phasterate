@@ -1101,12 +1101,8 @@ void tm_set_subst_matrices(TreeModel *tm) {
         params[1] *= tm->scale;
         probsF84Models(tm, i, j, n, branch_scale);
       }
-      else  if(subst_mod == F84E){
-        params[0] *= tm->scale;
-        params[1] *= tm->scale;
+      else  if(subst_mod == F84E)
         probsF84EModels(tm, i, j, n, branch_scale);
-        printMatrix(tm->P[i][j]->matrix, 5);
-      }
       else
           mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);        
     }
@@ -1267,16 +1263,25 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   double* freqs = tm->backgd_freqs->data;
   double branchLength = n->dparent;
   double sum = 0;
-
+  /*Save values as we will need them. We multiply mu and lambda by our scale, and restore
+   * the original values at the bottom.*/
+  const double lambda = params[0];
+  const double mu = params[1];
+  params[0] *= scale;
+  params[1] *= scale;
+  
   //Both Models share this in common:
   for(k = 0; k < matrixSize; k++)
     for(l = 0; l < matrixSize; l++)
-      matrixA[k][l] = singleEventCondProb(l, k, branchLength * scale, freqs, params);
+      matrixA[k][l] = singleEventCondProb(l, k, branchLength, freqs, params);
 
   for(k = 0; k < matrixSize; k++)
     sum += matrixA[4][k];
   
   matrixA[4][4] = 1 - sum;
+  
+  params[0] = lambda;
+  params[1] = mu;
   
   return;
 }
