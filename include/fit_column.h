@@ -402,6 +402,6 @@ void col_find_missing_branches(TreeModel *mod, MSA *msa, int tupleidx,
  * basically does the work of computing for one column.
 */
 double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL);
-
+double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** pL);
 /** \} */
 #endif

@@ -128,7 +128,7 @@ double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
   double results;
   
   if(mod->subst_mod == F84E)
-    results = log(singleSiteLikelihood(mod, msa, tupleidx, scratch));
+    results = log(singleSiteLikelihood2(mod, msa, tupleidx, scratch));
   else
     results = log(col_compute_likelihood(mod, msa, tupleidx, scratch));
   
@@ -1738,6 +1738,78 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
                 msa, n, tupleidx);
       /*Handle gap according to different formula.*/
       likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
+    }
+    /*printf("%d[%d]:\t{%.8f, %.8f, %.8f, %.8f, %.8f}\n", nodeidx, n->id, l[0][n->id], l[1][n->id], l[2][n->id], l[3][n->id], l[4][n->id]);*/
+  }
+    
+  totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
+  /*printf("\n\n");*/
+  return totalProb;
+}
+/* =====================================================================================*/
+//==========================================================================================
+/*
+ * Extremely similar to double computeTotalTreeLikelihood() from tree_likelihoods.c
+ * but only calculates the scores for the given tupleIdx instead of the whole alignment
+ * basically does the work of computing for one column.
+*/
+  
+double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** likelihoodTable){
+  int i;
+  int nstates = mod->rate_matrix->size;
+  double totalProb;
+  List* traversal;
+  int nodeidx;
+  TreeNode *n;
+  int alph_size = strlen(mod->rate_matrix->states);
+  double p = mod->geometricParameter;
+  int rootNodeId = mod->tree->id;
+  double** l = likelihoodTable;
+  
+  /*printf("Column #%d\n", tupleidx);*/
+  /*Get traversal order so we iterate over nodes instead of recursing.*/
+  traversal = tr_postorder(mod->tree);
+  /* Iterate over traversal hitting all nodes in a post order matter.*/
+  for (nodeidx = 0; nodeidx < lst_size(traversal); nodeidx++) {
+    n = lst_get_ptr(traversal, nodeidx);
+    
+    /* Leaf: base case of recursion */
+    if (n->lchild == NULL) {
+      
+      int sequenceNumber = mod->msa_seq_idx[n->id];
+      /*Integer version of character in our alignment.*/
+      int observedState;
+      char thischar;
+
+      thischar = ss_get_char_tuple(msa, tupleidx, sequenceNumber, 0);
+      observedState = mod->rate_matrix->inv_states[(int)thischar];
+      
+      /*Special Case where we have a N at this spot:*/
+      if(observedState == -1)
+        for (i = 0; i < alph_size; i++)
+          likelihoodTable[i][n->id] = 1;
+      else
+        /*Iterate over all bases setting probability based on base case*/
+        for (i = 0; i < alph_size; i++)
+          likelihoodTable[i][n->id] = probabilityOfLeaf2(observedState,i);
+      }
+    else{
+      /* General recursive case. Calculate probabilities at inner node for all bases.*/
+      /*Get matrices for left and right side.*/
+      int lChild = n->lchild->id;
+      int rChild = n->rchild->id;
+      double** lMatrix = mod->P[lChild][0]->matrix->data;
+      double** rMatrix = mod->P[rChild][0]->matrix->data;
+      
+      for (i = 0; i < nstates; i++){
+        /*pL[k][n] :: Probability of base K given, node n.*/
+        int q; double qSum = 0, sSum = 0;
+        for(q = 0; q < nstates; q++){
+          qSum += likelihoodTable[q][lChild] * lMatrix[i][q];
+          sSum += likelihoodTable[q][rChild] * rMatrix[i][q];
+        }
+        likelihoodTable[i][n->id] = qSum * sSum;
+      }
     }
     /*printf("%d[%d]:\t{%.8f, %.8f, %.8f, %.8f, %.8f}\n", nodeidx, n->id, l[0][n->id], l[1][n->id], l[2][n->id], l[3][n->id], l[4][n->id]);*/
   }
