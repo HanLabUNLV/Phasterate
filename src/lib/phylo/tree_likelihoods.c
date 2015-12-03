@@ -1198,13 +1198,11 @@ double computeTotalTreeLikelihood2(TreeModel* mod,MSA* msa, double **inside_join
         int sequenceNumber = mod->msa_seq_idx[n->id];
         /*Integer version of character in our alignment.*/
         int observedState;
-        char thischar;
+        char thischar = '-'; /*Takes care of currentColumn == length case.*/
 
         /*Get character from MSA based on position and specie.*/
         if(currentColumn != length)
           thischar = ss_get_char_tuple(msa, currentColumn, sequenceNumber, 0);
-        else
-          thischar = '-'; /*All gap column case for extended algorithm.*/
 
         observedState = mod->rate_matrix->inv_states[(int)thischar];
         
@@ -1215,7 +1213,7 @@ double computeTotalTreeLikelihood2(TreeModel* mod,MSA* msa, double **inside_join
         else
           /*Iterate over all bases setting probability based on base cases.*/
           for (i = 0; i < alph_size; i++)
-            likelihoodTable[i][n->id] = probabilityOfLeaf2(observedState, i);
+            likelihoodTable[i][n->id] = (observedState == i) ? 1 : 0;
       }
       /* General recursive case. Calculate probabilities at inner node for all bases.*/
       else{
@@ -1780,13 +1778,10 @@ char getCharacterForSpecie(char* name,MSA* msa,int index){
   return myChar;
 }
 /* =====================================================================================*/
-/* P_u(L_k,i) = { 1, if leaf k has residue i at position u;
- *              { 0, otherwise;
- * For gaps: P_u(L_k,'-') = 0  // Equation 18 on paper.
- */
 int probabilityOfLeaf(int observedState,int iResidue){
-  /*Gap case:*/
-  if (observedState == 4)
+  int gapChar = 4;
+  
+  if(observedState == gapChar)
     return 0;
   /*Case where residue matches what we see.*/
   if (iResidue == observedState)
@@ -1794,10 +1789,4 @@ int probabilityOfLeaf(int observedState,int iResidue){
   return 0;
 }
 /* =====================================================================================*/
-int probabilityOfLeaf2(int observedState,int iResidue){
-  /*Case where residue matches what we see.*/
-  if (iResidue == observedState)
-    return 1;
-  return 0;
-}
 /*EOO (End of Omar)*/

@@ -1077,13 +1077,6 @@ void tm_set_subst_matrices(TreeModel *tm) {
 	/* treat as if infinitely long */
         tm_set_probs_independent(tm, tm->P[i][j]);
 
-      /*Here we scale the rate matrix based on a parameters and pass it to mm_exp. */
-      /*if(subst_mod == HKY85G && tm->isPhyloP){
-        MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale);
-        mm_exp(tm->P[i][j], tempMatrix, n->dparent);
-        mm_free(tempMatrix);
-        continue;
-      }*/
       /* for simple models, full matrix exponentiation is not necessary */
       if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
         tm_set_probs_JC69(tm, tm->P[i][j],
@@ -1103,112 +1096,6 @@ void tm_set_subst_matrices(TreeModel *tm) {
     }
   }
   return;
-}
-
-/**
- * Given a HKYG85 matrix and a scale paremeter from PhyloP it will scale the
- * substitution matrix using scaleO for the insertion rate and scaleTwo for the deletion
- * rate. It returns the scaled matrix, this memory should be deallocated!
- * @param matrix: Matrix to scale.
- * @param scaleOne: scale parameter for insertions.
- * @return: scaled matrix.
- */
-MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale){
-  MarkovMatrix* returnMatrix = mm_create_copy(matrix);
-  int const size = 5;
-  int const innerSize = 4;
-  int const k = 4;
-  int i,j;
-  
-  /*For each row, scale the diagonal and 5th column.*/
-  for(i = 0; i < innerSize; i++){
-    double rowSum = 0;
-    double val = mm_get(returnMatrix, i, k);
-    mm_set(returnMatrix, i, k, scale * val);
-
-    for(j = 0; j < size; j++){
-      if(i == j)
-        continue;
-      rowSum += mm_get(returnMatrix, i, j);
-    }
-    mm_set(returnMatrix, i, i, -rowSum);
-  }
-
-  double counter = 0;  
-  /*Scale 5 row.*/
-  for(i = 0; i < innerSize; i++){
-    double val = mm_get(returnMatrix, k, i);
-    double newVal = scale * val;
-    counter += newVal;
-    mm_set(returnMatrix, k, i, newVal);
-  }
-  mm_set(returnMatrix, k, k, -counter);
-  
-  /*Assert we add up to zero:*/
-  
-  for(i = 0; i < size; i++){
-   double rowSum = 0;
-   for(j = 0; j < size; j++)
-     rowSum += mm_get(returnMatrix, i, j);
-   double comp = (rowSum < 0) ? -rowSum : rowSum;
-   if(comp >= 0.0001){
-     printf("Error: scaleHkygBySections failed to add row %d to zero:\n", i);
-     printMatrix(returnMatrix->matrix, 5);
-     exit(0);
-   }
-  }
-
-  return returnMatrix;
-}
-
-/**
- * Given a proper F84E matrix and a scale paremeters from PhyloP it will scale the
- * insertion and deletion row and column.
- * It returns the scaled matrix, this memory should be deallocated!
- * @param matrix: Matrix to scale.
- * @param scale: scale parameter.
- * @param tm: our tree model to extract lambda, mu and our frequencies.
- * @return: scaled matrix.
- */
-MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scale, TreeModel* tm){
-  MarkovMatrix* returnMatrix = mm_create_copy(matrix);
-  int const innerMatrixSize = 4;
-  int const k = 4;
-  /*Get our parameter vector.*/
-  int const m = tm->ratematrix_idx;
-  double* params = & (tm->all_params->data[m]);
-  double const lambda = params[0];
-  double const mu = params[1];
-  /*Get our frequencies.*/
-  double* freqs = tm->backgd_freqs->data;
-  int i;
-  /*printf("Scaling Parameters %f %f\nOriginal Matrix:\n", scaleOne, scaleTwo);
-  printMatrix(matrix->matrix, 5);*/
-   
-  /*Scale 5th column.*/
-  for(i = 0; i < innerMatrixSize; i++)
-    mm_set(returnMatrix, i, k, mu * scale);
-
-  /*Scale 5 row.*/
-  double lambdaAndScale = lambda * scale;
-  double sum = 0;
-  for(i = 0; i < innerMatrixSize; i++){
-    sum += lambdaAndScale * freqs[i];
-    mm_set(returnMatrix, k, i, lambdaAndScale * freqs[i]);
-  }
-  mm_set(returnMatrix, 4, 4, -sum);
-  
-  /*Set diagonal: */
-  for(i = 0; i < 4; i++){
-    double val = mm_get(returnMatrix, i, i);
-    double newVal= val + mu * ( 1 - scale);
-    mm_set(returnMatrix, i, i, newVal);
-  }
-  
- /* printf("Output matrix\n");
-  printMatrix(returnMatrix->matrix, 5);*/
-
-  return returnMatrix;
 }
 
 /**

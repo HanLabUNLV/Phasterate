@@ -413,7 +413,5 @@ char getCharacterForSpecie(char* name,MSA* msa,int index);
  * For gaps: P_u(L_k,'-') = 0  // Equation 18 on paper.
  */
 int probabilityOfLeaf(int observedState,int iResidue);
-int probabilityOfLeaf2(int observedState,int iResidue);
- 
 
 #endif
