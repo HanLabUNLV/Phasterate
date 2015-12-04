@@ -1144,24 +1144,20 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   int k, l;
   double* freqs = tm->backgd_freqs->data;
   double branchLength = n->dparent;
-  double sum = 0;
   /*Save values as we will need them. We multiply mu and lambda by our scale, and restore
    * the original values at the bottom.*/
   const double lambda = params[0];
   const double mu = params[1];
   params[0] *= scale;
   params[1] *= scale;
+  double xiValue = xi(branchLength, params[1], params[0]);
 
-  //Both Models share this in common:
   for(k = 0; k < matrixSize; k++)
     for(l = 0; l < matrixSize; l++)
       matrixA[k][l] = singleEventCondProb(l, k, branchLength, freqs, params);
-
-  for(k = 0; k < matrixSize; k++)
-    sum += matrixA[4][k];
-
-  matrixA[4][4] = 1 - sum;
-
+  /*Set corner.*/  
+  matrixA[4][4] = 1 - xiValue;
+  
   params[0] = lambda;
   params[1] = mu;
 
@@ -4483,13 +4479,11 @@ List *tm_new_from_dir(char *dir) {
   DIR *dfd;
   TreeModel **tmpmods = smalloc(MAX_TREE_NUM * sizeof (TreeModel*));
   int i, mods_num = 0;
-
-  if ((dfd = opendir(dir)) == NULL) {
-    fprintf(stderr, "Can't open %s\n", dir);
-    return 0;
-  }
   char filename_qfd[STR_MED_LEN];
 
+  if ((dfd = opendir(dir)) == NULL) 
+    die("Error: Could Not open directory %s\n", dir);
+  
   while ((dp = readdir(dfd)) != NULL) {
     struct stat stbuf;
     sprintf(filename_qfd, "%s/%s", dir, dp->d_name);

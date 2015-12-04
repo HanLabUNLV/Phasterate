@@ -1791,7 +1791,7 @@ double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** like
       else
         /*Iterate over all bases setting probability based on base case*/
         for (i = 0; i < alph_size; i++)
-          likelihoodTable[i][n->id] = probabilityOfLeaf2(observedState,i);
+          likelihoodTable[i][n->id] = (observedState == i) ? 1 : 0;
       }
     else{
       /* General recursive case. Calculate probabilities at inner node for all bases.*/

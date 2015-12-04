@@ -1596,7 +1596,7 @@ double singleEventCondProb(int j,int i, double branchLength, double* freqs,doubl
   double lambda = params[0];
   double mu = params[1];
   double xiValue = xi(branchLength,mu,lambda);
-  
+
   /*Formula (23)*/
   if(j == gapCharacter){
     return (1-xiValue) * gammaML(branchLength,mu,lambda);
