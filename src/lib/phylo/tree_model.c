@@ -1155,9 +1155,14 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   for(k = 0; k < matrixSize; k++)
     for(l = 0; l < matrixSize; l++)
       matrixA[k][l] = singleEventCondProb(l, k, branchLength, freqs, params);
+  /*printMatrix(tm->P[i][j]->matrix, 5);*/
   /*Set corner.*/  
-  matrixA[4][4] = 1 - xiValue;
-  
+  /*printf("Scale: %f\n", scale);*/
+  /*printf("Heurestic: %f\n", matrixA[4][4]);*/
+  matrixA[4][4] = 1 - xiValue;/* - matrixA[4][4];*/
+
+  /*printMatrix(tm->P[i][j]->matrix, 5);*/
+
   params[0] = lambda;
   params[1] = mu;
 

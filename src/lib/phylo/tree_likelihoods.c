@@ -1233,12 +1233,12 @@ double computeTotalTreeLikelihood2(TreeModel* mod,MSA* msa, double **inside_join
             likelihoodTable[i][n->id] = qSum * sSum;
           }
         }
-      }
+      printf("{%f, %f, %f, %f, %f}\n", likelihoodTable[0][n->id], likelihoodTable[1][n->id],
+              likelihoodTable[2][n->id], likelihoodTable[3][n->id], likelihoodTable[4][n->id]);
+    }
 
     columnProbability = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-    /*printf("[%d]: %f\tA:%d\tC:%d\tG:%d\tT:%d\t-:%d\tN:%d\n", currentColumn, log(columnProbability),
-            numberOfOcurrances[0], numberOfOcurrances[1], numberOfOcurrances[2], numberOfOcurrances[3],
-            numberOfOcurrances[4], numberOfOcurrances[5]);*/
+    
     /*Multiply by the amount of times this column appeared in the alignment.*/
     if(currentColumn != length)
       totalLikelihood += log(columnProbability) * msa->ss->counts[currentColumn];
