@@ -2124,15 +2124,15 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   double* params = &(tm->all_params->data[k]);
   double* freqs = tm->backgd_freqs->data;
   double p = tm->geometricParameter;
-  double lambda;
-  double mu;
+  double lambda = 0;
+  double mu = 0;
   double alpha;
   double betta;
+  double meanSizeOfInsertion = -1;
+  double meanSizeOfDeletion = -1;
   
   /*F84 does not use all of them!*/
   if(tm->subst_mod == F84){
-    lambda = 0;
-    mu = 0;
     alpha = params[0];
     betta = params[1];
   }
@@ -2141,6 +2141,8 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
     mu = params[1];
     alpha = params[2];
     betta = params[3];
+    meanSizeOfInsertion = tm->meanSizeOfInsertion;
+    meanSizeOfDeletion = tm->meanSizeOfDeletion;
   }
   
   /*Calculated rates!*/  
@@ -2163,6 +2165,12 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   /** Geometric Distribution Parameter. */
   fprintf(fout, "Geometric Distribution parameter (p):\n");
   fprintf(fout, "%f\n", p);
+  
+  /** Mean size of insertions and deletions.*/
+  fprintf(fout, "Mean size of insertion:\n");
+  fprintf(fout, "%f\n", meanSizeOfInsertion);
+  fprintf(fout, "Mean size of deletion:\n");
+  fprintf(fout, "%f\n", meanSizeOfDeletion);
   
   phast_fclose(fout);
   return;

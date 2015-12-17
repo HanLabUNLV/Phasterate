@@ -358,13 +358,14 @@ Matrix *col_get_fim_sub(FimGrid *g, double scale);
 int col_has_data(TreeModel *mod, MSA *msa, int tupleidx);
 
 /**
- * Given a column returns true if the gap is not all columns. Else false.
+ * Given a column returns true if the column is not all N's. Else false.
  * @param mod: model.
  * @param msa: the msa to check.
  * @param tupleidx: the index of the column we are loooking at.
+ * *param flag: weather we have sufficient statistics for this MSA or not.
  * @return true or false.
  */
-int columnHasDataGaps(TreeModel *mod, MSA *msa, int tupleidx);
+int columnHasDataGaps(TreeModel *mod, MSA *msa, int tupleidx, int flag);
 
 /**  Check if a column has enough data in the subtree of interest to perform an analysis.
     @param mod Tree Model
@@ -402,6 +403,6 @@ void col_find_missing_branches(TreeModel *mod, MSA *msa, int tupleidx,
  * basically does the work of computing for one column.
 */
 double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL);
-double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** pL);
+double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** pL, int flag);
 /** \} */
 #endif

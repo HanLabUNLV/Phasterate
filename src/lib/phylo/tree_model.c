@@ -28,8 +28,8 @@
 #include <misc.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <omp.h>
 #include "phylo_fit.h"
+#include "fit_column.h"
 
 #define ALPHABET_TAG "ALPHABET:"
 #define BACKGROUND_TAG "BACKGROUND:"
@@ -58,6 +58,10 @@ double tm_likelihood_wrapper(Vector *params, void *data);
 double tm_multi_likelihood_wrapper(Vector *params, void *data);
 double tmMultiGapAwareLikelihoodWrapper(Vector *params, void *data);
 double gapAwareLikelihoodWrapper(Vector *params, void *data);
+void computeMeanIndelSizes(TreeModel* mod,MSA* msa, double* meanInsertionSize,
+        double* meanDeletionSize);
+double countEvolutionaryEventE(char e, char** inferredEvent, int specie, int msaLength);
+double computeMeanOfEvent(char event, char** inferredEvent, int msaLength, int treeSize);
 
 /* tree == NULL implies weight matrix (most other params ignored in
    this case) */
@@ -1151,7 +1155,7 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   params[0] *= scale;
   params[1] *= scale;
   double xiValue = xi(branchLength, params[1], params[0]);
-
+  printf("Branch length: %f\n", branchLength);
   for(k = 0; k < matrixSize; k++)
     for(l = 0; l < matrixSize; l++)
       matrixA[k][l] = singleEventCondProb(l, k, branchLength, freqs, params);
@@ -1161,7 +1165,7 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   /*printf("Heurestic: %f\n", matrixA[4][4]);*/
   matrixA[4][4] = 1 - xiValue;/* - matrixA[4][4];*/
 
-  /*printMatrix(tm->P[i][j]->matrix, 5);*/
+  printMatrix(tm->P[i][j]->matrix, 5);
 
   params[0] = lambda;
   params[1] = mu;
@@ -2109,6 +2113,13 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
     retval = opt_bfgs(gapAwareLikelihoodWrapper, opt_params, (void*)mod, &ll,lower_bounds,
                       upper_bounds, logf, NULL, precision,NULL, &numeval);
     mod->lnL = -ll;
+    
+    /*Compute the average size of insertion and deletions, this is auxiliary information
+     used for phyloP.*/
+    double meanInsertionSize, meanDeletionSize;
+    computeMeanIndelSizes(mod, msa, &meanInsertionSize, &meanDeletionSize);
+    mod->meanSizeOfInsertion = meanInsertionSize;
+    mod->meanSizeOfDeletion = meanDeletionSize;
   }
   else{
     retval = opt_bfgs(tm_likelihood_wrapper, opt_params, (void*)mod, &ll, lower_bounds,
@@ -2311,7 +2322,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   /*All models now need to be reinitialized with the proper values based on the global
    * values!*/
   for (i = 0; i < nmod; i++)
-    /*Emperically we know to set kappa at about 5.0*/
+    /*Emperically we know to set kappa at about 5.0, this is how Phast does it...*/
     tm_rate_params_init(mod[i], mod[i]->all_params, mod[i]->ratematrix_idx, 5.0);
   
   /*No need to iterate over models as they all share the same parameters!*/
@@ -2361,7 +2372,40 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
     for (j=0; j < nmod; j++){
       mod[j]->lnL = gapAwareLikelihoodWrapper(opt_params, mod[j]);
     }
+    
+    /*Compute the average size of insertion and deletions, this is auxiliary information
+     used for phyloP.*/
+    double insertionTotal, deletionTotal;
+    int insertionEvent = 0, deletionEvent = 0;
+    
+    for(j = 0; j < nmod; j++){
+      double meanInsertionSize, meanDeletionSize;
+      computeMeanIndelSizes(mod[j], msa[j], &meanInsertionSize, &meanDeletionSize);
+      printf("[%d]Mean Deletion Size: %f\n", j, meanDeletionSize);
+      if(meanInsertionSize != 0){
+        insertionTotal += meanInsertionSize;
+        insertionEvent++;
+      }
+      if(meanDeletionSize != 0){
+        deletionTotal += meanDeletionSize;
+        deletionEvent++;
+      }
+    }
+    
+    double finalInsertionSize = 0, finalDeletionSize = 0;
+    if(insertionEvent != 0)
+      finalInsertionSize = insertionTotal / insertionEvent;
+    if(deletionEvent != 0)
+      finalDeletionSize = deletionTotal / deletionEvent;
+    
+    for(j = 0; j < nmod; j++){
+      printf("[%d] Final Insertion size: %f\n", j, finalInsertionSize);
+      printf("[%d] Final Deletion size: %f\n", j, finalDeletionSize);
+      mod[j]->meanSizeOfInsertion = finalInsertionSize;
+      mod[j]->meanSizeOfDeletion = finalDeletionSize;
+    }
   }
+  
   else{ /*Just regular model!*/
     retval = opt_bfgs(tm_multi_likelihood_wrapper, opt_params, (void*)modlist, &ll,
             lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);
@@ -2851,11 +2895,9 @@ double tmMultiGapAwareLikelihoodWrapper(Vector *params, void *data) {
   double llReturn = 0;
   int i;
   
-  #pragma omp parallel for
-    for (i=0; i < size; i++)
-      ll[i] = gapAwareLikelihoodWrapper(params, lst_get_ptr(modlist, i));
+  for (i=0; i < size; i++)
+    ll[i] = gapAwareLikelihoodWrapper(params, lst_get_ptr(modlist, i));
     
-  
   for(i = 0; i < size; i++)
     llReturn += ll[i];
   
@@ -4517,7 +4559,7 @@ List *tm_new_from_dir(char *dir) {
   free(tmpmods);
   return mods;
 }
-
+/* =====================================================================================*/
 /* Wrapper for computation of likelihood for extended model. Needed as BFGS function
  requires this function type.*/
 double gapAwareLikelihoodWrapper(Vector *params, void *data) {
@@ -4528,7 +4570,7 @@ double gapAwareLikelihoodWrapper(Vector *params, void *data) {
 
   return val;
 }
-
+/* =====================================================================================*/
 /**
  * Scale Tree model matrix by a parameter. Similar to function above except this is used
  * only for F84E since it computes background frequencies differently. We have to
@@ -4564,3 +4606,183 @@ double scaleRateMatrixExtended(TreeModel *mod) {
 
   return scale;
 }
+/* =====================================================================================*/
+/**
+ * Given a phylogenetic tree and multiple sequence alignment, and a model of nucleotide 
+ * and gap substitution this function will compute the average rate of insertion and
+ * deletion events. This function assumes that the most likely model has already been fit
+ * for our data. Then it:
+ * 1) Recomputes all conditional probability matrices.
+ * 2) Iterates through each column and calculates the probabilities for every vertex in
+ * our tree using @singleSiteLikelihood2.
+ * 3) It then uses this information to infer the most likely character that every specie
+ * had at that given column using inferCharsFromProbs.
+ * 4) It then calculates the type of evolutionary event that created the character at
+ * every vertex either: 'D' for deletion, 'I' for insertion, 'S' for subsitution, or 'N'
+ * for none.
+ * 5) It then counts continuous sequences of 'D' or 'I' to find the average rate of
+ * insertions and deletions.
+ * @param mod: our tree model fitted to our data.
+ * @param msa: our multiple sequence alignment, the sufficient statistics are not used.
+ * @param meanInsertionSize: will be set to our average insertion size.
+ * @param meanDeletionSize: will be set to our average deletion size.
+ * @return void :)
+ */
+void computeMeanIndelSizes(TreeModel* mod,MSA* msa, double* meanInsertionSize,
+        double* meanDeletionSize){
+  /*Just to be sure we recalculate the conditional probability matrices.*/
+  tm_set_subst_matrices(mod);
+  
+  /* Total size of tree including all leaf and inner nodes.*/
+  int treeSize = mod->tree->nnodes;
+  int msaLength = msa->length;
+  int nStates = 5;
+  int i,j;
+  
+  /*Tables of size probsTable[5][treeSize] and charInferred[msaLength][treeSize],
+   * inferredEvent[msaLength][treeSize]. */
+  double** probsTable = (double**)malloc(nStates * sizeof(double*));
+  int** charInferred = (int**)malloc(msaLength * sizeof(int*));
+  /*inferredEvent will hold what type of event happened between the parent node and this
+    node. 'I' for insertion, 'D' for deletion, 'S' substitution, 'N' for none. */
+  char** inferredEvent = (char**)malloc(msaLength * sizeof(char*));
+
+  for(i = 0; i < nStates; i++)
+    probsTable[i] = (double*)malloc( treeSize * sizeof(double));
+  for(i = 0; i < msaLength; i++){
+    charInferred[i] = (int*)malloc(treeSize * sizeof(int));
+    inferredEvent[i] = (char*)malloc(treeSize * sizeof(char));
+  }
+
+  /*Calculate the most probable character {A, C, G, T, -} per tree vertex and put in in
+   * our charInferred table. This method of iterating over every column individually is
+   * probably slower but a lot cleaner.
+   */
+  for(i = 0; i < msaLength; i++){
+    /*Make sure this is not an all N column...*/
+    if(columnHasDataGaps(mod, msa, i, 0) == 1){
+      /*Get the probabilities into our probability table, ignore return value...*/
+      singleSiteLikelihood2(mod, msa, i, probsTable, 0);
+      /*Notice this function knows what the msa-column looks like based on the values inside
+       * of probsTable.*/
+      inferCharsFromProbs(mod->tree, probsTable, -1, mod, charInferred[i]);
+      /*Fill table of events: we assume 0 to start, it doesn't matter for the root*/
+      inferEventsFromChar(mod->tree, charInferred[i], 0, inferredEvent[i]);
+    }
+    else{
+      /*All N column, no data to infer.*/
+      for(j = 0; j < treeSize; j++)
+        inferredEvent[i][j] = 'N';
+    }
+  }
+  /*Prints what it looks like.*/
+    for(j = 0; j < treeSize; j++){
+      printf("[%d]: ", j);
+      for(i = 0; i < msaLength; i++){
+      printf("%c", inferredEvent[i][j]);
+    }
+    printf("\n");
+  }
+
+  *meanInsertionSize = computeMeanOfEvent('I', inferredEvent, msaLength, treeSize);
+  *meanDeletionSize = computeMeanOfEvent('D', inferredEvent, msaLength, treeSize);
+  
+  printf("Final insertion size: %f\n", *meanInsertionSize);
+  printf("Final deletion size: %f\n", *meanDeletionSize);
+    
+  /*Clean up memory:*/
+  for(i = 0; i < nStates; i++)
+    free(probsTable[i]);
+  for(i = 0; i < msaLength; i++){
+    free(charInferred[i]);
+    free(inferredEvent[i]);
+  }
+  free(probsTable); free(charInferred); free(inferredEvent); 
+  
+  return;
+}
+/* =====================================================================================*/
+/**
+ * Computes the mean of continuous events. Return 0 if no events where found.
+ * @param event: Type of event to count.
+ * @param inferredEvent: table of events shaped as inferredEvent[msaLength][treeSize].
+ * @param msaLength: length of msa.
+ * @param treeSize: size of phylogenetic tree.
+ * @return mean or zero.
+ */
+double computeMeanOfEvent(char event, char** inferredEvent, int msaLength, int treeSize){
+  int i;
+  double eTotal = 0;
+  int eEvents = 0;
+  double returnVal = 0;
+
+  /*Iterate through our table counting continuous sequences of event. */
+  for(i = 1; i < treeSize; i++){ /*i = 1 because skip root. */
+    double tempE = countEvolutionaryEventE(event, inferredEvent, i, msaLength);
+
+    if(tempE != 0){
+      eTotal += tempE;
+      eEvents++;
+    }
+  }
+
+  if(eEvents != 0)
+    returnVal = eTotal / eEvents;
+
+  return returnVal;
+}
+/* =====================================================================================*/
+/**
+ * Given the type of event e, a table containing this type of event, (all it does is check
+ * events for equality, it will count the number of continuous events of this type in the
+ * table. Notice the entire 2d array and specie is needed because of the way the array
+ * is shaped.
+ * @param e: Type of event we want to get average for.
+ * @param inferredEvent: table of events shaped as inferredEvent[msaLength][treeSize].
+ * @param specie: specie we are iterating over.
+ * @param msaLength: length of our alignment.
+ * @return average size of event e for this specie.
+ */
+double countEvolutionaryEventE(char e, char** inferredEvent, int specie, int msaLength){
+  int i; char c;
+  int eTotals = 0, eEvents = 0;
+  /*Keeps track whether we are counting an event.*/
+  char currentSequence = '\0';
+  int counter = 0;
+  printf("Doing Specie %d\n", specie);
+
+  /*Iterate through each specie in our tree, both ancestral and extant.*/
+  for(i = 0; i < msaLength; i++){
+    c = inferredEvent[i][specie];
+    /*Continuous sequence, just add to our counter...*/
+    if(currentSequence == c){
+      counter++;
+      continue;
+    }
+    /*Flush our counter if we were counting a sequence of e's.*/
+    if(currentSequence == e){
+      printf("One event counted of length %d of type %c\n", counter, e);
+      eTotals += counter;
+      eEvents++;
+      currentSequence = '\0';
+    }
+    /*Start a new continuous sequence if we see one of type e.*/
+    if(c == e){
+      currentSequence = e;
+      counter = 1;
+    }
+  }
+  /*Done. flush data if needed and reset counters.*/
+  if(currentSequence == e){
+    printf("One event counted of length %d of type %c\n", counter, e);
+    eTotals += counter;
+    eEvents++;
+  }
+  /*No events of this type in this column.*/
+  if(eEvents == 0)
+    return 0;
+  
+  printf("Total average length %f\n", ((double)eTotals / eEvents));
+  return ((double)eTotals) / eEvents;
+}
+/* =====================================================================================*/

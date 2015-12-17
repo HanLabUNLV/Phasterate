@@ -29,6 +29,10 @@ void printTree(TreeNode* node);
 int tuple_index_missing_data(char *tuple, int *inv_alph, int *is_missing,
                              int alph_size);
 
+/*Local functions...*/
+int getMaxFive(double** array, int id);
+int getMaxFivePrime(double* array);
+char getCharEvent(int childNode,int parentNode);
 
 
 /* Compute the likelihood of a tree model with respect to an
@@ -1787,6 +1791,149 @@ int probabilityOfLeaf(int observedState,int iResidue){
   if (iResidue == observedState)
     return 1;
   return 0;
+}
+/* =====================================================================================*/
+/**
+ * Compute the most likely character for every inner node of the tree. For the given
+ * column.
+ * @param node: The root of our tree.
+ * @param probTable: table of probabilities as computed by prunning algorithm of size:
+ * probTable[5][numberOfNodes], where probTable[i][n] contains the probability of the
+ * ith character (from {A, C, G ,T, -}) and n is the id of the node.
+ * @param parentChar: pass in -1;
+ * @param mod: Our tree model, needed for the probability matrices.
+ * @param charInferred: one-dimensional array of integers, where charInferred[n] is the
+ * inferred character at the node id n.
+ * @return: void.
+ */
+void inferCharsFromProbs(TreeNode* node, double** probTable, int parentChar,
+        TreeModel* mod, int* charInferred){
+  int id = node->id;
+  int c;
+
+  /*Base case: This is a leaf:*/
+  if(node->lchild == NULL){
+    c = getMaxFive(probTable, id);
+    charInferred[id] = c;
+    printf("Base Case[%d]: %d\n", id, c);
+    return;
+  }
+
+  /*Recursive Case: calculate our character and recurse on our children!*/
+  if(id == 0){ /*If we are the root...*/
+    c = getMaxFive(probTable, id);
+    printf("Root[0]: %d\n", c);
+  }
+  else{
+    double** probMatrix = mod->P[id][0]->matrix->data;
+    double array[5];
+    int i;
+    
+    for(i = 0; i < 5; i++){
+      /*For each character i, we calculate P(i|p) * P(i), where p is the parentChar.*/
+      array[i] = probMatrix[parentChar][i] * probTable[i][id];
+    }
+
+    c = getMaxFivePrime(array);
+    printf("Inner Node[%d]: %d\n", id, c);
+  }
+
+  charInferred[id] = c;
+  /*Recurse on our children:*/
+  inferCharsFromProbs(node->lchild, probTable, c, mod, charInferred);
+  inferCharsFromProbs(node->rchild, probTable, c, mod, charInferred);
+
+  return;
+}
+/* =====================================================================================*/
+/**
+ * Selects the index of the highest value of the array. Assumes array is of length five.
+ * This only works with the probability table from likelihoodSingleColumn, which is index
+ * by array[dnaChar][nodeId].
+ * @param array: array to check.
+ * @param id: node id for node we are checking.
+ * @return maxInt: index of maximum value.
+ */
+int getMaxFive(double** array, int id){
+  int length = 5, maxInt = 0;
+  int i;
+
+  for(i = 0; i < length; i++)
+    if(array[i][id] > array[maxInt][id])
+      maxInt = i;
+  
+  return maxInt;
+}
+
+/* Similar to above but works for a simple one-dimensional array of size five. */
+int getMaxFivePrime(double* array){
+  int length = 5, maxInt = 0;
+  int i;
+
+  for(i = 0; i < length; i++)
+    if(array[i] > array[maxInt])
+      maxInt = i;
+  
+  return maxInt;
+}
+/* =====================================================================================*/
+/**
+ * This function will populate an array of length "size of nodes on tree" and fill every
+ * node with the type of event that created this node.
+ * @param node: Root of tree, during recursion other nodes ;)
+ * @param charInferred: array[i] hold the character we assume to be here, where i is the
+ * id of the node.
+ * @param parentChar: character of parent node.
+ * @param eventInferred: table to be filled with type of event for node.
+ */
+void inferEventsFromChar(TreeNode* node, int* charInferred, int parentChar,
+        char* eventInferred){
+  int id = node->id;
+  eventInferred[id] = getCharEvent(charInferred[id], parentChar);
+  printf("inferEventsFromChar[%d]: Was a %c\n", id, eventInferred[id]);  
+  /*Base case: This is a leaf:*/
+  if(node->lchild == NULL)
+    return;
+
+  /*Recursive Case: Calculate event and recurse on our children. */
+  if(id == 0){ /*If we are the root rewrite what we had. */
+    printf("Root[0]: 'N'\n");
+    eventInferred[id] = 'N';
+  }
+  /*Recurse on our children:*/
+  inferEventsFromChar(node->lchild, charInferred, charInferred[id], eventInferred);
+  inferEventsFromChar(node->rchild, charInferred, charInferred[id], eventInferred);
+
+  return;
+}
+/* =====================================================================================*/
+/**
+ * Given what the parent and child looks like it will return the kind of event this
+ * caused. 'I' for insertion, 'D' for deletion, 'S' substitution, 'N' for none.
+ * @param childNode: index char of child from {A, C, G, T}, 1 <= childNode <= 4.
+ * @param parentNode: index char of child from {A, C, G, T}, 1 <= parentNode <= 4.
+ * @return type of event. 'I' or 'D' or 'S' or 'N'.
+ */
+char getCharEvent(int childNode,int parentNode){
+  const int gapChar = 4;
+
+  if(childNode < 0 || childNode > 4 || parentNode < 0 || parentNode > 4)
+    die("Error, bad child/parent node given to tree_likelihoods::getCharEvent()\n");
+
+  /* Some of the checks are redundant or can't happen, but we want it to be explicit.*/
+  if(childNode == parentNode)
+    return 'N'; /*No evolutionary event. */
+  if(parentNode == gapChar && childNode != gapChar)
+    return 'I'; /*Insertion event. */
+  if(parentNode != gapChar && childNode == gapChar)
+    return 'D'; /*Deletion event. */
+  if( (parentNode != gapChar) && (childNode != gapChar) && (parentNode != childNode) )
+    return 'S';
+
+  die("Error, tree_likelihoods::getCharEvents() fell through all possibilities, this \
+should not be possible.");
+
+  return '\0'; /*Null*/
 }
 /* =====================================================================================*/
 /*EOO (End of Omar)*/

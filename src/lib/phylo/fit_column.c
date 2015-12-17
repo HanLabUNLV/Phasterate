@@ -126,9 +126,9 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
 double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
                                   double **scratch) {
   double results;
-  
+  int flagTrue = 1;
   if(mod->subst_mod == F84E)
-    results = log(singleSiteLikelihood2(mod, msa, tupleidx, scratch));
+    results = log(singleSiteLikelihood2(mod, msa, tupleidx, scratch, flagTrue));
   else
     results = log(col_compute_likelihood(mod, msa, tupleidx, scratch));
   
@@ -790,8 +790,8 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
      * gaps which are considered missing data */
     if(
        col_has_data(mod, msa, i) ||
-       (mod->subst_mod == F84E && columnHasDataGaps(mod, msa, i)) ||
-       (mod->subst_mod == HKY85G && columnHasDataGaps(mod, msa, i))
+       (mod->subst_mod == F84E && columnHasDataGaps(mod, msa, i, 1)) ||
+       (mod->subst_mod == HKY85G && columnHasDataGaps(mod, msa, i, 1))
       ){
       /* compute null and alt lnl */
       mod->scale = 1;
@@ -1613,12 +1613,14 @@ int col_has_data(TreeModel *mod, MSA *msa, int tupleidx) {
  * @param mod: model.
  * @param msa: the msa to check.
  * @param tupleidx: the index of the column we are loooking at.
+ * *param flag: weather we have sufficient statistics for this MSA or not.
  * @return true or false.
  */
-int columnHasDataGaps(TreeModel *mod, MSA *msa, int tupleidx) {
+int columnHasDataGaps(TreeModel *mod, MSA *msa, int tupleidx, int flag) {
   int i, nbases = 0;
   for (i = 0; i < msa->nseqs && nbases < 2; i++) {
-    char c = ss_get_char_tuple(msa, tupleidx, i, 0);
+    char c = flag ? ss_get_char_tuple(msa, tupleidx, i, 0) : 
+      msa_get_char(msa, i, tupleidx);
     if (c != 'N')
       nbases++;
   }
@@ -1752,9 +1754,11 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
  * Extremely similar to double computeTotalTreeLikelihood() from tree_likelihoods.c
  * but only calculates the scores for the given tupleIdx instead of the whole alignment
  * basically does the work of computing for one column.
+ * @param flag: If flag is true is will assume sufficient statistics, else it will not.
 */
   
-double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** likelihoodTable){
+double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** likelihoodTable,
+        int flag){
   int i;
   int nstates = mod->rate_matrix->size;
   double totalProb;
@@ -1781,7 +1785,8 @@ double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** like
       int observedState;
       char thischar;
 
-      thischar = ss_get_char_tuple(msa, tupleidx, sequenceNumber, 0);
+      thischar = flag ? ss_get_char_tuple(msa, tupleidx, sequenceNumber, 0) :
+        msa_get_char(msa, sequenceNumber, tupleidx);
       observedState = mod->rate_matrix->inv_states[(int)thischar];
       
       /*Special Case where we have a N at this spot:*/
@@ -1815,7 +1820,7 @@ double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** like
   }
     
   totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-  printf("Total Prob: %f\n\n", totalProb);
+  /*printf("Total Prob: %f\n\n", totalProb);*/
   return totalProb;
 }
 /* =====================================================================================*/

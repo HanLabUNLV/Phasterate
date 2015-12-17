@@ -414,4 +414,32 @@ char getCharacterForSpecie(char* name,MSA* msa,int index);
  */
 int probabilityOfLeaf(int observedState,int iResidue);
 
+/**
+ * Compute the most likely character for every inner node of the tree. For the given
+ * column.
+ * @param node: The root of our tree.
+ * @param probTable: table of probabilities as computed by prunning algorithm of size:
+ * probTable[5][numberOfNodes], where probTable[i][n] contains the probability of the
+ * ith character (from {A, C, G ,T, -}) and n is the id of the node.
+ * @param parentChar: pass in -1;
+ * @param mod: Our tree model, needed for the probability matrices.
+ * @param charInferred: one-dimensional array of integers, where charInferred[n] is the
+ * inferred character at the node id n.
+ * @return: void.
+ */
+void inferCharsFromProbs(TreeNode* node, double** probTable, int parentChar,
+        TreeModel* mod, int* charInferred);
+
+/**
+ * This function will populate an array of length "size of nodes on tree" and fill every
+ * node with the type of event that created this node.
+ * @param node: Root of tree, during recursion other nodes ;)
+ * @param charInferred: array[i] hold the character we assume to be here, where i is the
+ * id of the node.
+ * @param parentChar: character of parent node.
+ * @param eventInferred: table to be filled with type of event for node.
+ */
+void inferEventsFromChar(TreeNode* node, int* charInferred, int parentChar,
+        char* eventInferred);
+
 #endif

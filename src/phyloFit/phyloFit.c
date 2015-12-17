@@ -356,6 +356,9 @@ int main(int argc, char *argv[]) {
     msa_fname = argv[optind];
     pf->msa_fname = msa_fname;
   }
+  
+  if(!is_dir(msa_fname) && pf->input_mods)
+    die("Error: Expected folder of MSAs.\n");
 
   if (is_dir(msa_fname)) {
     pf->msa_file_names = list_files_in_dir(msa_fname, NULL);
