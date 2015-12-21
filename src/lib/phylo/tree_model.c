@@ -62,6 +62,7 @@ void computeMeanIndelSizes(TreeModel* mod,MSA* msa, double* meanInsertionSize,
         double* meanDeletionSize);
 double countEvolutionaryEventE(char e, char** inferredEvent, int specie, int msaLength);
 double computeMeanOfEvent(char event, char** inferredEvent, int msaLength, int treeSize);
+int countEvents(char event, char** inferredEvent, int msaLength, int treeSize);
 
 /* tree == NULL implies weight matrix (most other params ignored in
    this case) */
@@ -2114,12 +2115,12 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
                       upper_bounds, logf, NULL, precision,NULL, &numeval);
     mod->lnL = -ll;
     
-    /*Compute the average size of insertion and deletions, this is auxiliary information
+    /*Compute the number of insertion and deletion events, this is auxiliary information
      used for phyloP.*/
-    double meanInsertionSize, meanDeletionSize;
-    computeMeanIndelSizes(mod, msa, &meanInsertionSize, &meanDeletionSize);
-    mod->meanSizeOfInsertion = meanInsertionSize;
-    mod->meanSizeOfDeletion = meanDeletionSize;
+    double insertionsCount, deletionsCount;
+    computeIndelCounts(mod, msa, &insertionsCount, &deletionsCount);
+    mod->insertionsCount = insertionsCount;
+    mod->deletionsCount = deletionsCount;
   }
   else{
     retval = opt_bfgs(tm_likelihood_wrapper, opt_params, (void*)mod, &ll, lower_bounds,
@@ -2373,36 +2374,19 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
       mod[j]->lnL = gapAwareLikelihoodWrapper(opt_params, mod[j]);
     }
     
-    /*Compute the average size of insertion and deletions, this is auxiliary information
-     used for phyloP.*/
-    double insertionTotal, deletionTotal;
-    int insertionEvent = 0, deletionEvent = 0;
-    
+    /*Compute the counts of insertion and deletions, this is auxiliary information used
+     * for phyloP.*/
+    double insertionTotal = 0, deletionTotal = 0;
     for(j = 0; j < nmod; j++){
-      double meanInsertionSize, meanDeletionSize;
-      computeMeanIndelSizes(mod[j], msa[j], &meanInsertionSize, &meanDeletionSize);
-      printf("[%d]Mean Deletion Size: %f\n", j, meanDeletionSize);
-      if(meanInsertionSize != 0){
-        insertionTotal += meanInsertionSize;
-        insertionEvent++;
-      }
-      if(meanDeletionSize != 0){
-        deletionTotal += meanDeletionSize;
-        deletionEvent++;
-      }
+      double insertionsCount, deletionsCount;
+      computeIndelCounts(mod[j], msa[j], &insertionsCount, &deletionsCount);
+      insertionTotal += insertionsCount;
+      deletionTotal += deletionsCount;
     }
     
-    double finalInsertionSize = 0, finalDeletionSize = 0;
-    if(insertionEvent != 0)
-      finalInsertionSize = insertionTotal / insertionEvent;
-    if(deletionEvent != 0)
-      finalDeletionSize = deletionTotal / deletionEvent;
-    
     for(j = 0; j < nmod; j++){
-      printf("[%d] Final Insertion size: %f\n", j, finalInsertionSize);
-      printf("[%d] Final Deletion size: %f\n", j, finalDeletionSize);
-      mod[j]->meanSizeOfInsertion = finalInsertionSize;
-      mod[j]->meanSizeOfDeletion = finalDeletionSize;
+      mod[j]->insertionsCount = insertionTotal;
+      mod[j]->deletionsCount = deletionTotal;
     }
   }
   
@@ -4609,27 +4593,26 @@ double scaleRateMatrixExtended(TreeModel *mod) {
 /* =====================================================================================*/
 /**
  * Given a phylogenetic tree and multiple sequence alignment, and a model of nucleotide 
- * and gap substitution this function will compute the average rate of insertion and
- * deletion events. This function assumes that the most likely model has already been fit
- * for our data. Then it:
+ * and gap substitution this function will compute a prediction on the number of insertion
+ * and deletion events. This function assumes that the most likely model has already been
+ * fit for our data. Then it:
  * 1) Recomputes all conditional probability matrices.
  * 2) Iterates through each column and calculates the probabilities for every vertex in
  * our tree using @singleSiteLikelihood2.
  * 3) It then uses this information to infer the most likely character that every specie
  * had at that given column using inferCharsFromProbs.
  * 4) It then calculates the type of evolutionary event that created the character at
- * every vertex either: 'D' for deletion, 'I' for insertion, 'S' for subsitution, or 'N'
+ * every vertex either: 'D' for deletion, 'I' for insertion, 'S' for substitution, or 'N'
  * for none.
- * 5) It then counts continuous sequences of 'D' or 'I' to find the average rate of
- * insertions and deletions.
+ * 5) It then counts the 'D' or 'I' to find the number of insertions and deletions events.
  * @param mod: our tree model fitted to our data.
  * @param msa: our multiple sequence alignment, the sufficient statistics are not used.
- * @param meanInsertionSize: will be set to our average insertion size.
- * @param meanDeletionSize: will be set to our average deletion size.
+ * @param insertionsCount: will be set to our number of insertions.
+ * @param deletionsCount: will be set to our number of deletions.
  * @return void :)
  */
-void computeMeanIndelSizes(TreeModel* mod,MSA* msa, double* meanInsertionSize,
-        double* meanDeletionSize){
+void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
+        double* deletionsCount){
   /*Just to be sure we recalculate the conditional probability matrices.*/
   tm_set_subst_matrices(mod);
   
@@ -4684,11 +4667,13 @@ void computeMeanIndelSizes(TreeModel* mod,MSA* msa, double* meanInsertionSize,
     printf("\n");
   }
 
-  *meanInsertionSize = computeMeanOfEvent('I', inferredEvent, msaLength, treeSize);
-  *meanDeletionSize = computeMeanOfEvent('D', inferredEvent, msaLength, treeSize);
+  /**meanInsertionSize = computeMeanOfEvent('I', inferredEvent, msaLength, treeSize);*/
+  /**meanDeletionSize = computeMeanOfEvent('D', inferredEvent, msaLength, treeSize);*/
+  *insertionsCount = countEvents('I', inferredEvent, msaLength, treeSize);
+  *deletionsCount = countEvents('D', inferredEvent, msaLength, treeSize);
   
-  printf("Final insertion size: %f\n", *meanInsertionSize);
-  printf("Final deletion size: %f\n", *meanDeletionSize);
+  printf("Final insertions count: %f\n", *insertionsCount);
+  printf("Final deletion count: %f\n", *deletionsCount);
     
   /*Clean up memory:*/
   for(i = 0; i < nStates; i++)
@@ -4700,6 +4685,20 @@ void computeMeanIndelSizes(TreeModel* mod,MSA* msa, double* meanInsertionSize,
   free(probsTable); free(charInferred); free(inferredEvent); 
   
   return;
+}
+/* =====================================================================================*/
+int countEvents(char event, char** inferredEvent, int msaLength, int treeSize){
+  int eventCounter = 0;
+  int i, j;
+  
+  for(i = 0; i < msaLength; i++)
+      for(j = 0; j < treeSize; j++){
+        if(event == inferredEvent[i][j])
+          eventCounter++;
+      }
+  
+  printf("%d events of type %c\n", eventCounter, event);
+  return eventCounter;
 }
 /* =====================================================================================*/
 /**

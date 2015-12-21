@@ -1826,6 +1826,7 @@ void inferCharsFromProbs(TreeNode* node, double** probTable, int parentChar,
   }
   else{
     double** probMatrix = mod->P[id][0]->matrix->data;
+    printMatrix(mod->P[id][0]->matrix, 5);
     double array[5];
     int i;
     

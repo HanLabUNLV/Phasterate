@@ -228,9 +228,9 @@ struct tm_struct {
                                * exponentiating the matrix. */
   int dnaMlNormalize;              /**Whether or not to normalize and reroot based on user option
                                * no by default. */
-  double meanSizeOfInsertion;  /**Mean size of insertions observed in our MSA, only used for extended
+  double insertionsCount;  /**Mean size of insertions observed in our MSA, only used for extended
                                * model.*/
-  double meanSizeOfDeletion;  /**Mean size of deletions observed in our MSA, only used for extended
+  double deletionsCount;  /**Mean size of deletions observed in our MSA, only used for extended
                                * model.*/
 };
 
@@ -775,4 +775,27 @@ void tm_setup_site_model(TreeModel *mod, const char *foreground, int bgc,
 
 List *tm_setup_bgc_model_hmm(TreeModel *mod, const char *foreground, double selNeg,
 			     double selPos, double initBgc, double *initWeights);
+
+/**
+ * Given a phylogenetic tree and multiple sequence alignment, and a model of nucleotide 
+ * and gap substitution this function will compute a prediction on the number of insertion
+ * and deletion events. This function assumes that the most likely model has already been
+ * fit for our data. Then it:
+ * 1) Recomputes all conditional probability matrices.
+ * 2) Iterates through each column and calculates the probabilities for every vertex in
+ * our tree using @singleSiteLikelihood2.
+ * 3) It then uses this information to infer the most likely character that every specie
+ * had at that given column using inferCharsFromProbs.
+ * 4) It then calculates the type of evolutionary event that created the character at
+ * every vertex either: 'D' for deletion, 'I' for insertion, 'S' for subsitution, or 'N'
+ * for none.
+ * 5) It then counts the 'D' or 'I' to find the number of insertions and deletions events.
+ * @param mod: our tree model fitted to our data.
+ * @param msa: our multiple sequence alignment, the sufficient statistics are not used.
+ * @param insertionsCount: will be set to our number of insertions.
+ * @param deletionsCount: will be set to our number of deletions.
+ * @return void :)
+ */
+void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
+        double* deletionsCount);
 #endif

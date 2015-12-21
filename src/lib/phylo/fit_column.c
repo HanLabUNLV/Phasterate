@@ -18,6 +18,7 @@
 #include <sufficient_stats.h>
 #include <tree_likelihoods.h>
 #include <time.h>
+#include <tree_model.h>
 
 #define DERIV_EPSILON 1e-6      
 /* for numerical computation of derivatives */
@@ -781,7 +782,7 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 
   /* init ColFitData */
   d = col_init_fit_data(mod, msa, ALL, mode, FALSE);
-
+  
   /* iterate through column tuples */
   for (i = 0; i < msa->ss->ntuples; i++) {
     checkInterruptN(i, 100);

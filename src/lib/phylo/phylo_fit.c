@@ -2141,8 +2141,8 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
     mu = params[1];
     alpha = params[2];
     betta = params[3];
-    meanSizeOfInsertion = tm->meanSizeOfInsertion;
-    meanSizeOfDeletion = tm->meanSizeOfDeletion;
+    meanSizeOfInsertion = tm->insertionsCount;
+    meanSizeOfDeletion = tm->deletionsCount;
   }
   
   /*Calculated rates!*/  
