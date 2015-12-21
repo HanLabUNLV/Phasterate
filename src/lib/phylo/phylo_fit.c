@@ -2128,9 +2128,9 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   double mu = 0;
   double alpha;
   double betta;
-  double meanSizeOfInsertion = -1;
-  double meanSizeOfDeletion = -1;
-  
+  double insertionCount = -1;
+  double deletionSize = -1;
+
   /*F84 does not use all of them!*/
   if(tm->subst_mod == F84){
     alpha = params[0];
@@ -2141,11 +2141,11 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
     mu = params[1];
     alpha = params[2];
     betta = params[3];
-    meanSizeOfInsertion = tm->insertionsCount;
-    meanSizeOfDeletion = tm->deletionsCount;
+    insertionCount = tm->insertionsCount;
+    deletionSize = tm->deletionsCount;
   }
-  
-  /*Calculated rates!*/  
+
+  /*Calculated rates!*/
   fprintf(fout, "Lambda Rate:\n");
   fprintf(fout, "%f\n", lambda);
   fprintf(fout, "Mu Rate:\n");
@@ -2154,24 +2154,24 @@ void printExtendedInfo(char* fileName, TreeModel* tm){
   fprintf(fout, "%f\n", alpha);
   fprintf(fout, "Betta Rate:\n");
   fprintf(fout, "%f\n", betta);
-  
+
   /*Background frequencies :)*/
   fprintf(fout, "Background frequencies (A, C, G, T):\n");
   fprintf(fout, "%f\n", freqs[0]);
   fprintf(fout, "%f\n", freqs[1]);
   fprintf(fout, "%f\n", freqs[2]);
   fprintf(fout, "%f\n", freqs[3]);
-  
+
   /** Geometric Distribution Parameter. */
   fprintf(fout, "Geometric Distribution parameter (p):\n");
   fprintf(fout, "%f\n", p);
-  
+
   /** Mean size of insertions and deletions.*/
-  fprintf(fout, "Mean size of insertion:\n");
-  fprintf(fout, "%f\n", meanSizeOfInsertion);
-  fprintf(fout, "Mean size of deletion:\n");
-  fprintf(fout, "%f\n", meanSizeOfDeletion);
-  
+  fprintf(fout, "Insertions Count:\n");
+  fprintf(fout, "%f\n", insertionCount);
+  fprintf(fout, "Deletions Count:\n");
+  fprintf(fout, "%f\n", deletionSize);
+
   phast_fclose(fout);
   return;
 }

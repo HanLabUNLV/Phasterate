@@ -46,7 +46,6 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
   double total_prob = 0;
   List *traversal = tr_postorder(mod->tree);  
   double **pL = NULL;
-  /*printf("Column #%d\n", tupleidx);*/
 
   if (msa->ss->tuple_size != 1)
     die("ERROR col_compute_likelihood: need tuple size 1, got %i\n",
@@ -98,9 +97,6 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
           pL[i][n->id] = totl * totr;
         }
       }
-
-      /*printf("%d[%d]:\t{%.8f, %.8f, %.8f, %.8f, %.8f}\n", nodeidx, n->id, pL[0][n->id], pL[1][n->id], pL[2][n->id], pL[3][n->id], pL[4][n->id]);*/
-
     }
 
     /* termination (for each rate cat) */
@@ -113,8 +109,6 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
     for (j = 0; j < nstates; j++) sfree(pL[j]);
     sfree(pL);
   }
-
-  /*printf("\n\n");*/
 
   return(total_prob);
 }
@@ -1698,9 +1692,7 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
   int alph_size = strlen(mod->rate_matrix->states);
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
-  double** l = likelihoodTable;
   
-  /*printf("Column #%d\n", tupleidx);*/
   /*Get traversal order so we iterate over nodes instead of recursing.*/
   traversal = tr_postorder(mod->tree);
   /* Iterate over traversal hitting all nodes in a post order matter.*/
@@ -1742,11 +1734,10 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
       /*Handle gap according to different formula.*/
       likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
     }
-    /*printf("%d[%d]:\t{%.8f, %.8f, %.8f, %.8f, %.8f}\n", nodeidx, n->id, l[0][n->id], l[1][n->id], l[2][n->id], l[3][n->id], l[4][n->id]);*/
   }
     
   totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-  /*printf("\n\n");*/
+
   return totalProb;
 }
 /* =====================================================================================*/
@@ -1769,9 +1760,7 @@ double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** like
   int alph_size = strlen(mod->rate_matrix->states);
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
-  double** l = likelihoodTable;
 
-  printf("Column #%d; Scale = %f\n", tupleidx, mod->scale);
   /*Get traversal order so we iterate over nodes instead of recursing.*/
   traversal = tr_postorder(mod->tree);
   /* Iterate over traversal hitting all nodes in a post order matter.*/
@@ -1817,11 +1806,10 @@ double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** like
         likelihoodTable[i][n->id] = qSum * sSum;
       }
     }
-    printf("%d[%d]:\t{%.8f, %.8f, %.8f, %.8f, %.8f}\n", nodeidx, n->id, l[0][n->id], l[1][n->id], l[2][n->id], l[3][n->id], l[4][n->id]);
   }
     
   totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-  /*printf("Total Prob: %f\n\n", totalProb);*/
+
   return totalProb;
 }
 /* =====================================================================================*/

@@ -236,6 +236,10 @@ int main(int argc, char *argv[]) {
  .284
  Geometric Distribution parameter (p):
  .9954
+ Insertion Counts:
+ 4506.000000
+ Deletion Counts:
+ 26577.000000
  */
 void setExtendedMod(TreeModel* mod, char* fileName){
   double params[4];
@@ -291,6 +295,28 @@ void setExtendedMod(TreeModel* mod, char* fileName){
   length = 0;
   getline(&line, &length, fin);
   sscanf(line, "%lf", &(mod->geometricParameter));
+  free(line);
+  line = NULL;
+  length = 0;
+  
+  /*Read in insertion and deletion counts, for F84 these will be -1.*/
+  getline(&line, &length, fin);
+  free(line);
+  line = NULL;
+  length = 0;
+  getline(&line, &length, fin);
+  sscanf(line, "%lf", &(mod->insertionsCount));
+  free(line);
+  line = NULL;
+  length = 0;
+  
+  /*Now do deletions...*/
+  getline(&line, &length, fin);
+  free(line);
+  line = NULL;
+  length = 0;
+  getline(&line, &length, fin);
+  sscanf(line, "%lf", &(mod->deletionsCount));
   free(line);
   line = NULL;
   length = 0;

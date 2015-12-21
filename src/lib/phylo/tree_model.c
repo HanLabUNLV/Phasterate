@@ -1149,25 +1149,36 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   int k, l;
   double* freqs = tm->backgd_freqs->data;
   double branchLength = n->dparent;
+  
   /*Save values as we will need them. We multiply mu and lambda by our scale, and restore
    * the original values at the bottom.*/
   const double lambda = params[0];
   const double mu = params[1];
-  params[0] *= scale;
+  
+  /*As explained in the paper, we must multiply by the ratio of number of insertions vs
+   * deletion to account for the fact that indel are not column independent when trying to
+   * compute conservation scores for our alignment. */
+  if(tm->isPhyloP){
+    double indelRatio = 1.0;
+    if(tm->insertionsCount == 0.0)
+      fprintf(stderr, "Warning! Insertion count = 0.0, using 1.0 as our indelRatio...\n");
+    else
+      indelRatio = tm->deletionsCount / tm->insertionsCount;
+      
+    params[0] *= scale * indelRatio;
+  }
+  else
+    params[0] *= scale;
+  
   params[1] *= scale;
   double xiValue = xi(branchLength, params[1], params[0]);
-  printf("Branch length: %f\n", branchLength);
+
   for(k = 0; k < matrixSize; k++)
     for(l = 0; l < matrixSize; l++)
       matrixA[k][l] = singleEventCondProb(l, k, branchLength, freqs, params);
-  /*printMatrix(tm->P[i][j]->matrix, 5);*/
-  /*Set corner.*/  
-  /*printf("Scale: %f\n", scale);*/
-  /*printf("Heurestic: %f\n", matrixA[4][4]);*/
-  matrixA[4][4] = 1 - xiValue;/* - matrixA[4][4];*/
 
-  printMatrix(tm->P[i][j]->matrix, 5);
-
+  matrixA[4][4] = 1 - xiValue;
+  
   params[0] = lambda;
   params[1] = mu;
 
@@ -4605,6 +4616,8 @@ double scaleRateMatrixExtended(TreeModel *mod) {
  * every vertex either: 'D' for deletion, 'I' for insertion, 'S' for substitution, or 'N'
  * for none.
  * 5) It then counts the 'D' or 'I' to find the number of insertions and deletions events.
+ * The main reason that we use heap-allocated arrays is because the likelihood function
+ * uses this...
  * @param mod: our tree model fitted to our data.
  * @param msa: our multiple sequence alignment, the sufficient statistics are not used.
  * @param insertionsCount: will be set to our number of insertions.
@@ -4658,23 +4671,10 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
         inferredEvent[i][j] = 'N';
     }
   }
-  /*Prints what it looks like.*/
-    for(j = 0; j < treeSize; j++){
-      printf("[%d]: ", j);
-      for(i = 0; i < msaLength; i++){
-      printf("%c", inferredEvent[i][j]);
-    }
-    printf("\n");
-  }
 
-  /**meanInsertionSize = computeMeanOfEvent('I', inferredEvent, msaLength, treeSize);*/
-  /**meanDeletionSize = computeMeanOfEvent('D', inferredEvent, msaLength, treeSize);*/
   *insertionsCount = countEvents('I', inferredEvent, msaLength, treeSize);
   *deletionsCount = countEvents('D', inferredEvent, msaLength, treeSize);
   
-  printf("Final insertions count: %f\n", *insertionsCount);
-  printf("Final deletion count: %f\n", *deletionsCount);
-    
   /*Clean up memory:*/
   for(i = 0; i < nStates; i++)
     free(probsTable[i]);
@@ -4687,6 +4687,14 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
   return;
 }
 /* =====================================================================================*/
+/**
+ * Counts the number of events in our inferredEvents table.
+ * @param event: Char to look for in our table.
+ * @param inferredEvent: Table of events of size [msaLength][treeSize].
+ * @param msaLength: Length of inferredEvents.
+ * @param treeSize: with of inferredEvents.
+ * @return: number of events.
+ */
 int countEvents(char event, char** inferredEvent, int msaLength, int treeSize){
   int eventCounter = 0;
   int i, j;
@@ -4697,7 +4705,6 @@ int countEvents(char event, char** inferredEvent, int msaLength, int treeSize){
           eventCounter++;
       }
   
-  printf("%d events of type %c\n", eventCounter, event);
   return eventCounter;
 }
 /* =====================================================================================*/
@@ -4748,7 +4755,6 @@ double countEvolutionaryEventE(char e, char** inferredEvent, int specie, int msa
   /*Keeps track whether we are counting an event.*/
   char currentSequence = '\0';
   int counter = 0;
-  printf("Doing Specie %d\n", specie);
 
   /*Iterate through each specie in our tree, both ancestral and extant.*/
   for(i = 0; i < msaLength; i++){
@@ -4760,7 +4766,6 @@ double countEvolutionaryEventE(char e, char** inferredEvent, int specie, int msa
     }
     /*Flush our counter if we were counting a sequence of e's.*/
     if(currentSequence == e){
-      printf("One event counted of length %d of type %c\n", counter, e);
       eTotals += counter;
       eEvents++;
       currentSequence = '\0';
@@ -4773,7 +4778,6 @@ double countEvolutionaryEventE(char e, char** inferredEvent, int specie, int msa
   }
   /*Done. flush data if needed and reset counters.*/
   if(currentSequence == e){
-    printf("One event counted of length %d of type %c\n", counter, e);
     eTotals += counter;
     eEvents++;
   }
@@ -4781,7 +4785,6 @@ double countEvolutionaryEventE(char e, char** inferredEvent, int specie, int msa
   if(eEvents == 0)
     return 0;
   
-  printf("Total average length %f\n", ((double)eTotals / eEvents));
   return ((double)eTotals) / eEvents;
 }
 /* =====================================================================================*/
