@@ -133,7 +133,6 @@ double tl_compute_log_likelihood(TreeModel *mod, MSA *msa,
     for (j = 0; j < mod->nratecats; j++)
       if (mod->P[i][j] == NULL) defined = FALSE;
   }
-/*   printf("mod %d\n", mod); */
   if (!defined) {
     tm_set_subst_matrices(mod);
   }
@@ -1147,9 +1146,6 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
     }
 
     columnProbability = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-    /*printf("[%d]: %f\tA:%d\tC:%d\tG:%d\tT:%d\t-:%d\tN:%d\n", currentColumn, log(columnProbability),
-            numberOfOcurrances[0], numberOfOcurrances[1], numberOfOcurrances[2], numberOfOcurrances[3],
-            numberOfOcurrances[4], numberOfOcurrances[5]);*/
     /*Multiply by the amount of times this column appeared in the alignment.*/
     if(currentColumn != length)
       totalLikelihood += log(columnProbability) * msa->ss->counts[currentColumn];
@@ -1237,8 +1233,6 @@ double computeTotalTreeLikelihood2(TreeModel* mod,MSA* msa, double **inside_join
             likelihoodTable[i][n->id] = qSum * sSum;
           }
         }
-      printf("{%f, %f, %f, %f, %f}\n", likelihoodTable[0][n->id], likelihoodTable[1][n->id],
-              likelihoodTable[2][n->id], likelihoodTable[3][n->id], likelihoodTable[4][n->id]);
     }
 
     columnProbability = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
@@ -1815,18 +1809,15 @@ void inferCharsFromProbs(TreeNode* node, double** probTable, int parentChar,
   if(node->lchild == NULL){
     c = getMaxFive(probTable, id);
     charInferred[id] = c;
-    printf("Base Case[%d]: %d\n", id, c);
     return;
   }
 
   /*Recursive Case: calculate our character and recurse on our children!*/
   if(id == 0){ /*If we are the root...*/
     c = getMaxFive(probTable, id);
-    printf("Root[0]: %d\n", c);
   }
   else{
     double** probMatrix = mod->P[id][0]->matrix->data;
-    printMatrix(mod->P[id][0]->matrix, 5);
     double array[5];
     int i;
     
@@ -1836,7 +1827,6 @@ void inferCharsFromProbs(TreeNode* node, double** probTable, int parentChar,
     }
 
     c = getMaxFivePrime(array);
-    printf("Inner Node[%d]: %d\n", id, c);
   }
 
   charInferred[id] = c;
@@ -1891,16 +1881,14 @@ void inferEventsFromChar(TreeNode* node, int* charInferred, int parentChar,
         char* eventInferred){
   int id = node->id;
   eventInferred[id] = getCharEvent(charInferred[id], parentChar);
-  printf("inferEventsFromChar[%d]: Was a %c\n", id, eventInferred[id]);  
   /*Base case: This is a leaf:*/
   if(node->lchild == NULL)
     return;
 
   /*Recursive Case: Calculate event and recurse on our children. */
-  if(id == 0){ /*If we are the root rewrite what we had. */
-    printf("Root[0]: 'N'\n");
+  if(id == 0) /*If we are the root rewrite what we had. */
     eventInferred[id] = 'N';
-  }
+  
   /*Recurse on our children:*/
   inferEventsFromChar(node->lchild, charInferred, charInferred[id], eventInferred);
   inferEventsFromChar(node->rchild, charInferred, charInferred[id], eventInferred);
