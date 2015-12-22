@@ -180,6 +180,10 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
     tm->fileName[i] = 0;
   tm->dnaMlNormalize = 0;
   tm->isPhyloP = 0;
+  tm->insertionsCount = -1;
+  tm->deletionsCount = -1;
+  
+  
   return tm;
 }
 
@@ -1158,18 +1162,7 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   /*As explained in the paper, we must multiply by the ratio of number of insertions vs
    * deletion to account for the fact that indel are not column independent when trying to
    * compute conservation scores for our alignment. */
-  if(tm->isPhyloP){
-    double indelRatio = 1.0;
-    if(tm->insertionsCount == 0.0)
-      fprintf(stderr, "Warning! Insertion count = 0.0, using 1.0 as our indelRatio...\n");
-    else
-      indelRatio = tm->deletionsCount / tm->insertionsCount;
-      
-    params[0] *= scale * indelRatio;
-  }
-  else
-    params[0] *= scale;
-  
+  params[0] *= scale * tm->indelRatio;
   params[1] *= scale;
   double xiValue = xi(branchLength, params[1], params[0]);
 

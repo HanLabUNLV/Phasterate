@@ -330,6 +330,12 @@ void setExtendedMod(TreeModel* mod, char* fileName){
     params[1] = params[3];
     mod->all_params = vec_new_from_array(params, 2);
     
+  } /*Set indelRatio. */
+  else{
+    if(mod->insertionsCount == 0.0)
+      fprintf(stderr, "Warning! Insertion count = 0.0, using 1.0 as our indelRatio...\n");
+    else
+      mod->indelRatio = mod->deletionsCount / mod->insertionsCount;
   }
   phast_fclose(fin);
   return;

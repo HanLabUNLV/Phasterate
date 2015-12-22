@@ -228,10 +228,13 @@ struct tm_struct {
                                * exponentiating the matrix. */
   int dnaMlNormalize;              /**Whether or not to normalize and reroot based on user option
                                * no by default. */
-  double insertionsCount;  /**Mean size of insertions observed in our MSA, only used for extended
+  double insertionsCount;  /**<Mean size of insertions observed in our MSA, only used for extended
                                * model.*/
-  double deletionsCount;  /**Mean size of deletions observed in our MSA, only used for extended
+  double deletionsCount;  /**<Mean size of deletions observed in our MSA, only used for extended
                                * model.*/
+  double indelRatio;      /**<Ratio of deletionRate over insertionRate to help make up for
+                           * the fact insertion/deletions are not column independent
+                           * events. */
 };
 
 // Collect trees from files in a directory

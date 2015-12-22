@@ -797,7 +797,7 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 
       vec_set(d->params, 0, d->init_scale);
       d->tupleidx = i;
-      int sigFigs = 8;
+      int sigFigs = 6;
       opt_newton_1d(col_likelihood_wrapper_1d, &d->params->data[0], d, &alt_lnl,
               sigFigs, d->lb->data[0], d->ub->data[0], logf, NULL, NULL);
       /* turns out to be faster (roughly 15% in limited experiments)
