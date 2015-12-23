@@ -1101,7 +1101,7 @@ void tm_set_subst_matrices(TreeModel *tm) {
       else  if(subst_mod == F84E)
         probsF84EModels(tm, i, j, n, branch_scale);
       else
-          mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);        
+        mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);        
     }
   }
   return;
@@ -1802,8 +1802,7 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
     for (i = 0; i < tm_get_nratematparams(mod); i++) {
       if (mod->param_map[mod->ratematrix_idx+i] >= 0){
         if(mod->subst_mod == F84E){
-          /*DnaMl sets this as the lower bounds for the values. */
-          vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 0.0001);
+          vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 0.0000);
           /*Also set an upper bound for our variables. This will stop Betta from
            * going negative. */
           vec_set(upper_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0);
@@ -4554,7 +4553,7 @@ double gapAwareLikelihoodWrapper(Vector *params, void *data) {
   TreeModel *mod = (TreeModel*)data;
   double val;
   tm_unpack_params(mod, params, -1);
-  val = -1 * gapAwareLikelihood(mod, mod->msa, NULL, NULL, mod->category, NULL, 1);
+  val = -1 * gapAwareLikelihood(mod, mod->msa, NULL, NULL, mod->category, NULL, 0);
 
   return val;
 }
