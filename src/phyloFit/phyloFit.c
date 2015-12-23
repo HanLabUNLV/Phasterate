@@ -102,6 +102,7 @@ int main(int argc, char *argv[]) {
     {"seed", 1, 0, 'D'},
     {"dnaMlNormalize", 0, 0, 0},
     {"reroot", 0 , 0, 0},
+    {"originalF84E", 0, 0, 0},
     {0, 0, 0, 0}
   };
 
@@ -326,6 +327,9 @@ int main(int argc, char *argv[]) {
       }
       else if (strcmp(long_opts[opt_idx].name, "reroot") == 0) {
         pf->reroot = 1;
+      }
+      else if (strcmp(long_opts[opt_idx].name, "originalF84E") == 0) {
+        pf->originalF84E = 1;
       }
       else {
 	die("ERROR: unknown option.  Type 'phyloFit -h' for usage.\n");

@@ -1024,7 +1024,7 @@ double gapAwareLikelihood(TreeModel *mod, MSA *msa,double *col_scores, double *t
       post->rcat_expected_nsites[rcat] = 0;
 
   /**Do work here!*/
-  if(flag == 0)
+  if(flag == 1)
   retval = computeTotalTreeLikelihood(mod, msa, inside_joint);
   else
     retval = computeTotalTreeLikelihood2(mod, msa, inside_joint);

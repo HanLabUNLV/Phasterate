@@ -48,6 +48,7 @@ int main(int argc, char *argv[]) {
     {"seed", 1, 0, 'd'},
     {"help", 0, 0, 'h'},
     {"extended", 1, 0, 'x'},
+    {"originalF84E", 0, 0, 'O'},
     {0, 0, 0, 0}
   };
 
@@ -56,7 +57,7 @@ int main(int argc, char *argv[]) {
   gettimeofday(&now, NULL);
   srandom(now.tv_usec);
 #endif
-  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:hx:",
+  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:hx:E",
                           long_opts, &opt_idx)) != -1) {
     switch (c) {
     case 'm':
@@ -148,6 +149,9 @@ int main(int argc, char *argv[]) {
     case 'P':
       p->no_prune = TRUE;
       break;
+    case 'O':
+      p->originalF84E = 1;
+      break;
     case 'h':
       printf("%s", HELP);
       exit(0);
@@ -172,12 +176,17 @@ int main(int argc, char *argv[]) {
   
   if(p->mod->subst_mod == F84 && !p->extended)
     die("ERROR: F84 Model requires -x with *.infoX file!\n");
+  if(p->mod->subst_mod == F84E && !p->extended)
+    die("ERROR: F84E Model requires -x with *.infoX file!\n");
+  
   /*Extended Likelihood algorithm requires the TreeModel all_params->data
    and the mod->rateMatrix_idx to be set as it is used, we simulate that
    here.*/
   if(p->extended || p->mod->subst_mod == F84)
     setExtendedMod(p->mod, p->infoXFileName);
 
+  if(p->originalF84E)
+    p->mod->originalF84E = 1;
 
   if (cats_to_do_str != NULL) {
     if (p->cm == NULL) die("ERROR: --cats-to-do requires --catmap option\n");

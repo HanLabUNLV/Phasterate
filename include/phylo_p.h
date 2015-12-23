@@ -50,8 +50,10 @@ struct phyloP_struct {
   char *help, *mod_fname, *msa_fname;
   ListOfLists *results;
   int no_prune;
-  int extended; /* << Is this using the extended algorithm flag? */
-  char infoXFileName[1000]; /* << Name of file where to read all information from*/
+  int extended; /* << Is this using the extended algorithm. */
+  char infoXFileName[1000]; /* << Name of file where to read all information from.*/
+  int originalF84E; /* << Whether to use original F84E Rivas, Eddy 2008 model. 0 by
+                     * default. */
 };
 
 struct phyloP_struct *phyloP_struct_new(int rphast);

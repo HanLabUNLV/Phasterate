@@ -103,6 +103,7 @@ struct phyloFit_struct* phyloFit_struct_new(int rphast) {
   pf->trees = NULL;
   pf->dnaMlNormalize = 0;
   pf->reroot = 0;
+  pf->originalF84E = 0;
   return pf;
 }
 
@@ -1230,6 +1231,9 @@ int run_phyloFit(struct phyloFit_struct *pf) {
           
         if(pf->reroot)
           mod->tree = midpointRooting(mod->tree);
+        
+        if(pf->originalF84E)
+          mod->originalF84E= 1;
 
         /*If user selected option for dnaMlTree we must compute the "average ration of
          * changes just how dnaMl does it. Then we re-root the tree if needed. */
@@ -1602,6 +1606,10 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
   if(pf->dnaMlNormalize)
     for(i = 0; i < lst_size(mods); i++)
       myMods[i]->dnaMlNormalize = 1;
+  
+  if(pf->originalF84E)
+    for(i = 0; i < lst_size(mods); i++)
+      myMods[i]->originalF84E = 1;
   
   // fit model
   tm_fit_multi(myMods, nmod, (MSA **)msas->array, lst_size(msas), newparams, OPT_VERY_HIGH_PREC, NULL, 1);

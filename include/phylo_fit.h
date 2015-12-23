@@ -69,6 +69,7 @@ struct phyloFit_struct {
                                * how dnaML does. That is, all branchlengths are divided by
                                * the fracChange and tree is midpoint rooted. */
   int reroot;                      /**<reroot tree if user choses for it to do so. */
+  int originalF84E;
   //results go here if not-null
   ListOfLists *results;
 };

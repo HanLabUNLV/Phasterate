@@ -183,6 +183,7 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
   tm->insertionsCount = -1;
   tm->deletionsCount = -1;
   tm->indelRatio = 1;
+  tm->originalF84E = 0;
   
   return tm;
 }
@@ -4553,7 +4554,8 @@ double gapAwareLikelihoodWrapper(Vector *params, void *data) {
   TreeModel *mod = (TreeModel*)data;
   double val;
   tm_unpack_params(mod, params, -1);
-  val = -1 * gapAwareLikelihood(mod, mod->msa, NULL, NULL, mod->category, NULL, 0);
+  int flag = mod->originalF84E;
+  val = -1 * gapAwareLikelihood(mod, mod->msa, NULL, NULL, mod->category, NULL, flag);
 
   return val;
 }
@@ -4626,7 +4628,10 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
   int msaLength = msa->length;
   int nStates = 5;
   int i,j;
-  
+  /*Flag to let likelihood function to look in the full msa table and not the sufficient
+   statistics.*/
+  int doFullMsa = 0;
+
   /*Tables of size probsTable[5][treeSize] and charInferred[msaLength][treeSize],
    * inferredEvent[msaLength][treeSize]. */
   double** probsTable = (double**)malloc(nStates * sizeof(double*));
@@ -4650,7 +4655,10 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
     /*Make sure this is not an all N column...*/
     if(columnHasDataGaps(mod, msa, i, 0) == 1){
       /*Get the probabilities into our probability table, ignore return value...*/
-      singleSiteLikelihood(mod, msa, i, probsTable, 0);
+      if(mod->originalF84E == 0)
+        singleSiteLikelihood2(mod, msa, i, probsTable, doFullMsa);
+      else
+        singleSiteLikelihood(mod, msa, i, probsTable, doFullMsa);
       /*Notice this function knows what the msa-column looks like based on the values inside
        * of probsTable.*/
       inferCharsFromProbs(mod->tree, probsTable, -1, mod, charInferred[i]);

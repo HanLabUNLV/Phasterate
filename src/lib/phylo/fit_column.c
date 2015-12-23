@@ -122,8 +122,12 @@ double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
                                   double **scratch) {
   double results;
   int flagTrue = 1;
-  if(mod->subst_mod == F84E)
-    results = log(singleSiteLikelihood(mod, msa, tupleidx, scratch, flagTrue));
+  if(mod->subst_mod == F84E){
+    if(mod->originalF84E == 0)
+      results = log(singleSiteLikelihood2(mod, msa, tupleidx, scratch, flagTrue));
+    else
+      results = log(singleSiteLikelihood(mod, msa, tupleidx, scratch, flagTrue));
+  }
   else
     results = log(col_compute_likelihood(mod, msa, tupleidx, scratch));
   

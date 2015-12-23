@@ -235,6 +235,8 @@ struct tm_struct {
   double indelRatio;      /**<Ratio of deletionRate over insertionRate to help make up for
                            * the fact insertion/deletions are not column independent
                            * events. */
+  int originalF84E;       /**<Flag to determine if we are using F84E as implemented
+                           * originally in Rivas, Eddy 2008 or not. (No by default.) */
 };
 
 // Collect trees from files in a directory

@@ -62,6 +62,8 @@ struct phyloP_struct *phyloP_struct_new(int rphast) {
   p->no_prune = FALSE;
   p->extended = 0; 
   p->results = rphast ? lol_new(20) : NULL;
+  p->originalF84E = 0;
+  
   return p;
 }
 
