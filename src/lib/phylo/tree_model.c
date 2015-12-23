@@ -182,7 +182,7 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
   tm->isPhyloP = 0;
   tm->insertionsCount = -1;
   tm->deletionsCount = -1;
-  
+  tm->indelRatio = 1;
   
   return tm;
 }
