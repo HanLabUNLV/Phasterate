@@ -285,10 +285,12 @@ double totalProbOfSite(double** pL,double* freqs,int rootNodeId, double p);
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
  * @param k, tree node used for calculating delta gap.
  * @param currSite, u column we are looking at.
+ * @param flag: flag to pass down to deltaGap to let function know whether to look in the
+ * ss table of in the normal msa table. 1 for ss, 0 for msa.
  * @return likelihood as computed by formula 20.
  */
 double probForNodeResidue(int i,double** pL,double** lMatrix, double** rMatrix,
-        int lChild, int rChild, MSA* msa, TreeNode* k, int currSite);
+        int lChild, int rChild, MSA* msa, TreeNode* k, int currSite, int flag);
 
 /**
  * Computes the likelihood of node curentNode (k) given the likelihoods up to node k for
@@ -300,11 +302,12 @@ double probForNodeResidue(int i,double** pL,double** lMatrix, double** rMatrix,
  * @param rChild, rightChild id for pL.
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
  * @param currSite, u column we are looking at.
- *  * @param currSite, u column we are looking at.
+ * @param flag: flag to pass down to deltaGap to let function know whether to look in the
+ * ss table of in the normal msa table. 1 for ss, 0 for msa.
  * @return likelihood as computed by formula 21.
  */
 double probForNodeGap(double** pL, double** lMatrix, double** rMatrix, int lChild,
-        int rChild, MSA* msa, TreeNode* k, int currSite);
+        int rChild, MSA* msa, TreeNode* k, int currSite, int flag);
 
 /**
  * Same as probForNodeResidue except used for extra column containing all gaps therefore
@@ -384,11 +387,11 @@ double epsilonProbability(int j,int i,double t,double* freqs,double* params);
  * a gap or false if node was not a gap. Used by probForNodeResidue and probForNodeGap.
  * @param k, node being looked at.
  * @param msa, we need the MSA to see what the characters look like at tree.
+ * @param flag: Flag to see whether to look in the sufficient statistics of our msa or
+ * at the actual table. 1 for ss, 0 for full table.
  * @return predicate stating whether all leaves from k down were gaps or not.
  */
-
-
-int deltaGap(TreeNode* k,MSA* msa,int currSite);
+int deltaGap(TreeNode* k,MSA* msa,int currSite, int flag);
 
 /**
  * Returns whether the passed char was a gap ;)
@@ -404,9 +407,11 @@ int isGap(char c);
  * @param name, name of the specie.
  * @param msa, multiple sequence alignment.
  * @param index, site in the MSA to get char from.
+ * @param flag: Flag to see whether to look in the sufficient statistics of our msa or
+ * at the actual table. 1 for ss, 0 for full table.
  * @return char at that position.
  */
-char getCharacterForSpecie(char* name,MSA* msa,int index);
+char getCharacterForSpecie(char* name, MSA* msa, int index, int flag);
 
 /* P_u(L_k,i) = { 1, if leaf k has residue i at position u;
  *              { 0, otherwise;

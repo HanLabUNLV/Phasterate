@@ -95,7 +95,7 @@ MSA *msa_new(char **seqs, char **names, int nseqs, int length, char *alphabet) {
     msa->inv_alphabet[(int)msa->alphabet[i]] = i;
   for (i = 0; msa->missing[i] != '\0'; i++)
     msa->is_missing[(int)msa->missing[i]] = 1;
-
+  
   return msa;
 }
 

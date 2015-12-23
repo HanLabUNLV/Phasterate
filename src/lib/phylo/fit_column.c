@@ -123,7 +123,7 @@ double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
   double results;
   int flagTrue = 1;
   if(mod->subst_mod == F84E)
-    results = log(singleSiteLikelihood2(mod, msa, tupleidx, scratch, flagTrue));
+    results = log(singleSiteLikelihood(mod, msa, tupleidx, scratch, flagTrue));
   else
     results = log(col_compute_likelihood(mod, msa, tupleidx, scratch));
   
@@ -797,7 +797,7 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 
       vec_set(d->params, 0, d->init_scale);
       d->tupleidx = i;
-      int sigFigs = 6;
+      int sigFigs = 8;
       opt_newton_1d(col_likelihood_wrapper_1d, &d->params->data[0], d, &alt_lnl,
               sigFigs, d->lb->data[0], d->ub->data[0], logf, NULL, NULL);
       /* turns out to be faster (roughly 15% in limited experiments)
@@ -1681,8 +1681,8 @@ int col_has_data_sub(TreeModel *mod, MSA *msa, int tupleidx, List *inside,
  * but only calculates the scores for the given tupleIdx instead of the whole alignment
  * basically does the work of computing for one column.
 */
-  
-double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likelihoodTable){
+double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likelihoodTable,
+        int flag){
   int i;
   int nstates = mod->rate_matrix->size;
   double totalProb;
@@ -1707,7 +1707,8 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
       int observedState;
       char thischar;
 
-      thischar = ss_get_char_tuple(msa, tupleidx, sequenceNumber, 0);
+      thischar = flag ? ss_get_char_tuple(msa, tupleidx, sequenceNumber, 0) :
+        msa_get_char(msa, sequenceNumber, tupleidx);
       observedState = mod->rate_matrix->inv_states[(int)thischar];
       
       /*Special Case where we have a N at this spot:*/
@@ -1729,10 +1730,11 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
       
       for (i = 0; i < nstates - 1; i++)
         /*pL[k][n] :: Probability of base K given, node n.*/
-        likelihoodTable[i][n->id] = probForNodeResidue(i, likelihoodTable, lMatrix, rMatrix, lChild, rChild,
-                msa, n, tupleidx);
+        likelihoodTable[i][n->id] = probForNodeResidue(i, likelihoodTable, lMatrix,
+                rMatrix, lChild, rChild, msa, n, tupleidx, flag);
       /*Handle gap according to different formula.*/
-      likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, tupleidx);
+      likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix,
+              lChild, rChild, msa, n, tupleidx, flag);
     }
   }
     
@@ -1740,7 +1742,6 @@ double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** likel
 
   return totalProb;
 }
-/* =====================================================================================*/
 //==========================================================================================
 /*
  * Extremely similar to double computeTotalTreeLikelihood() from tree_likelihoods.c

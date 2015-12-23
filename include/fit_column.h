@@ -402,7 +402,7 @@ void col_find_missing_branches(TreeModel *mod, MSA *msa, int tupleidx,
  * but only calculates the scores for the given tupleIdx instead of the whole alignment
  * basically does the work of computing for one column.
 */
-double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL);
+double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL, int flag);
 double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** pL, int flag);
 /** \} */
 #endif

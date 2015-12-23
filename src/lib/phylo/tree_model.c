@@ -4651,7 +4651,7 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
     /*Make sure this is not an all N column...*/
     if(columnHasDataGaps(mod, msa, i, 0) == 1){
       /*Get the probabilities into our probability table, ignore return value...*/
-      singleSiteLikelihood2(mod, msa, i, probsTable, 0);
+      singleSiteLikelihood(mod, msa, i, probsTable, 0);
       /*Notice this function knows what the msa-column looks like based on the values inside
        * of probsTable.*/
       inferCharsFromProbs(mod->tree, probsTable, -1, mod, charInferred[i]);
@@ -4664,7 +4664,7 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
         inferredEvent[i][j] = 'N';
     }
   }
-
+  
   *insertionsCount = countEvents('I', inferredEvent, msaLength, treeSize);
   *deletionsCount = countEvents('D', inferredEvent, msaLength, treeSize);
   

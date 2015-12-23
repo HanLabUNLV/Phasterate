@@ -1081,6 +1081,8 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
   int length = msa->ss->ntuples;
+  /*msa->ss available*/
+  int flag = 1;
   
   /*Get traversal order so we iterate over nodes instead of recursing.*/
   List* traversal = tr_postorder(mod->tree);
@@ -1133,13 +1135,13 @@ double computeTotalTreeLikelihood(TreeModel* mod,MSA* msa, double **inside_joint
           if(currentColumn != length)
             /*pL[k][n] :: Probability of base K given, node n.*/
             likelihoodTable[i][n->id] = probForNodeResidue(i, likelihoodTable, lMatrix, rMatrix, lChild, rChild,
-                    msa, n, currentColumn);
+                    msa, n, currentColumn, flag);
           else /* Extra (all gap) column case*/
             likelihoodTable[i][n->id] = probForNodeResidueAllGap(i, likelihoodTable, lMatrix, rMatrix, lChild, rChild);
         }
         /*Handle gap according to different formula.*/
         if(currentColumn != length)
-          likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, currentColumn);
+          likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild, msa, n, currentColumn, flag);
         else
           likelihoodTable[4][n->id] = probForNodeGapAllGap(likelihoodTable, lMatrix, rMatrix, lChild, rChild);
       }
@@ -1431,10 +1433,12 @@ double totalProbOfSite(double** pL,double* freqs,int rootNodeId, double p){
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
  * @param k, tree node used for calculating delta gap.
  * @param currSite, u column we are looking at.
+ * @param flag: flag to pass down to deltaGap to let function know whether to look in the
+ * ss table of in the normal msa table. 1 for ss, 0 for msa.
  * @return likelihood as computed by formula 20.
  */
 double probForNodeResidue(int i,double** pL,double** lMatrix, double** rMatrix,
-        int lChild, int rChild, MSA* msa, TreeNode* k, int currSite){
+        int lChild, int rChild, MSA* msa, TreeNode* k, int currSite, int flag){
   int q;
   int gapChar = 4;
   int residues = 4;
@@ -1453,8 +1457,8 @@ double probForNodeResidue(int i,double** pL,double** lMatrix, double** rMatrix,
     sSum +=  pL[q][rChild] * rMatrix[i][q];
   }
   
- qDelta = deltaGap(k->lchild, msa, currSite) * lMatrix[i][gapChar];
- sDelta = deltaGap(k->rchild, msa, currSite) * rMatrix[i][gapChar];
+ qDelta = deltaGap(k->lchild, msa, currSite, flag) * lMatrix[i][gapChar];
+ sDelta = deltaGap(k->rchild, msa, currSite, flag) * rMatrix[i][gapChar];
  
   return (qSum + qDelta) * (sSum + sDelta);
 }
@@ -1469,11 +1473,13 @@ double probForNodeResidue(int i,double** pL,double** lMatrix, double** rMatrix,
  * @param rChild, rightChild id for pL.
  * @param msa, Multiple sequence alignment of our tree. Needed for deltaChar()
  * @param currSite, u column we are looking at.
- *  * @param currSite, u column we are looking at.
+ * @param currSite, u column we are looking at.
+ * @param flag: flag to pass down to deltaGap to let function know whether to look in the
+ * ss table of in the normal msa table. 1 for ss, 0 for msa.
  * @return likelihood as computed by formula 21.
  */
 double probForNodeGap(double** pL, double** lMatrix, double** rMatrix, int lChild,
-        int rChild, MSA* msa, TreeNode* k, int currSite){
+        int rChild, MSA* msa, TreeNode* k, int currSite, int flag){
   int q;
   int gapChar = 4;
   int residues = 4;
@@ -1495,8 +1501,8 @@ double probForNodeGap(double** pL, double** lMatrix, double** rMatrix, int lChil
   }
   
   /*Not an error the leftDelta has the rchild and the rightDelta has the lChild...*/
-  leftDelta = deltaGap(k->rchild, msa, currSite);
-  rightDelta = deltaGap(k->lchild, msa, currSite);
+  leftDelta = deltaGap(k->rchild, msa, currSite, flag);
+  rightDelta = deltaGap(k->lchild, msa, currSite, flag);
   lhs =  qSum + pL[gapChar][lChild];
   rhs =  sSum + pL[gapChar][rChild];
 
@@ -1718,13 +1724,13 @@ void printMatrix(Matrix* m, int size){
  * @param msa, we need the MSA to see what the characters look like at tree.
  * @return predicate stating whether all leaves from k down were gaps or not.
  */
-int deltaGap(TreeNode* k,MSA* msa,int currSite){
+int deltaGap(TreeNode* k,MSA* msa,int currSite, int flag){
 
   /*Base case we hit the leaf. Notice assumes properly made tree*/
   if(k->lchild == NULL && k->rchild == NULL){
     char* name = k->name;
     /*Look up the characters at these nodes based on the name.*/
-    char base = getCharacterForSpecie(name,msa,currSite);
+    char base = getCharacterForSpecie(name, msa, currSite, flag);
     
     return isGap(base);
   }
@@ -1733,7 +1739,8 @@ int deltaGap(TreeNode* k,MSA* msa,int currSite){
   TreeNode* leftChild = k->lchild;
   TreeNode* rightChild = k->rchild;
   
-  return deltaGap(leftChild,msa,currSite) * deltaGap(rightChild,msa,currSite);
+  return deltaGap(leftChild, msa, currSite, flag) *
+          deltaGap(rightChild, msa, currSite, flag);
 }
 /* =====================================================================================*/
 /**
@@ -1757,7 +1764,7 @@ int isGap(char c){
  * @param index, site in the MSA to get char from.
  * @return char at that position.
  */
-char getCharacterForSpecie(char* name,MSA* msa,int index){
+char getCharacterForSpecie(char* name, MSA* msa, int index, int flag){
   char myChar;
   char** nameTable = msa->names;
   int size = msa->nseqs;
@@ -1771,7 +1778,8 @@ char getCharacterForSpecie(char* name,MSA* msa,int index){
       break;
     }
   /*Index now holds the location of our species in the SS.*/
-  myChar = msa->ss->col_tuples[index][specieIndex];
+  myChar = flag ? msa->ss->col_tuples[index][specieIndex] :
+    msa_get_char(msa, specieIndex, index);
 
   return myChar;
 }
