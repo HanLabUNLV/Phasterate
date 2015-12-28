@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
   gettimeofday(&now, NULL);
   srandom(now.tv_usec);
 #endif
-  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:hx:E",
+  while ((c = getopt_long(argc, argv, "m:o:i:n:pc:s:f:Fe:l:r:B:d:qwgbPN:hx:O",
                           long_opts, &opt_idx)) != -1) {
     switch (c) {
     case 'm':
