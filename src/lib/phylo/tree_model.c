@@ -1803,7 +1803,7 @@ void tm_set_boundaries(Vector *lower_bounds, Vector *upper_bounds,
     for (i = 0; i < tm_get_nratematparams(mod); i++) {
       if (mod->param_map[mod->ratematrix_idx+i] >= 0){
         if(mod->subst_mod == F84E){
-          vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 0.0000);
+          vec_set(lower_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0e-6);
           /*Also set an upper bound for our variables. This will stop Betta from
            * going negative. */
           vec_set(upper_bounds, mod->param_map[mod->ratematrix_idx+i], 1.0);
