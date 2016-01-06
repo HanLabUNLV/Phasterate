@@ -280,6 +280,7 @@ TreeNode *tr_new_node() {
   n->nodes = n->preorder = n->inorder = n->postorder = NULL;
   n->hold_constant = 0;
   n->childList = NULL;
+  n->fileName[0] = '\0';
   return(n);
 }
 

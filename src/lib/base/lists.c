@@ -272,6 +272,18 @@ int lst_mod_compare(const void* ptr1, const void* ptr2){
     return strcmp(str1,str2);
 }
 
+int lst_tree_compare(const void* ptr1, const void* ptr2){
+    /*Data type of array was a void* that pointed to an MSA object, therefore
+     we must dereference to a void** to get the address of the MSA*/
+    /*This was pointer hell to figure out...*/
+    TreeNode* first =  (TreeNode*)(*(void**)ptr1);
+    TreeNode* second = (TreeNode*)(*(void**)ptr2);
+    char* str1 = first->fileName;
+    char* str2 = second->fileName;
+    return strcmp(str1,str2);
+    
+}
+
 int lst_int_compare_asc(const void* ptr1, const void* ptr2) {
   int val1 = *((int*)ptr1);
   int val2 = *((int*)ptr2);

@@ -239,8 +239,13 @@ struct tm_struct {
                            * originally in Rivas, Eddy 2008 or not. (No by default.) */
 };
 
-// Collect trees from files in a directory
-List *tm_new_from_dir(char *dir);
+/**
+ * Given a directory it will return all the trees in this directory with the extension
+ * *.newick. This function allocates memory that should be deallocated at some point.
+ * @param dir: directory to be searched for all trees.
+ * @return treeList: list of TreeNode* objects representing the trees in the files.
+ */
+List *treesFromDir(char *dir);
 
 typedef struct tm_struct TreeModel;
 

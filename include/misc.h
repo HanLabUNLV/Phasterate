@@ -810,6 +810,7 @@ int is_file(const char* path);
 int is_dir(const char* path);
 List* list_files_in_dir(const char* dirname, const char* extension);
 
+char *remove_ext(char* mystr);
 
 /**
  * 

@@ -38,7 +38,6 @@ void printNames(struct phyloFit_struct *pf);
 
 
 int main(int argc, char *argv[]) {
-  const char* treeToParse;
   char *msa_fname = NULL, *alph = "ACGT";
   msa_format_type input_format = UNKNOWN_FORMAT;
   char c;
@@ -48,8 +47,6 @@ int main(int argc, char *argv[]) {
   struct phyloFit_struct *pf;
   
   struct option long_opts[] = {
-    {"tree-only",1,0,'T'}, /*Tree only model, gets the mod file to get information from
-                           * but only takes the tree model ignoring everything else*/
     {"msa", 1, 0, 'm'},
     {"tree", 1, 0, 't'},
     {"subst-mod", 1, 0, 's'},
@@ -110,22 +107,8 @@ int main(int argc, char *argv[]) {
 
   pf = phyloFit_struct_new(0);
 
-  while ((c = getopt_long(argc, argv, "T:m:t:s:g:c:C:i:o:k:a:l:w:v:M:p:A:I:K:S:b:d:O:u:Y:e:D:GVENRqLPXZUBFfnrzhWyJx", long_opts, &opt_idx)) != -1) {
+  while ((c = getopt_long(argc, argv, "m:t:s:g:c:C:i:o:k:a:l:w:v:M:p:A:I:K:S:b:d:O:u:Y:e:D:GVENRqLPXZUBFfnrzhWyJx", long_opts, &opt_idx)) != -1) {
     switch(c) {
-    case 'T':
-        if (is_dir(optarg)) {
-            pf->mod_file_names = list_files_in_dir(optarg, ".mod");
-            pf->input_mods = tm_new_from_dir(optarg);
-        }
-        else{
-            treeToParse = tr_only_from_file(optarg);
-            if(treeToParse == NULL){
-                printf("Error: No tree in file/malformed.\n");
-                return 1;
-            }
-            pf->tree = tr_new_from_string(treeToParse);
-        }
-        break;
     case 'm':
       msa_fname = optarg;
       break;
@@ -209,11 +192,11 @@ int main(int argc, char *argv[]) {
       break;
     case 'M':
       if (is_dir(optarg)) {
-        pf->mod_file_names = list_files_in_dir(optarg, ".mod");
-        pf->input_mods = tm_new_from_dir(optarg);
+        pf->mod_file_names = list_files_in_dir(optarg, ".newick");
+        pf->trees = treesFromDir(optarg);
       }
       else
-        pf->input_mod = tm_new_from_file(phast_fopen(optarg, "r"), 1);
+        die("Error: Expected directory of *.newick files.");
       break;
     case 'r':
       pf->random_init = TRUE;
@@ -361,7 +344,7 @@ int main(int argc, char *argv[]) {
     pf->msa_fname = msa_fname;
   }
   
-  if(!is_dir(msa_fname) && pf->input_mods)
+  if(!is_dir(msa_fname) && pf->trees)
     die("Error: Expected folder of MSAs.\n");
 
   if (is_dir(msa_fname)) {
@@ -377,14 +360,11 @@ int main(int argc, char *argv[]) {
   /* first label sites, if necessary */
   pf->label_categories = (input_format != MAF);
  
-  if (pf->input_mods) {
-      /*
-       List need to be sorted before hand! The get file from directory does not
-       give the information back in any sensible order. It appears to be random...
-       (Note: this could be used to implement a random-pseudo number generator ;)
-       */
-    lst_qsort(pf->msas,lst_msa_compare);
-    lst_qsort(pf->input_mods,lst_mod_compare);
+  if (pf->trees) {
+    /* List need to be sorted before hand! The get file from directory does not give the
+     * information back in any sensible order. It appears to be random... */
+    lst_qsort(pf->msas, lst_msa_compare);
+    lst_qsort(pf->trees, lst_tree_compare);
     run_phyloFit_multi(pf);
   }
   else {
@@ -398,7 +378,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-MSA* read_msa(struct phyloFit_struct *pf, char * msa_fname, msa_format_type input_format, char* alph) {
+MSA* read_msa(struct phyloFit_struct* pf, char* msa_fname, msa_format_type input_format, char* alph) {
   
   FILE* infile = phast_fopen(msa_fname, "r");
   MSA* msa = NULL;  
@@ -465,20 +445,4 @@ List *msa_from_dir(struct phyloFit_struct *pf, char * dir, msa_format_type input
   for (i = 0; i < msas_num; i++) lst_push_ptr(msas, tmpmsas[i]);
   free(tmpmsas);
   return msas;
-}
-/**
- * Give a phyloFit_struct prints both list inside for comparison.
- * @param pf, structure containing MSA and Mod to print.
- */
-void printNames(struct phyloFit_struct *pf){
-        /*Temporary Printing of lists:*/
-        int i;
-        int sizeMod = lst_size(pf->input_mods);
-        printf("File Comparison:\n");
-        for (i = 0; i < sizeMod; i++){
-            TreeModel* tree = (TreeModel*)lst_get_ptr(pf->input_mods,i);
-            MSA* msa = (MSA*)lst_get_ptr(pf->msas,i);
-            printf("%s\t%s\n",msa->fileName,tree->fileName);
-            fflush(NULL);
-        }
 }

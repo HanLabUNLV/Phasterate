@@ -1386,8 +1386,7 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
   List *trees = pf->trees;
   GFF_Set *gff = pf->gff;
   int quiet = pf->quiet;
-  //TreeModel *input_mod = pf->input_mod;
-  List *mods = pf->input_mods;
+  List *mods = NULL;
   FILE *error_file=NULL;
   
   /*Error Checking*/
@@ -1412,24 +1411,15 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
       die("Error: F84E Model requires -O branches.\n");
   }
   //Make sure the folder is not empty.
-  void* ptr = lst_get_ptr(pf->input_mods, 0);
+  void* ptr = lst_get_ptr(pf->trees, 0);
   if(ptr == NULL)
     die("\nError: One of the folders is empty!\n");
   
-  int substMod = ((TreeModel*)ptr)->subst_mod;
-  if(pf->subst_mod == F84E && pf->subst_mod != substMod)
-      die("\nError: F84E can only be used with F84E mod files.\n");
-
-  /*Make sure all the mod file are of the same substitution model.*/  
+  /*Error checking between folder of msas and trees.*/
   for (i = 0; i < lst_size(pf->msas); i ++){
-    ptr = lst_get_ptr(pf->input_mods, i);
+    ptr = lst_get_ptr(pf->trees, i);
     if(ptr == NULL)
       die("\nError: Unequal number of files in both folders.\n");
-    int otherSubstMod = ((TreeModel*)ptr)->subst_mod;
-    if(substMod != otherSubstMod)
-      die("\nError: Not all models in the model directory are the same!\n");
-    if(pf->subst_mod != otherSubstMod)
-      die("\nError: Model in model directory does not match given model in arguments!\n");
   }
   
   /*As of now users must use -O flag.*/
@@ -1499,17 +1489,6 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
     free_cats_to_do_str = TRUE;
   }
 
-  if (trees == NULL) {
-    if (mods != NULL) {
-      pf->trees = lst_new_ptr(lst_size(pf->input_mods));
-      for (i=0; i < lst_size(pf->input_mods); i++) {
-        TreeModel* currentMod = (TreeModel*)lst_get_ptr(pf->input_mods, i);
-        void* tree = currentMod->tree;
-        lst_push_ptr(pf->trees, tree);
-      }
-    }
-  }
-
   /* allow for specified ancestor */
   if (pf->root_seqname != NULL)
     die("ERROR: --ancestor not allowed with multiple input models.\n");
@@ -1525,7 +1504,7 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
     if (msa_alph_has_lowercase(msa)) msa_toupper(msa); 
     msa_remove_N_from_alph(msa);    /* for backward compatibility */
   }
-
+  
   // setupmsa
   for (i=0; i<lst_size(pf->msas); i++) {
     MSA *msa = lst_get_ptr(pf->msas, i);
@@ -1537,8 +1516,8 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
   if (pf->error_fname != NULL)
     error_file = phast_fopen(pf->error_fname, "w");
   
-  if(lst_size(pf->input_mods) != lst_size(pf->msas))
-    die("Error: Unequal number of mod files and fa file.\n");
+  if(lst_size(pf->trees) != lst_size(pf->msas))
+    die("Error: Unequal number of tree files and fa files.\n");
   
   // setupmod
   List *newmods = lst_new_ptr(1);
@@ -1547,20 +1526,27 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
    restructuring function...*/
   List* toSkipList = lst_new_int(100);
   
-  for (i=0; i<lst_size(pf->input_mods); i++) {
-    TreeModel *input_mod = lst_get_ptr(pf->input_mods, i);
+  for(i = 0; i < lst_size(pf->msas); i++) {
     MSA *msa = lst_get_ptr(pf->msas, i);
     TreeNode *tree = lst_get_ptr(pf->trees, i);
-    List* tmpmods = setupmod(pf, NULL, msa, tree, cats_to_do, newparams,i,toSkipList);
+    List* tmpmods = setupmod(pf, NULL, msa, tree, cats_to_do, newparams, i, toSkipList);
 
-    for (j=0; j<lst_size(tmpmods); j++) {
+    for (j = 0; j < lst_size(tmpmods); j++){
       TreeModel* tempMod = lst_get_ptr(tmpmods, j);
-      memcpy(tempMod->fileName, input_mod->fileName, sizeof(input_mod->fileName));
+      /*Extract the filename from the tree.*/
+      char* fileName = getFileName(tree->fileName);
+      char* fileNameNoExt = remove_ext(fileName);
+
+      /*We do no string length checking... this could create buffer overflows...*/
+      memcpy(tempMod->fileName, fileNameNoExt, strlen(fileNameNoExt));
+      strcat(tempMod->fileName, ".mod");
+      
       tm_init_backgd(tempMod, msa, tempMod->category);
       lst_push_ptr(newmods, tempMod);
+      free(fileName); free(fileNameNoExt);
     }
   }
-  
+
   /*Some mods/msas failed and are recorded in toSkipList. Delete these files.
    *   Then get the index and delete this entries from the 3 lists that are relevant.
    *   This happens when some of the files in the folder don't have enough information
@@ -1569,23 +1555,22 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
    */
   for(i=0; i < lst_size(toSkipList);i++){
       int index = lst_get_int(toSkipList,i);
-      MSA* toDelete = ((MSA*)lst_get_ptr(pf->msas,index-i));
+      MSA* toDelete = ((MSA*)lst_get_ptr(pf->msas,index - i));
       char deletedFile[100];
       
-      strcpy(deletedFile,toDelete->fileName);
-      lst_delete_idx(newmods,index);
-      lst_delete_idx(msas,index);
+      strcpy(deletedFile, toDelete->fileName);
+      lst_delete_idx(newmods, index);
+      lst_delete_idx(msas, index);
       lst_delete_idx(newparams,index);
       printf("Deleted Msa/Mod: %s\n",deletedFile);
   }
   
-  List* tofree = pf->input_mods;
   pf->input_mods = mods = newmods;
   
-  lst_free(tofree);
   lst_free(toSkipList);
   toSkipList = NULL;
   int nmod = lst_size(mods);
+
   /*Original trees if user pick --dnaMlTree, trees are rooted and copy is kept :)*/
   TreeNode* originalTrees[nmod];
   TreeModel** myMods = (TreeModel**)mods->array;

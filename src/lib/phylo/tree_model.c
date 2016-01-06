@@ -4508,12 +4508,18 @@ List *tm_setup_bgc_model_hmm(TreeModel *mod, const char *foreground,
   return modlist;
 }
 
-/** Collect input-models within a directory: files in .mod format */
-List *tm_new_from_dir(char *dir) {
+/**
+ * Given a directory it will return all the trees in this directory with the extension
+ * *.newick. This function allocates memory that should be deallocated at some point.
+ * @param dir: directory to be searched for all trees.
+ * @return treeList: list of TreeNode* objects representing the trees in the files.
+ */
+List *treesFromDir(char *dir) {
   struct dirent *dp;
   DIR *dfd;
-  TreeModel **tmpmods = smalloc(MAX_TREE_NUM * sizeof (TreeModel*));
-  int i, mods_num = 0;
+
+  TreeNode** tempTrees = smalloc(MAX_TREE_NUM * sizeof (TreeNode*));
+  int i, treesNumber = 0;
   char filename_qfd[STR_MED_LEN];
 
   if ((dfd = opendir(dir)) == NULL) 
@@ -4530,22 +4536,26 @@ List *tm_new_from_dir(char *dir) {
       continue;
       // Skip directories
     } else {
-      if (strcmp (".mod", &(dp->d_name[strlen (dp->d_name) - strlen(".mod")])) == 0) {
+      if (strcmp (".newick", &(dp->d_name[strlen (dp->d_name) - strlen(".newick")])) == 0) {
         FILE *f = phast_fopen(filename_qfd, "r");
-        TreeModel *tm = tm_new_from_file(f, 1);
-
-        strcpy(tm->fileName,getFileName(filename_qfd));
-
-        tmpmods[mods_num] = tm;
-        mods_num++;
+        TreeNode* tree = tr_new_from_file(f);
+        
+        strcpy(tree->fileName, getFileName(filename_qfd));
+          
+        tempTrees[treesNumber] = tree;
+        treesNumber++;
         phast_fclose(f);
       }
     }
   }
-  List *mods = lst_new_ptr(mods_num);
-  for (i = 0; i < mods_num; i++) lst_push_ptr(mods, tmpmods[i]);
-  free(tmpmods);
-  return mods;
+
+  List* treeList = lst_new_ptr(treesNumber);
+  for (i = 0; i < treesNumber; i++)
+    lst_push_ptr(treeList, tempTrees[i]);
+  
+  free(tempTrees);
+  
+  return treeList;
 }
 /* =====================================================================================*/
 /* Wrapper for computation of likelihood for extended model. Needed as BFGS function

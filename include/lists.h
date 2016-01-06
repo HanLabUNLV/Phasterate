@@ -67,6 +67,7 @@ int lst_dbl_compare_asc(const void* ptr1, const void* ptr2);
 int lst_dbl_compare_desc(const void* ptr1, const void* ptr2);
 int lst_mod_compare(const void* ptr1, const void* ptr2);
 int lst_msa_compare(const void* ptr1, const void* ptr2);
+int lst_tree_compare(const void* ptr1, const void* ptr2);
 
 void *srealloc(void *ptr, size_t size);
 

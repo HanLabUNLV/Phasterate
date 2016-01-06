@@ -49,6 +49,7 @@ struct tree_node {
    *rchild;   			/**< Node that is a child of this node, drawn to the right in a diagram */
   double dparent;		/**< Distance to parent node */
   char name [STR_MED_LEN];	/**< Name of this node i.e. 'Drosophila 23' usually one of the sequence names */
+  char fileName[100];           /**If this node came from a newick file this variables holds the name, else \0 at fileName[0]. */
   void *data;                   /**< Allows generic data to be 
                                    associated with tree node */ 
   int id;			/**< Uniquely identifying id number for this node */

@@ -1335,26 +1335,26 @@ void dbl_vector_print(double *vect, int D) {
 
 
 /**
- * 
- * @param path, given a path it will extract just the fileName for comparison purposes.
- * @return fileName as a char*
+ * Given a path it will extract just the fileName for comparison purposes.
+ * @param path to extract just the fileName for comparison purposes.
+ * @return fileName as a char*.
  */
 char* getFileName(char* path){
-        int i;
-    char* fileName = (char*)malloc(sizeof(char)*100);
-    char** strings = (char**)malloc(sizeof(char*)*100);
+  int i;
+  char* fileName = (char*)malloc(sizeof(char)*100);
+  char** strings = (char**)malloc(sizeof(char*)*100);
 
-    for(i=0; i < 100; i++)
-            strings[i] = (char*)malloc(sizeof(char)*100);
+  for(i=0; i < 100; i++)
+    strings[i] = (char*)malloc(sizeof(char)*100);
 
-    int tokenNum;
-    tokenNum = parseString(path,strings);
-    strcpy(fileName,strings[tokenNum-1]);
+  int tokenNum;
+  tokenNum = parseString(path,strings);
+  strcpy(fileName,strings[tokenNum-1]);
 
-    return fileName;
-    /*Free memory*/
-        for(i=0; i < 100; i++)
-            free(strings[i]);
+  return fileName;
+  /*Free memory*/
+  for(i=0; i < 100; i++)
+    free(strings[i]);
 }
 
 /**
