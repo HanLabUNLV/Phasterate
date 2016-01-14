@@ -175,14 +175,17 @@ int main(int argc, char *argv[]) {
   p->mod->isPhyloP = 1;
   
   if(p->mod->subst_mod == F84 && !p->extended)
-    die("ERROR: F84 Model requires -x with *.infoX file!\n");
+    die("ERROR: F84 Model requires -x with .infoX file!\n");
   if(p->mod->subst_mod == F84E && !p->extended)
-    die("ERROR: F84E Model requires -x with *.infoX file!\n");
+    die("ERROR: F84E Model requires -x with .infoX file!\n");
+  
+  if(p->extended && p->mod->subst_mod != F84 && p->mod->subst_mod != F84E)
+    die("ERROR:-x can only be used with F84 or F84E\n");
   
   /*Extended Likelihood algorithm requires the TreeModel all_params->data
    and the mod->rateMatrix_idx to be set as it is used, we simulate that
    here.*/
-  if(p->extended || p->mod->subst_mod == F84)
+  if(p->extended)
     setExtendedMod(p->mod, p->infoXFileName);
 
   if(p->originalF84E)

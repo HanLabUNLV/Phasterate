@@ -801,7 +801,7 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
 
       vec_set(d->params, 0, d->init_scale);
       d->tupleidx = i;
-      int sigFigs = 8;
+      int sigFigs = 6;
       opt_newton_1d(col_likelihood_wrapper_1d, &d->params->data[0], d, &alt_lnl,
               sigFigs, d->lb->data[0], d->ub->data[0], logf, NULL, NULL);
       /* turns out to be faster (roughly 15% in limited experiments)
@@ -816,8 +816,9 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
       msa->altScores[i] = alt_lnl;
       msa->scales[i] = this_scale;
       
-      if (delta_lnl <= -0.01)
-	die("ERROR col_lrts: delta_lnl = %e < -0.01\n", delta_lnl);
+      if (delta_lnl <= -0.0001)
+	die("ERROR null model likelihood was higher than alternate model, bad fit...\n",
+                delta_lnl);
       if (delta_lnl < 0) delta_lnl = 0;
     } /* end estimation of delta_lnl */
     else{
@@ -1175,7 +1176,7 @@ ColFitData *col_init_fit_data(TreeModel *mod, MSA *msa, scale_type stype,
   d->lb = vec_new(dim);
   d->ub = vec_new(dim);
   vec_set(d->lb, 0, 0.000001);
-  vec_set(d->ub, 0, 1000);
+  vec_set(d->ub, 0, INFTY);
   d->init_scale = d->init_scale_sub = 1;
 
   if (stype == ALL) {

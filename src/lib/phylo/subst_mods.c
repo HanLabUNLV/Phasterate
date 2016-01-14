@@ -703,8 +703,7 @@ void tm_set_HKYG_matrix(TreeModel *mod, Vector *params, int start_idx ) {
   
   double kappa = vec_get(params, kappa_idx);
   double sigma = vec_get(params, sigma_idx);
-  printf("Kappa: %f\n", kappa);
-  printf("Sigma: %f\n", sigma);
+
   if (mod->backgd_freqs == NULL)
     die("tm_set_HKYG_matrix: mod->backgd_freqs is NULL\n");
   for (i = 0; i < mod->rate_matrix->size; i++) {

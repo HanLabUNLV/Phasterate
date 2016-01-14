@@ -13,6 +13,9 @@ DESCRIPTION:
     frequencies.  They may also include information about parameters
     for modeling rate variation.
 
+    PhyloFit has been extended to allow more than one alignment fitted
+    at once, dubbed "MultiFit". See example 9 below.
+
 USAGE: phyloFit [OPTIONS] <msa_fname>
 
     <msa_fname> should be a multiple alignment in FASTA format or
@@ -93,7 +96,22 @@ EXAMPLES:
     (output will be to mammals-rev.cds-1.mod, mammals-rev.cds-2.mod, and 
     mammals-rev.cds-3.mod)
 
+    9. Multifit allows the user to specify two directories. One containing
+    phylogenetic trees in newick format, and another with msa files and
+    fit a model across all given sequences. We require to hold the branch
+    lengths constant with -O branches.
 
+        phyloFit -M SingleNewickTest/ SingleMsaTest/ -O branches
+            --subst-mod F84
+
+    10. Extended models allow fitting using F84-extended Rivas & Eddy (2008)
+    modified model designed to handle insertion/deletion events using an
+    extended Felsentein Prunning Algorithm. This model requires the -G
+    flag to be used. (See flags: --dnaMlNormalize, --reroot, --originalF84E
+    for extra information).
+
+        phyloFit --tree tree.newick msa.fa --subst-mod F84E -G
+    
 OPTIONS:
 
     --tree, -t <tree_fname>|<tree_string>
@@ -107,7 +125,8 @@ OPTIONS:
         rooted.  When a reversible substitution model is used, the root
         is ignored during the optimization procedure.
 
-    --subst-mod, -s JC69|F81|HKY85|HKY85+Gap|REV|SSREV|UNREST|R2|R2S|U2|U2S|R3|R3S|U3|U3S
+    --subst-mod, -s JC69|F81|HKY85|HKY85+Gap|REV|SSREV|UNREST|R2|R2S|U2|U2S|
+        R3|R3S|U3|U3S|F84|F84E|
         (default REV).  Nucleotide substitution model.  JC69, F81, HKY85
         REV, and UNREST have the usual meanings (see, e.g., Yang, 
         Goldman, and Friday, 1994).  SSREV is a strand-symmetric version
@@ -139,7 +158,8 @@ OPTIONS:
 
     --gaps-as-bases, -G
         Treat alignment gap characters ('-') like ordinary bases.  By
-        default, they are treated as missing data.
+        default, they are treated as missing data. This option is also
+        used for extended insertion/deletion model F84E.
 
     --ignore-branches, -b <branches>
         Ignore specified branches in likelihood computations and parameter
@@ -510,6 +530,39 @@ OPTIONS:
         interpreted as defining the start and end of a window.  Can be
         used with a two-column file and the '*' operator, e.g.,
         --windows-explicit '*mycoords'.
+
+
+ (Options for extended F84e model)
+
+   --dnaMlNormalize,
+       This option is used to produce the same results as program
+       dnaml-erate from software package phylip. With this flag
+       the entire tree's length are scaled by a factor computed
+       from the background frequencies just how dnaml-erate does.
+
+   --reroot,
+       Peforms a midpoint rerooting before fitting on the tree. This
+       new tree is used for the fitting but the final tree printed to
+       the mod file is still the original tree.
+
+   --originalF84E,
+       This option uses the gerative model as described by
+       (Rivas & Eddy, 2008). This is not on by default and instead
+       we use a modified F84e model to allow estimatation with PhyloP
+       using the F84e model.
+
+(Options for multifit)
+
+   -M <directoryPath>,
+       Path to a directory containing one or more trees in newick format
+       with the extension .newick. If this flag is used the path to the
+       msa must also be a directory with msa files with extension .fa.
+       The number of files in both folders must be the same. The names in
+       the trees must match the names of the alignments.
+
+       The results are printed to a "phyloFitResults/" directory. One .mod
+       file per given tree/alignment in the folders.
+
 
 
 REFERENCES:

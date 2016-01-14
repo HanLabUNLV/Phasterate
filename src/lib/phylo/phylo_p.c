@@ -191,18 +191,14 @@ void phyloP(struct phyloP_struct *p) {
   output_wig = p->output_wig;
   output_gff = p->output_gff;
 
-  /*Checking conditions for extended model*/
-  if((mod->subst_mod != F84)){
-    if((mod->subst_mod == F84E) && (p->extended != 1 || method != LRT))
-      die("F84E model can only be used with -x and LRT!\n");
-  }else{
-    if(p->extended != 1 || method != LRT)
-      die("F84 Must be given an input file through -x and use LRT!");
-   p->extended = 0;
-  }
-
-  if((p->extended == 1) && (mod->subst_mod != F84E || method != LRT))
-    die("Extended prunning algorithm only works with F84E and LRT\n");
+  if(p->mod->subst_mod == F84E && p->refidx != 0)
+    die("Error: F84E model requires --refidx 0 option.\n");
+  
+  if(p->mod->subst_mod == F84E && p->mode != CONACC)
+    die("Error: F84E model requires --mode CONACC.\n");
+  
+  if(p->mod->subst_mod == F84E && p->method != LRT)
+    die("Error: F84E model requires --mode CONACC.\n");
 
   if (msa == NULL && !prior_only)
     die("Need either --prior-only or an alignment\n");

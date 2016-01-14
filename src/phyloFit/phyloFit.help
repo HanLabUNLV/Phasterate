@@ -13,6 +13,9 @@ DESCRIPTION: \n\
     frequencies.  They may also include information about parameters\n\
     for modeling rate variation.\n\
 \n\
+    PhyloFit has been extended to allow more than one alignment fitted\n\
+    at once, dubbed \"MultiFit\". See example 9 below.\n\
+\n\
 USAGE: phyloFit [OPTIONS] <msa_fname>\n\
 \n\
     <msa_fname> should be a multiple alignment in FASTA format or\n\
@@ -93,6 +96,22 @@ EXAMPLES:\n\
     (output will be to mammals-rev.cds-1.mod, mammals-rev.cds-2.mod, and \n\
     mammals-rev.cds-3.mod)\n\
 \n\
+    9. Multifit allows the user to specify two directories. One containing\n\
+    phylogenetic trees in newick format, and another with msa files and\n\
+    fit a model across all given sequences. We require to hold the branch\n\
+    lengths constant with -O branches.\n\
+\n\
+        phyloFit -M SingleNewickTest/ SingleMsaTest/ -O branches\n\
+            --subst-mod F84\n\
+\n\
+    10. Extended models allow fitting using F84-extended Rivas & Eddy (2008)\n\
+    modified model designed to handle insertion/deletion events using an\n\
+    extended Felsentein Prunning Algorithm. This model requires the -G\n\
+    flag to be used. (See flags: --dnaMlNormalize, --reroot, --originalF84E\n\
+    for extra information).\n\
+\n\
+        phyloFit --tree tree.newick msa.fa --subst-mod F84E -G\n\
+\n\
 \n\
 OPTIONS:\n\
 \n\
@@ -107,7 +126,8 @@ OPTIONS:\n\
         rooted.  When a reversible substitution model is used, the root\n\
         is ignored during the optimization procedure.\n\
 \n\
-    --subst-mod, -s JC69|F81|HKY85|HKY85+Gap|REV|SSREV|UNREST|R2|R2S|U2|U2S|R3|R3S|U3|U3S\n\
+    --subst-mod, -s JC69|F81|HKY85|HKY85+Gap|REV|SSREV|UNREST|R2|R2S|U2|U2S\n\
+        |R3|R3S|U3|U3S|F84|F84E|\n\
         (default REV).  Nucleotide substitution model.  JC69, F81, HKY85\n\
         REV, and UNREST have the usual meanings (see, e.g., Yang, \n\
         Goldman, and Friday, 1994).  SSREV is a strand-symmetric version\n\
@@ -139,7 +159,8 @@ OPTIONS:\n\
 \n\
     --gaps-as-bases, -G\n\
         Treat alignment gap characters ('-') like ordinary bases.  By\n\
-        default, they are treated as missing data.\n\
+        default, they are treated as missing data. This option is also\n\
+        used for extended insertion/deletion model F84E.\n\
 \n\
     --ignore-branches, -b <branches>\n\
         Ignore specified branches in likelihood computations and parameter\n\
@@ -510,6 +531,37 @@ OPTIONS:\n\
         interpreted as defining the start and end of a window.  Can be\n\
         used with a two-column file and the '*' operator, e.g.,\n\
         --windows-explicit '*mycoords'.\n\
+\n\
+ (Options for extended F84e model)\n\
+\n\
+   --dnaMlNormalize, \n\
+       This option is used to produce the same results as program\n\
+       dnaml-erate from software package phylip. With this flag\n\
+       the entire tree's length are scaled by a factor computed\n\
+       from the background frequencies just how dnaml-erate does.\n\
+\n\
+   --reroot, \n\
+       Peforms a midpoint rerooting before fitting on the tree. This\n\
+       new tree is used for the fitting but the final tree printed to\n\
+       the mod file is still the original tree.\n\
+\n\
+   --originalF84E, \n\
+       This option uses the gerative model as described by\n\
+       (Rivas & Eddy, 2008). This is not on by default and instead\n\
+       we use a modified F84e model to allow estimatation with PhyloP\n\
+       using the F84e model.\n\
+\n\
+(Options for multifit)\n\
+\n\
+   -M <directoryPath>,\n\
+       Path to a directory containing one or more trees in newick format\n\
+       with the extension .newick. If this flag is used the path to the\n\
+       msa must also be a directory with msa files with extension .fa.\n\
+       The number of files in both folders must be the same. The names in\n\
+       the trees must match the names of the alignments.\n\
+\n\
+       The results are printed to a \"phyloFitResults/\" directory. One .mod\n\
+       file per given tree/alignment in the folders.\n\
 \n\
 \n\
 REFERENCES:\n\

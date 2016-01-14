@@ -1159,7 +1159,7 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
    * the original values at the bottom.*/
   const double lambda = params[0];
   const double mu = params[1];
-  
+
   /*As explained in the paper, we must multiply by the ratio of number of insertions vs
    * deletion to account for the fact that indel are not column independent when trying to
    * compute conservation scores for our alignment. */

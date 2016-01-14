@@ -50,6 +50,10 @@ DESCRIPTION:
     made less conservative with --fit-model and more conservative with
     --confidence-interval (see below).
 
+    PhyloP has been extended to allow compute conservations scores based
+    on insertion deletion events using the F84e model. See option -x and
+    example 8 below.
+
 EXAMPLES:
 
     1. Using the SPH method, compute and report p-values of conservation
@@ -118,6 +122,16 @@ EXAMPLES:
     can be used to output the original features in GFF format with scores
     equal to -log p.  Note that the input file can be in GFF instead of BED
     format.
+
+   8. Compute conservation scores for insertion and deletion events. This
+   requires a mod file from model F84e and a infoX file. Both can be created
+   by PhyloFit using the --subst-mod F84e option. Scores printed represent
+   indel scores. See -x flag. Options -r 0 should be used to make sure
+   coordinate frame is correct. This option only works for CONACC and LRT,
+   With --wig-scores.
+
+       phyloP -r 0 --wig-scores --mode CONACC --method LRT f84e.mod msa.fa \
+            -x f84e.infoX
 
 OPTIONS:
 
@@ -276,6 +290,10 @@ OPTIONS:
     --quantiles, -q
         (For use with --null or --posterior) Report quantiles of
         distribution rather than whole distribution.
+
+    -x <infoXFile>,
+        Option required when using F84 or F84e model. The name of the infoX
+        file produced by PhyloFit must be given.
 
 
 REFERENCES:

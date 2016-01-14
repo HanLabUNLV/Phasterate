@@ -5,16 +5,16 @@ PHAST: PHYLOGENETIC ANALYSIS WITH SPACE/TIME MODELS
 QUICK START - INSTALLING PHAST
 
 You can either download the Phast binaries or compile Phast from source.
-Binaries are generally the easiest way to get up and running with Phast 
-and are suggested for new users.  
+Binaries are generally the easiest way to get up and running with Phast
+and are suggested for new users.
 
 -Installing using Binaries
-  Phast binaries for Windows, MacOSX, and Linux can be downloaded from the 
+  Phast binaries for Windows, MacOSX, and Linux can be downloaded from the
     main PHAST page: http://compgen.bscb.cornell.edu/phast
 
 -Compiling from Source
   MacOSX
-    1. Download a copy of Phast from http://compgen.bscb.cornell.edu/phast/ 
+    1. Download a copy of Phast from http://compgen.bscb.cornell.edu/phast/
 	and extract the file phast*.tgz using 'tar -xvzf phast*.tgz'
     2. Change directory to 'phast/src/' and run the command 'make'
     3. The Phast binaries should be located in the 'phast/bin/' directory.
@@ -23,19 +23,19 @@ and are suggested for new users.
     Part 1 - Installing Clapack - (If you already have Clapack installed, skip to Part 2)
     1. Download Clapack from the following URL http://www.netlib.org/clapack/clapack.tgz
     2. Unzip clapack.tgz with the command 'tar -xvzf clapack.tgz'
-    3. Go into the newly created Clapack directory (i.e. 'cd CLAPACK-3.2.1') 
+    3. Go into the newly created Clapack directory (i.e. 'cd CLAPACK-3.2.1')
 	and type 'cp make.inc.example make.inc && make f2clib && make blaslib && make lib'
        Note: Building Clapack can take several minutes depending on your system
-    
+
     Part 2 - Installing Phast
-    4. Download a copy of Phast from http://compgen.bscb.cornell.edu/phast/ 
+    4. Download a copy of Phast from http://compgen.bscb.cornell.edu/phast/
 	and extract the contents of phast*.tgz using 'tar -xvzf phast*.tgz'
     5. Change directory to 'phast/src/' and run 'make CLAPACKPATH=/usr/local/software/clapack'
 	replacing '/usr/local/software/clapack' with the path of your
 	Clapack install (e.g., CLAPACKPATH=/home/username/CLAPACK-3.2.1)
     6. The Phast binaries should be created in the '../bin/' directory
-    
-  Windows 
+
+  Windows
     PHAST can be compiled under Windows using the Cygwin linux-like
     environment, but some users have reported difficulties in making this
     work.  We recommend using the provided binaries for Windows, unless you
@@ -73,7 +73,7 @@ NOTES
       to check out the latest version before submitting a bug report.
       To download the latest code simply run the command as follows
       'svn co http://compgen.bscb.cornell.edu/svnrepo/phast/trunk/phast'.
-      The source code will be saved in a folder called 'phast' in the 
+      The source code will be saved in a folder called 'phast' in the
       directory where the command was run. You can substitute SVN code for
       the *.tgz formated code download from our site and build by following
       the above instructions.

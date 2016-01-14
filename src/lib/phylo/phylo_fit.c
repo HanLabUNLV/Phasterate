@@ -681,7 +681,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   /*This model should only work when used along with the -O branches, -x -G*/
   if(pf->subst_mod == F84E){
     if(pf->gaps_as_bases == 0)
-      die("Error: F84E Model requires -G for gaps as bases.\n");
+    die("Error: F84E Model requires -G for gaps as bases.\n");
     if(pf->nooptstr != NULL){
       if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
         die("Error: F84E Model requires -O branches.\n");

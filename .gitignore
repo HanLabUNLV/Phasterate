@@ -7,11 +7,4 @@ lib/
 !src/lib/
 doc/
 nbproject/
-tempTest/
-*.mod
-*.infoX
-*.hs
-*.fa
-*.newick
-data/
-Testing/
+computedLikelihoods.txt

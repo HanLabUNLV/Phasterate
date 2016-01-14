@@ -1,0 +1,19 @@
+Lambda Rate:
+0.008509
+Mu Rate:
+0.061660
+Alpha Rate:
+0.513467
+Betta Rate:
+0.486533
+Background frequencies (A, C, G, T):
+0.254698
+0.260464
+0.263575
+0.221263
+Geometric Distribution parameter (p):
+0.998058
+Mean size of insertion:
+4506.000000
+Mean size of deletion:
+26577.000000
