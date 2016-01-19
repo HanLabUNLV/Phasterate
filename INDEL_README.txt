@@ -1,11 +1,19 @@
 ==========================================================================================
+Phasterate
+==========================================================================================
 PHAST: PHYLOGENETIC ANALYSIS WITH SPACE/TIME MODELS
 
 EXTENDED WITH INDELS
 ==========================================================================================
 
+This is an extended version of Phast, for any question please email:
+"mira.han" atSymbol "unlv.edu"
+
 Installation:
 For installation instructions see: README.txt in this directory.
+
+This serves as a quick start guide and reference. Please see PhastDocumentation.pdf
+for more information.
 
 
 Sample Runs:

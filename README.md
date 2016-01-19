@@ -1,4 +1,4 @@
-# Phast-erate
+# Phasterate
 
 ##Description
 This is an extension of Phylogenetic Analysis With Space/Time Models (Phast) version 1.3.
