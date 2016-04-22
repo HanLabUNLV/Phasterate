@@ -184,7 +184,7 @@ TreeModel *tm_new(TreeNode *tree, MarkovMatrix *rate_matrix,
   tm->deletionsCount = -1;
   tm->indelRatio = 1;
   tm->originalF84E = 0;
-  
+
   return tm;
 }
 
@@ -1102,7 +1102,7 @@ void tm_set_subst_matrices(TreeModel *tm) {
       else  if(subst_mod == F84E)
         probsF84EModels(tm, i, j, n, branch_scale);
       else
-        mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);        
+        mm_exp(tm->P[i][j], rate_matrix, n->dparent * branch_scale * tm->rK[j]);
     }
   }
   return;
@@ -1122,7 +1122,7 @@ void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   int m = tm->ratematrix_idx;
   double* currentParams = &(tm->all_params->data[m]);
   double params[4] = {0, 0, currentParams[0], currentParams[1]};
-      
+
   double** matrixA = tm->P[i][j]->matrix->data;
   int k, l;
   double* freqs = tm->backgd_freqs->data;
@@ -1154,7 +1154,7 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   int k, l;
   double* freqs = tm->backgd_freqs->data;
   double branchLength = n->dparent;
-  
+
   /*Save values as we will need them. We multiply mu and lambda by our scale, and restore
    * the original values at the bottom.*/
   const double lambda = params[0];
@@ -1172,7 +1172,7 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
       matrixA[k][l] = singleEventCondProb(l, k, branchLength, freqs, params);
 
   matrixA[4][4] = 1 - xiValue;
-  
+
   params[0] = lambda;
   params[1] = mu;
 
@@ -2044,13 +2044,12 @@ void tm_check_boundaries(Vector *opt_params, Vector *lower_bounds,
    background frequencies.  The vector 'params' should define the
    initial values for the optimization procedure.  Fuction returns 0
    on success, 1 on failure.  */
-int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
-           opt_precision_type precision, FILE *logf, int quiet,
-	   FILE *error_file) {
+int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat, opt_precision_type precision,
+           FILE *logf, int quiet, FILE *error_file) {
   double ll;
   Vector *lower_bounds, *upper_bounds, *opt_params;
   int i, retval = 0, npar, numeval;
-  
+
   if (msa->ss == NULL) {
     if (msa->seqs == NULL)
       die("ERROR tm_fit: msa->ss and msa->seqs are both NULL\n");
@@ -2113,12 +2112,12 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
 
   if (!quiet)
     fprintf(stderr, "numpar = %i\n", opt_params->size);
-  
+
   if(mod->subst_mod == F84E){
     retval = opt_bfgs(gapAwareLikelihoodWrapper, opt_params, (void*)mod, &ll,lower_bounds,
                       upper_bounds, logf, NULL, precision,NULL, &numeval);
     mod->lnL = -ll;
-    
+
     /*Compute the number of insertion and deletion events, this is auxiliary information
      used for phyloP.*/
     double insertionsCount, deletionsCount;
@@ -2134,6 +2133,15 @@ int tm_fit(TreeModel *mod, MSA *msa, Vector *params, int cat,
       mod->lnL = ll * -1 * log(2);
     else
       mod->lnL = ll * -1;
+
+    /*Compute the number of insertion and deletion events, this is auxiliary information
+      used for phyloP for the HKY85+Gap model.*/
+    if(mod->subst_mod == HKY85G && mod->allow_gaps){
+      double insertionsCount, deletionsCount;
+      computeIndelCounts(mod, msa, &insertionsCount, &deletionsCount);
+      mod->insertionsCount = insertionsCount;
+      mod->deletionsCount = deletionsCount;
+    }
   }
 
   if (!quiet) fprintf(stderr, "Done.  log(likelihood) = %f numeval=%i\n", mod->lnL, numeval);
@@ -2210,7 +2218,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
 		   subst_mod_is_codon_model(mod[i]->subst_mod));
     }
   }
-  
+
   /*Set global geometric parameter for all models now that the sufficient stats are set.*/
   double totalP = 0;
   for(i = 0; i < nmsa; i ++){
@@ -2220,7 +2228,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
   totalP /= (double)nmsa;
   for(i = 0; i < nmsa; i ++)
     mod[i]->geometricParameter = totalP;
-  
+
   nstate = int_pow(strlen(msa[0]->alphabet), mod[0]->order+1);
 
   for (j=0; j < nmod; j++) {
@@ -2261,20 +2269,20 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
 	npar = mod[j]->param_map[i]+1;
     }
   }
-  
+
   double totalFreqs[4] = {0, 0, 0, 0};
   double gapTotalFreq = 0;
   int residues = 4, k;
   double gapFreq, gapDivisor;
-  
-  if (mod[0]->subst_mod == F84E){ 
-    /*We will normalize the vectors if we have a 5-gap model.*/  
-    for (i = 0; i < nmod; i++) {      
+
+  if (mod[0]->subst_mod == F84E){
+    /*We will normalize the vectors if we have a 5-gap model.*/
+    for (i = 0; i < nmod; i++) {
       gapFreq = mod[i]->backgd_freqs->data[4];
       /*To normalize the frequency calculate 1.0 - gapFrequency and compute the
        *             reciprocal to divide all our frequencies by.*/
       gapDivisor = 1.0 / (1.0 - gapFreq);
-      
+
       for (k = 0; k < residues; k++){
         double currentFreq = vec_get(mod[i]->backgd_freqs, k);
         double normalizedFreq = currentFreq * gapDivisor;
@@ -2286,23 +2294,23 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
       mod[i]->backgd_freqs->data[4] = gapFreq;
     }
   }
-  
+
   /*We want to figure out the global background frequencies so our data shares them.*/
   for (i = 0; i < nmod; i++) {
     double* tempFreqs = mod[i]->backgd_freqs->data;
     /*Iterate over our temporary frequencies and add them to the total!*/
     for(j = 0; j < residues; j++)
       totalFreqs[j] += tempFreqs[j];
-     
+
     if(mod[i]->subst_mod == F84E || mod[i]->allow_gaps)
       gapTotalFreq += tempFreqs[4];
   }
-  
+
    /*Find the average by dividing by number of models entered.*/
   double total = (double) nmod;
   for(j = 0; j < residues; j++)
     totalFreqs[j] /= total;
-  
+
   if(mod[0]->subst_mod == F84E || mod[0]->allow_gaps)
     gapTotalFreq /= total;
 
@@ -2317,29 +2325,29 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
     if(mod[0]->subst_mod == F84E || mod[0]->allow_gaps){
       modFreqs[4] = gapTotalFreq;
       vec_set(mod[i]->all_params, mod[i]->backgd_idx + 4, gapTotalFreq);
-      
+
     }
   }
   if (npar <= 0)
     die("ERROR tm_fit npar=%i.  Nothing to optimize!\n", npar);
   opt_params = vec_new(npar);
-  
+
   /*All models now need to be reinitialized with the proper values based on the global
    * values!*/
   for (i = 0; i < nmod; i++)
     /*Emperically we know to set kappa at about 5.0, this is how Phast does it...*/
     tm_rate_params_init(mod[i], mod[i]->all_params, mod[i]->ratematrix_idx, 5.0);
-  
+
   /*No need to iterate over models as they all share the same parameters!*/
   for (i = 0; i < mod[0]->all_params->size; i++)
     if (mod[0]->param_map[i] >=0)
       vec_set(opt_params, mod[0]->param_map[i], vec_get(mod[0]->all_params, i));
-  
+
   tm_new_boundaries(&lower_bounds, &upper_bounds, npar, mod[0], 1);
   for (j=1; j < nmod; j++)
     tm_set_boundaries(lower_bounds, upper_bounds, mod[j]);
   tm_check_boundaries(opt_params, lower_bounds, upper_bounds);
-  
+
   /*If user selected option for dnaMlTree we must compute the "average ration of
    * changes just how dnaMl does it. Then we re-root the tree if needed. */
   if(mod[0]->dnaMlNormalize){
@@ -2350,10 +2358,10 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
     double mu = params->data[m + 1];
     double alpha = params->data[m + 2];
     double betta = params->data[m + 3];
-    
+
     double fracChange = computeFracChange(lambda, mu, alpha, betta,
             freq[0], freq[1], freq[2], freq[3], freq[4]);
-    
+
     for(i = 0; i < nmod; i++){
       /*Divide all branches by fracChange*/
       tr_scale(mod[i]->tree, 1.0 / fracChange);
@@ -2369,7 +2377,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
 
   for (i=0; i < nmod; i++)
     lst_push_ptr(modlist, mod[i]);
-    
+
   /*Do Most of the work here!*/
   if(mod[0]->subst_mod == F84E){
     retval = opt_bfgs(tmMultiGapAwareLikelihoodWrapper, opt_params, (void*)modlist, &ll,
@@ -2377,7 +2385,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
     for (j=0; j < nmod; j++){
       mod[j]->lnL = gapAwareLikelihoodWrapper(opt_params, mod[j]);
     }
-    
+
     /*Compute the counts of insertion and deletions, this is auxiliary information used
      * for phyloP.*/
     double insertionTotal = 0, deletionTotal = 0;
@@ -2387,27 +2395,27 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
       insertionTotal += insertionsCount;
       deletionTotal += deletionsCount;
     }
-    
+
     for(j = 0; j < nmod; j++){
       mod[j]->insertionsCount = insertionTotal;
       mod[j]->deletionsCount = deletionTotal;
     }
   }
-  
+
   else{ /*Just regular model!*/
     retval = opt_bfgs(tm_multi_likelihood_wrapper, opt_params, (void*)modlist, &ll,
             lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);
     for (j=0; j < nmod; j++)
       if(mod[0]->subst_mod != F84)
-      mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0 * log(2); 
+      mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0 * log(2);
       else
         mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0;
   }
-  
+
   lst_free(modlist);
-  
+
   ll *= -1.0*log(2);
-  
+
   if (!quiet) {
     fprintf(stderr, "Done.  log(likelihood) = %f numeval=%i (", ll, numeval);
     for (i=0; i < npar; i++) {
@@ -2424,7 +2432,7 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
 
   if (retval != 0)
     fprintf(stderr, "WARNING: BFGS algorithm reached its maximum number of iterations.\n");
-    
+
   return retval;
 }
 
@@ -2882,13 +2890,13 @@ double tmMultiGapAwareLikelihoodWrapper(Vector *params, void *data) {
   double ll[size];
   double llReturn = 0;
   int i;
-  
+
   for (i=0; i < size; i++)
     ll[i] = gapAwareLikelihoodWrapper(params, lst_get_ptr(modlist, i));
-    
+
   for(i = 0; i < size; i++)
     llReturn += ll[i];
-  
+
   return llReturn;
 }
 
@@ -2898,14 +2906,14 @@ double tm_multi_likelihood_wrapper(Vector *params, void *data) {
   double ll[size];
   double llReturn = 0;
   int i;
-  
+
   for (i=0; i < lst_size(modlist); i++)
     ll[i] = tm_likelihood_wrapper(params, lst_get_ptr(modlist, i));
-  
-  
+
+
   for(i = 0; i < size; i++)
     llReturn += ll[i];
-  
+
   return llReturn;
 }
 
@@ -3006,7 +3014,7 @@ void tm_unpack_params(TreeModel *mod, Vector *params_in, int idx_offset) {
   for (j = 0; j < mod->backgd_freqs->size; j++)
     vec_set(mod->backgd_freqs, j, vec_get(params, mod->backgd_idx+j)/sum);
   }
-  
+
   /* rate variation */
   if (mod->nratecats > 1) {
     if (mod->site_model)  {   /* Nielsen-yang site model parameterization */
@@ -4522,9 +4530,9 @@ List *treesFromDir(char *dir) {
   int i, treesNumber = 0;
   char filename_qfd[STR_MED_LEN];
 
-  if ((dfd = opendir(dir)) == NULL) 
+  if ((dfd = opendir(dir)) == NULL)
     die("Error: Could Not open directory %s\n", dir);
-  
+
   while ((dp = readdir(dfd)) != NULL) {
     struct stat stbuf;
     sprintf(filename_qfd, "%s/%s", dir, dp->d_name);
@@ -4539,9 +4547,9 @@ List *treesFromDir(char *dir) {
       if (strcmp (".newick", &(dp->d_name[strlen (dp->d_name) - strlen(".newick")])) == 0) {
         FILE *f = phast_fopen(filename_qfd, "r");
         TreeNode* tree = tr_new_from_file(f);
-        
+
         strcpy(tree->fileName, getFileName(filename_qfd));
-          
+
         tempTrees[treesNumber] = tree;
         treesNumber++;
         phast_fclose(f);
@@ -4552,9 +4560,9 @@ List *treesFromDir(char *dir) {
   List* treeList = lst_new_ptr(treesNumber);
   for (i = 0; i < treesNumber; i++)
     lst_push_ptr(treeList, tempTrees[i]);
-  
+
   free(tempTrees);
-  
+
   return treeList;
 }
 /* =====================================================================================*/
@@ -4607,13 +4615,13 @@ double scaleRateMatrixExtended(TreeModel *mod) {
 }
 /* =====================================================================================*/
 /**
- * Given a phylogenetic tree and multiple sequence alignment, and a model of nucleotide 
+ * Given a phylogenetic tree and multiple sequence alignment, and a model of nucleotide
  * and gap substitution this function will compute a prediction on the number of insertion
  * and deletion events. This function assumes that the most likely model has already been
  * fit for our data. Then it:
  * 1) Recomputes all conditional probability matrices.
  * 2) Iterates through each column and calculates the probabilities for every vertex in
- * our tree using @singleSiteLikelihood2.
+ * our tree using the proper @singleSiteLikelihood functions.
  * 3) It then uses this information to infer the most likely character that every specie
  * had at that given column using inferCharsFromProbs.
  * 4) It then calculates the type of evolutionary event that created the character at
@@ -4632,7 +4640,7 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
         double* deletionsCount){
   /*Just to be sure we recalculate the conditional probability matrices.*/
   tm_set_subst_matrices(mod);
-  
+
   /* Total size of tree including all leaf and inner nodes.*/
   int treeSize = mod->tree->nnodes;
   int msaLength = msa->length;
@@ -4664,11 +4672,20 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
   for(i = 0; i < msaLength; i++){
     /*Make sure this is not an all N column...*/
     if(columnHasDataGaps(mod, msa, i, 0) == 1){
+
       /*Get the probabilities into our probability table, ignore return value...*/
-      if(mod->originalF84E == 0)
-        singleSiteLikelihood2(mod, msa, i, probsTable, doFullMsa);
+      if(mod->subst_mod == HKY85G){
+        col_compute_likelihood(mod, msa, i, probsTable, doFullMsa);
+      }
+      /* Modified Rivas i.e. PhastIndel Model. */
+      else if(mod->subst_mod == F84E && mod->originalF84E == 0)
+        singleSiteLikelihoodModified(mod, msa, i, probsTable, doFullMsa);
+      /*Original Rivas model. */
+      else if(mod->subst_mod == F84E && mod->originalF84E == 1)
+        singleSiteLikelihoodRivas(mod, msa, i, probsTable, doFullMsa);
       else
-        singleSiteLikelihood(mod, msa, i, probsTable, doFullMsa);
+        die("Error: Unkown model combination for computeIndelCounts.\n");
+
       /*Notice this function knows what the msa-column looks like based on the values inside
        * of probsTable.*/
       inferCharsFromProbs(mod->tree, probsTable, -1, mod, charInferred[i]);
@@ -4681,10 +4698,10 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
         inferredEvent[i][j] = 'N';
     }
   }
-  
+
   *insertionsCount = countEvents('I', inferredEvent, msaLength, treeSize);
   *deletionsCount = countEvents('D', inferredEvent, msaLength, treeSize);
-  
+
   /*Clean up memory:*/
   for(i = 0; i < nStates; i++)
     free(probsTable[i]);
@@ -4692,8 +4709,8 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
     free(charInferred[i]);
     free(inferredEvent[i]);
   }
-  free(probsTable); free(charInferred); free(inferredEvent); 
-  
+  free(probsTable); free(charInferred); free(inferredEvent);
+
   return;
 }
 /* =====================================================================================*/
@@ -4708,13 +4725,13 @@ void computeIndelCounts(TreeModel* mod,MSA* msa, double* insertionsCount,
 int countEvents(char event, char** inferredEvent, int msaLength, int treeSize){
   int eventCounter = 0;
   int i, j;
-  
+
   for(i = 0; i < msaLength; i++)
       for(j = 0; j < treeSize; j++){
         if(event == inferredEvent[i][j])
           eventCounter++;
       }
-  
+
   return eventCounter;
 }
 /* =====================================================================================*/
@@ -4794,7 +4811,7 @@ double countEvolutionaryEventE(char e, char** inferredEvent, int specie, int msa
   /*No events of this type in this column.*/
   if(eEvents == 0)
     return 0;
-  
+
   return ((double)eTotals) / eEvents;
 }
 /* =====================================================================================*/

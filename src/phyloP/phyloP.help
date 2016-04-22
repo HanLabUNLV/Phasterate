@@ -133,7 +133,6 @@ EXAMPLES:\n\
        phyloP -r 0 --wig-scores --mode CONACC --method LRT f84e.mod msa.fa \\\n\
             -x f84e.infoX\n\
 \n\
-\n\
 OPTIONS:\n\
 \n\
     --msa-format, -i FASTA|PHYLIP|MPM|MAF|SS\n\

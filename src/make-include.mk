@@ -45,7 +45,7 @@ ifneq ($(TARGETOS), Windows)
  #for debugging
  #CFLAGS = -g -fno-inline -Wall -DPHAST_DEBUG
  #for best performance
- CFLAGS = -O3 -g
+ CFLAGS = -g
  # some other options
  #CFLAGS = -mcpu=opteron -O3
  #CFLAGS = -mcpu=pentiumpro -O3 

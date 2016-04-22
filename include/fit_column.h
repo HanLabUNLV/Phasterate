@@ -146,23 +146,22 @@ double col_likelihood_wrapper_1d(double x, void *data);
 double col_compute_log_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
                                   double **scratch);
 
-/** Compute and return the likelihood of a tree model with respect
-   to a single column tuple in an alignment.  
-
-   This is a paired-down
-   version of tl_compute_likelihood for use in estimation of
-   base-by-base scale factors.  It assumes a 0th order model,
-   leaf-to-sequence mapping already available, probability matrices computed,
-   sufficient statistics already available.  This function does allow for
-   rate variation.
-  @param mod Substitution model, rates and its metadata
-  @param msa Sequence data and its metadata
-  @param tupleidx Which column to compute likelihood for
-  @param scratch Pre-allocated memory used as scratch space when computing likelihood 
-  @result Estimated Log likelihood
-*/
-double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx,
-		              double **scratch);
+/** Compute and return the log likelihood of a tree model with respect to a single column
+ * tuple in an alignment.  This is a pared-down version of tl_compute_log_likelihood for
+ * use in estimation of base-by-base scale factors.  It assumes a 0th order model,
+ * leaf-to-sequence mapping already available, prob matrices computed, sufficient stats
+ * already available.  Note that this function uses natural log rather than log2. This
+ * function does allow for rate variation.
+ * @param mod: Substitution model, rates and its metadata
+ * @param msa: Sequence data and its metadata
+ * @param tupleidx: Which column to compute likelihood for
+ * @param scratch: Pre-allocated memory used as scratch space when computing likelihood
+ * @param msaFlag: if flag is true it will use the sufficient statistics, else it will
+ * get the data directly from the MSA.
+ * @result: Estimated Log likelihood
+ */
+double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx, double **scratch,
+                              int msaFlag);
 
 /** \name Column Fit Data likelihood ratio test functions
  \{ */
@@ -402,7 +401,7 @@ void col_find_missing_branches(TreeModel *mod, MSA *msa, int tupleidx,
  * but only calculates the scores for the given tupleIdx instead of the whole alignment
  * basically does the work of computing for one column.
 */
-double singleSiteLikelihood(TreeModel* mod,MSA* msa,int tupleidx, double** pL, int flag);
-double singleSiteLikelihood2(TreeModel* mod,MSA* msa,int tupleidx, double** pL, int flag);
+double singleSiteLikelihoodRivas(TreeModel* mod,MSA* msa,int tupleidx, double** pL, int flag);
+double singleSiteLikelihoodModified(TreeModel* mod,MSA* msa,int tupleidx, double** pL, int flag);
 /** \} */
 #endif

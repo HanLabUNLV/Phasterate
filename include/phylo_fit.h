@@ -97,6 +97,13 @@ void print_post_prob_stats(TreeModel *mod, MSA *msa, char *output_fname_root,
  * @param tm, model containing information we shall write.
  */
 void printExtendedInfo(char* fileName, TreeModel* tm);
+/**
+* Printing functin printing additional information computed from running phyloFit
+ * with Hky85g.
+ * @param fileName, name of file to write to.
+ * @param tm, model containing information we shall write.
+ */
+void printExtendedInfoHkyg(char* fileName, TreeModel* tm);
 
 /**
  * Give the matrix rate parameters and the background frequencies including gaps return
