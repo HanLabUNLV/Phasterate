@@ -1630,7 +1630,7 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
       printExtendedInfo(temp1, mod);
     }
 
-    if(mod->subst_mod == HKY85G || mod->allow_gaps){
+    if(mod->subst_mod == HKY85G && mod->allow_gaps){
       //Print all needed info from model here!
       char temp1[100];
       char temp2[100];
