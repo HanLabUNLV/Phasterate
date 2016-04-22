@@ -1,6 +1,6 @@
 /***************************************************************************
  * PHAST: PHylogenetic Analysis with Space/Time models
- * Copyright (c) 2002-2005 University of California, 2006-2010 Cornell 
+ * Copyright (c) 2002-2005 University of California, 2006-2010 Cornell
  * University.  All rights reserved.
  *
  * This source code is distributed under a BSD-style license.  See the
@@ -8,7 +8,7 @@
  ***************************************************************************/
 
 /* phyloFit - fit phylogenetic model(s) to a multiple alignment */
- 
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <dirent.h>
@@ -43,9 +43,9 @@ int main(int argc, char *argv[]) {
   char c;
   int opt_idx, seed=-1;
   String *optstr;
-  List *tmplist = NULL; 
+  List *tmplist = NULL;
   struct phyloFit_struct *pf;
-  
+
   struct option long_opts[] = {
     {"msa", 1, 0, 'm'},
     {"tree", 1, 0, 't'},
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
     {"no-rates", 0, 0, 'n'},
     {"no-opt", 1, 0, 'O'},
     {"min-informative", 1, 0, 'I'},
-    {"gaps-as-bases", 0, 0, 'G'},     
+    {"gaps-as-bases", 0, 0, 'G'},
     {"quiet", 0, 0, 'q'},
     {"help", 0, 0, 'h'},
     {"windows", 1, 0, 'w'},
@@ -116,12 +116,12 @@ int main(int argc, char *argv[]) {
       if (optarg[0] == '(')        /* in this case, assume topology given
                                    at command line */
         pf->tree = tr_new_from_string(optarg);
-      else 
+      else
         pf->tree = tr_new_from_file(phast_fopen(optarg, "r"));
       break;
     case 's':
       pf->subst_mod = tm_get_subst_mod_type(optarg);
-      if (pf->subst_mod == UNDEF_MOD) 
+      if (pf->subst_mod == UNDEF_MOD)
         die("ERROR: illegal substitution model.     Type \"phyloFit -h\" for usage.\n");
       break;
     case 'g':
@@ -165,14 +165,14 @@ int main(int argc, char *argv[]) {
       tmplist = get_arg_list(optarg);
       if (lst_size(tmplist) != 2 ||
           str_as_int(lst_get_ptr(tmplist, 0), &(pf->window_size)) != 0 ||
-          str_as_int(lst_get_ptr(tmplist, 1), &(pf->window_shift)) != 0) 
+          str_as_int(lst_get_ptr(tmplist, 1), &(pf->window_shift)) != 0)
         die("ERROR: illegal arguments to --windows.\n");
       lst_free_strings(tmplist);
       lst_free(tmplist);
       break;
     case 'v':
       tmplist = get_arg_list(optarg);
-      if (lst_size(tmplist) % 2 != 0) 
+      if (lst_size(tmplist) % 2 != 0)
         die("ERROR: argument to --windows-explicit must be a list of even length.\n");
       pf->window_coords = str_list_as_int(tmplist);
       lst_free(tmplist);
@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
       pf->init_parsimony = TRUE;
       pf->parsimony_cost_fname = optarg;
       pf->parsimony_only=TRUE;
-      break; 
+      break;
     case 'L':
       pf->likelihood_only = TRUE;
       break;
@@ -249,7 +249,7 @@ int main(int argc, char *argv[]) {
       break;
     case 'S':
       pf->subtree_name = optarg;
-      break;       
+      break;
     case 'F':
       pf->estimate_backgd = TRUE;
       break;
@@ -277,7 +277,7 @@ int main(int argc, char *argv[]) {
       pf->assume_clock = TRUE;
       break;
     case 'O':
-      if (pf->nooptstr == NULL) 
+      if (pf->nooptstr == NULL)
 	pf->nooptstr = str_new_charstr(optarg);
       else die("ERROR: no-opt argument can only be used once!  parameters can be comma-separated list.");
       break;
@@ -297,8 +297,8 @@ int main(int argc, char *argv[]) {
 	  pf->label_type = lst_new_int(3);
 	}
 	lst_push_ptr(pf->label_str, optstr);
-	lst_push_int(pf->label_type, 
-		     strcmp(long_opts[opt_idx].name, "label-branches") == 0 ? 
+	lst_push_int(pf->label_type,
+		     strcmp(long_opts[opt_idx].name, "label-branches") == 0 ?
 		     BRANCH_TYPE : SUBTREE_TYPE);
       }
       else if (strcmp(long_opts[opt_idx].name, "selection") == 0) {
@@ -319,7 +319,7 @@ int main(int argc, char *argv[]) {
       }
       break;
     case 'u':
-      if (pf->bound_arg == NULL) 
+      if (pf->bound_arg == NULL)
 	pf->bound_arg = lst_new_ptr(1);
       optstr = str_new_charstr(optarg);
       lst_push_ptr(pf->bound_arg, optstr);
@@ -338,19 +338,23 @@ int main(int argc, char *argv[]) {
   set_seed(seed);
 
   if (msa_fname == NULL) {
-    if (optind >= argc) 
+    if (optind >= argc)
       die("ERROR: missing alignment filename.  Type 'phyloFit -h' for usage.\n");
     msa_fname = argv[optind];
     pf->msa_fname = msa_fname;
   }
-  
+
+  /* Check that originalF84E is not used with an alrternate model. */
+  if(pf->subst_mod != F84E && pf->originalF84E == 1)
+    die("Error: originalf84E model can only be used with F84E.\n");
+
   if(!is_dir(msa_fname) && pf->trees)
     die("Error: Expected folder of MSAs.\n");
 
   if (is_dir(msa_fname)) {
     pf->msa_file_names = list_files_in_dir(msa_fname, NULL);
     // check if filenames match between tree and msa
-    
+
     pf->msas = msa_from_dir(pf, msa_fname, input_format, alph);
   }
   else {
@@ -359,7 +363,7 @@ int main(int argc, char *argv[]) {
   /* set up for categories */
   /* first label sites, if necessary */
   pf->label_categories = (input_format != MAF);
- 
+
   if (pf->trees) {
     /* List need to be sorted before hand! The get file from directory does not give the
      * information back in any sensible order. It appears to be random... */
@@ -374,19 +378,19 @@ int main(int argc, char *argv[]) {
     phast_fclose(pf->logf);
   if (!pf->quiet) fprintf(stderr, "Done.\n");
   sfree(pf);
-  
+
   return 0;
 }
 
 MSA* read_msa(struct phyloFit_struct* pf, char* msa_fname, msa_format_type input_format, char* alph) {
-  
+
   FILE* infile = phast_fopen(msa_fname, "r");
-  MSA* msa = NULL;  
+  MSA* msa = NULL;
 
   if (input_format == UNKNOWN_FORMAT)
     input_format = msa_format_for_content(infile, 1);
 
-  if (pf->nonoverlapping && (pf->use_conditionals || pf->gff != NULL || 
+  if (pf->nonoverlapping && (pf->use_conditionals || pf->gff != NULL ||
 			     pf->cats_to_do_str || input_format == SS))
     die("ERROR: cannot use --non-overlapping with --markov, --features,\n--msa-format SS, or --do-cats.\n");
 
@@ -394,10 +398,10 @@ MSA* read_msa(struct phyloFit_struct* pf, char* msa_fname, msa_format_type input
   /* read alignment */
   if (!pf->quiet) fprintf(stderr, "Reading alignment from %s ...\n", msa_fname);
   if (input_format == MAF) {
-    pf->msa = maf_read(infile, NULL, 
-		       tm_order(pf->subst_mod) + 1, 
-		       NULL, pf->gff, pf->cm, 
-		       pf->nonoverlapping ? tm_order(pf->subst_mod) + 1 : -1, 
+    pf->msa = maf_read(infile, NULL,
+		       tm_order(pf->subst_mod) + 1,
+		       NULL, pf->gff, pf->cm,
+		       pf->nonoverlapping ? tm_order(pf->subst_mod) + 1 : -1,
 		       FALSE, pf->reverse_group_tag, NO_STRIP, FALSE);
     if (pf->gaps_as_bases)
       msa_reset_alphabet(msa, alph);

@@ -45,10 +45,10 @@ ifneq ($(TARGETOS), Windows)
  #for debugging
  #CFLAGS = -g -fno-inline -Wall -DPHAST_DEBUG
  #for best performance
- CFLAGS = -g
+ CFLAGS = -O3
  # some other options
  #CFLAGS = -mcpu=opteron -O3
- #CFLAGS = -mcpu=pentiumpro -O3 
+ #CFLAGS = -mcpu=pentiumpro -O3
 else
 #CFLAGS = -O3
 CFLAGS = -g

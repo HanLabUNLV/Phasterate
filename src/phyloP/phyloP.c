@@ -1,6 +1,6 @@
 /***************************************************************************
  * PHAST: PHylogenetic Analysis with Space/Time models
- * Copyright (c) 2002-2005 University of California, 2006-2010 Cornell 
+ * Copyright (c) 2002-2005 University of California, 2006-2010 Cornell
  * University.  All rights reserved.
  *
  * This source code is distributed under a BSD-style license.  See the
@@ -166,30 +166,32 @@ int main(int argc, char *argv[]) {
 
   set_seed(seed);
 
-  if ((p->prior_only && optind > argc - 1) || 
+  if ((p->prior_only && optind > argc - 1) ||
       (!p->prior_only && optind != argc - 2))
     die("ERROR: bad arguments.  Try 'phyloP -h'.\n");
   p->mod_fname = argv[optind];
 
   p->mod = tm_new_from_file(phast_fopen(p->mod_fname, "r"), 1);
   p->mod->isPhyloP = 1;
-  
+
   if(p->mod->subst_mod == F84 && !p->extended)
     die("ERROR: F84 Model requires -x with .infoX file!\n");
   if(p->mod->subst_mod == F84E && !p->extended)
     die("ERROR: F84E Model requires -x with .infoX file!\n");
-  
+
   if(p->extended && p->mod->subst_mod != F84 && p->mod->subst_mod != F84E)
     die("ERROR:-x can only be used with F84 or F84E\n");
-  
+
+  /*Set this before we setExtendedMod, we need to make sure don't include the
+    scaling values. */
+  if(p->originalF84E)
+    p->mod->originalF84E = 1;
+
   /*Extended Likelihood algorithm requires the TreeModel all_params->data
    and the mod->rateMatrix_idx to be set as it is used, we simulate that
    here.*/
   if(p->extended)
     setExtendedMod(p->mod, p->infoXFileName);
-
-  if(p->originalF84E)
-    p->mod->originalF84E = 1;
 
   if (cats_to_do_str != NULL) {
     if (p->cm == NULL) die("ERROR: --cats-to-do requires --catmap option\n");
@@ -201,12 +203,12 @@ int main(int argc, char *argv[]) {
     msa_f = phast_fopen(p->msa_fname, "r");
     if (msa_format == UNKNOWN_FORMAT)
       msa_format = msa_format_for_content(msa_f, 1);
-    if (msa_format == MAF) 
-      p->msa = maf_read_cats(msa_f, NULL, 1, NULL, 
-			     p->cats_to_do==NULL ? NULL : p->feats, p->cm, -1, 
+    if (msa_format == MAF)
+      p->msa = maf_read_cats(msa_f, NULL, 1, NULL,
+			     p->cats_to_do==NULL ? NULL : p->feats, p->cm, -1,
 			     (p->feats == NULL && p->base_by_base==0) ? FALSE : TRUE, /* --features requires order */
-			     NULL, NO_STRIP, FALSE, p->cats_to_do); 
-    else 
+			     NULL, NO_STRIP, FALSE, p->cats_to_do);
+    else
       p->msa = msa_new_from_file_define_format(msa_f, msa_format, NULL);
     phast_fclose(msa_f);
 
@@ -217,12 +219,12 @@ int main(int argc, char *argv[]) {
       else {
         str_remove_path(tmpstr);
         str_shortest_root(tmpstr, '.');
-        p->chrom = tmpstr->chars;    
+        p->chrom = tmpstr->chars;
       }
     }
   }
-  
-  phyloP(p);    
+
+  phyloP(p);
   return 0;
 }
 
@@ -266,7 +268,7 @@ void setExtendedMod(TreeModel* mod, char* fileName){
     length = 0;
    Are necessary because of the way the getline() works, see documentation of function
    for more details.*/
-  
+
   /*Iterate over file reading lines and filling lines based on expected format.*/
   for(i = 0; i < 4; i++){
     /*This is just a title ignore it.*/
@@ -274,7 +276,7 @@ void setExtendedMod(TreeModel* mod, char* fileName){
     free(line);
     line = NULL;
     length = 0;
-    
+
     /*This is a rate!*/
     getline(&line, &length, fin);
     sscanf(line, "%lf", &(params[i]));
@@ -291,7 +293,7 @@ void setExtendedMod(TreeModel* mod, char* fileName){
   line = NULL;
   length = 0;
 
-  /*Get background frequencies.*/  
+  /*Get background frequencies.*/
   for(i = 0; i < 4; i++){
     getline(&line, &length, fin);
     sscanf(line, "%lf", &(freqs[i]));
@@ -310,7 +312,7 @@ void setExtendedMod(TreeModel* mod, char* fileName){
   free(line);
   line = NULL;
   length = 0;
-  
+
   /*Read in insertion and deletion counts, for F84 these will be -1.*/
   getline(&line, &length, fin);
   free(line);
@@ -321,7 +323,7 @@ void setExtendedMod(TreeModel* mod, char* fileName){
   free(line);
   line = NULL;
   length = 0;
-  
+
   /*Now do deletions...*/
   getline(&line, &length, fin);
   free(line);
@@ -332,7 +334,7 @@ void setExtendedMod(TreeModel* mod, char* fileName){
   free(line);
   line = NULL;
   length = 0;
-  
+
   /*F84 Probability function still expects data to be in the format of only
    2 parameters in the param matrix. This is needed as the function is shared between
    phyloFit and phyloP!*/
@@ -341,13 +343,17 @@ void setExtendedMod(TreeModel* mod, char* fileName){
     params[0] = params[2];
     params[1] = params[3];
     mod->all_params = vec_new_from_array(params, 2);
-    
+
   } /*Set indelRatio. */
   else{
-    if(mod->insertionsCount == 0.0)
-      fprintf(stderr, "Warning! Insertion count = 0.0, using 1.0 as our indelRatio...\n");
+    if(!mod->originalF84E){
+      if(mod->insertionsCount == 0.0)
+        fprintf(stderr, "Warning! Insertion count = 0.0, using 1.0 as our indelRatio...\n");
+      else
+        mod->indelRatio = mod->deletionsCount / mod->insertionsCount;
+    }
     else
-      mod->indelRatio = mod->deletionsCount / mod->insertionsCount;
+      mod->indelRatio = 1.0;
   }
   phast_fclose(fin);
   return;

@@ -239,9 +239,9 @@ void print_post_prob_stats(TreeModel *mod, MSA *msa, char *output_fname_root,
   char ***dimnames;
 
   if (msa->ss == NULL)
-    die("Error: print_post_prob_stats needs sufficient statistics");
+    die("Error: print_post_prob_stats needs sufficient statistics.\n");
   if (do_every_site && msa->ss->tuple_idx == NULL)
-    die("Error in print_post_prob_stats: do_every_site option requires ordered sufficient statistics");
+    die("Error in print_post_prob_stats: do_every_site option requires ordered sufficient statistics.\n");
 
   tuplestr[mod->order+1] = '\0';
   coltupstr[msa->nseqs] = '\0';
@@ -692,7 +692,7 @@ int run_phyloFit(struct phyloFit_struct *pf) {
   /*F84 Model check, we do not use branch lengths when optimizing. I guess we could?*/
   if(pf->subst_mod == F84){
     if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
-      die("Error: F84E Model requires -O branches.");
+      die("Error: F84E Model requires -O branches.\n");
   }
   if(pf->dnaMlNormalize && !(pf->subst_mod == F84E))
     die("ERROR: dnaMlNormalize can only be used with F84E.\n");
@@ -1398,7 +1398,7 @@ int run_phyloFit_multi(struct phyloFit_struct *pf){
       die("Error: F84E Model requires -G for gaps as bases.\n");
     if(pf->nooptstr != NULL){
       if(str_equals_charstr(pf->nooptstr, BRANCHES_STR) == 0)
-        die("Error: F84E Model requires -O branches.");
+        die("Error: F84E Model requires -O branches.\n");
     }
     else
       die("Error: F84E Model requires -O branches.\n");

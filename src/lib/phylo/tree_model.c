@@ -2401,15 +2401,33 @@ int tm_fit_multi(TreeModel **mod, int nmod, MSA **msa, int nmsa, List* lst_param
       mod[j]->deletionsCount = deletionTotal;
     }
   }
-
   else{ /*Just regular model!*/
     retval = opt_bfgs(tm_multi_likelihood_wrapper, opt_params, (void*)modlist, &ll,
-            lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);
+                      lower_bounds, upper_bounds, logf, NULL, precision, NULL, &numeval);
     for (j=0; j < nmod; j++)
       if(mod[0]->subst_mod != F84)
-      mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0 * log(2);
+        mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0 * log(2);
       else
         mod[j]->lnL = tm_likelihood_wrapper(opt_params, mod[j]) * -1.0;
+
+    /*Compute the counts of insertion and deletions, this is auxiliary information used
+     * for phyloP if HKY85G model. */
+    if(mod[0]->subst_mod == HKY85G && mod[0]->allow_gaps){
+      double insertionTotal = 0, deletionTotal = 0;
+      for(j = 0; j < nmod; j++){
+        double insertionsCount, deletionsCount;
+        computeIndelCounts(mod[j], msa[j], &insertionsCount, &deletionsCount);
+        insertionTotal += insertionsCount;
+        deletionTotal += deletionsCount;
+      }
+
+      for(j = 0; j < nmod; j++){
+        mod[j]->insertionsCount = insertionTotal;
+        mod[j]->deletionsCount = deletionTotal;
+      }
+
+    }
+
   }
 
   lst_free(modlist);
