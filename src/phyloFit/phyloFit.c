@@ -351,6 +351,9 @@ int main(int argc, char *argv[]) {
   if(!is_dir(msa_fname) && pf->trees)
     die("Error: Expected folder of MSAs.\n");
 
+  if(pf->subst_mod == HKY85G && pf->gaps_as_bases == 0)
+    die("Error: HKY85+Gap model requires -G option.\n");
+
   if (is_dir(msa_fname)) {
     pf->msa_file_names = list_files_in_dir(msa_fname, NULL);
     // check if filenames match between tree and msa

@@ -351,19 +351,6 @@ TreeModel *tm_create_copy(TreeModel *src);
 void tm_set_subst_matrices(TreeModel *tm);
 
 /**
- * Given a proper F84E matrix and a scale paremeters from PhyloP it will scale the
- * insertion and deletion row and column.
- * It returns the scaled matrix, this memory should be deallocated!
- * @param matrix: Matrix to scale.
- * @param scale: scale parameter.
- * @param tm: our tree model to extract lambda, mu and our frequencies.
- * @return: scaled matrix.
- */
-MarkovMatrix* scaleF84EMatrixBySections(MarkovMatrix* matrix, double scale, TreeModel* tm);
-
-MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale);
-
-/**
  * Given the Tree model the current matrix we are computing and the current node.
  * It will calculate the conditional probabilities for these models.
  * @param tm, Tree model.
@@ -384,6 +371,17 @@ void probsF84Models(TreeModel *tm, int i, int j, TreeNode* n, double scale);
  * @param scale, scaling parameter (used by PhyloP).
  */
 void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale);
+
+/**
+ * Given a HKYG85 matrix and a scale paremeter from PhyloP it will scale the
+ * substitution matrix using scale for the indel rate.
+ * It returns the scaled matrix, this memory should be deallocated!
+ * @param matrix: Matrix to scale.
+ * @param scale: scale parameter for insertions.
+ * @param indelRatio: ratio of deletionCounts / insertionCounts.
+ * @return: scaled matrix.
+ */
+MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale, double indelRatio);
 
 /** Setup the substitution matrices on a Tree Model with custom probability matrix and branch length.
    @param P Probability matrix to use

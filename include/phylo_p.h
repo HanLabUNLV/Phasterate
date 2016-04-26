@@ -66,6 +66,7 @@ void phyloP(struct phyloP_struct *p);
  * @param file to read information from.
  */
 void setExtendedMod(TreeModel* mod, char* fileName);
+void getIndelCountsHkyg(TreeModel* mod, char* fileName);
 
 
 #endif

@@ -1087,6 +1087,14 @@ void tm_set_subst_matrices(TreeModel *tm) {
 	/* treat as if infinitely long */
         tm_set_probs_independent(tm, tm->P[i][j]);
 
+      /*Here we scale the rate matrix based on a parameters and pass it to mm_exp. */
+      if(subst_mod == HKY85G){
+        MarkovMatrix* tempMatrix = scaleHkygBySections(rate_matrix, tm->scale, tm->indelRatio);
+        mm_exp(tm->P[i][j], tempMatrix, n->dparent);
+        mm_free(tempMatrix);
+        continue;
+      }
+
       /* for simple models, full matrix exponentiation is not necessary */
       if (subst_mod == JC69 && selection==0.0 && bgc == 0.0)
         tm_set_probs_JC69(tm, tm->P[i][j],
@@ -1177,6 +1185,42 @@ void probsF84EModels(TreeModel *tm, int i, int j, TreeNode* n, double scale){
   params[1] = mu;
 
   return;
+}
+
+/**
+ * Given a HKYG85 matrix and a scale paremeter from PhyloP it will scale the
+ * substitution matrix using scale for the indel rate.
+ * It returns the scaled matrix, this memory should be deallocated!
+ * @param matrix: Matrix to scale.
+ * @param scale: scale parameter for insertions.
+ * @param indelRatio: ratio of deletionCounts / insertionCounts.
+ * @return: scaled matrix.
+ */
+MarkovMatrix* scaleHkygBySections(MarkovMatrix* matrix, double scale, double indelRatio){
+  MarkovMatrix* returnMatrix = mm_create_copy(matrix);
+  double newScale = scale * indelRatio;
+  int const size = 5;
+  int const innerSize = 4;
+  int const k = 4;
+  int i;
+
+  /*For the first 4 rows, scale the diagonal and 5th column.*/
+  for(i = 0; i < innerSize; i++){
+    double val = mm_get(returnMatrix, i, k);
+    double diagonal = mm_get(returnMatrix, i, i);
+
+    diagonal = diagonal + val * (1 - scale);
+    mm_set(returnMatrix, i, k, val * scale);
+    mm_set(returnMatrix, i, i, diagonal);
+  }
+
+  /*Scale 5th row.*/
+  for(i = 0; i < size; i++){
+    double val = mm_get(returnMatrix, k, i);
+    mm_set(returnMatrix, k, i, val * newScale);
+  }
+
+  return returnMatrix;
 }
 
 /* version of above that can be used with specified branch length and

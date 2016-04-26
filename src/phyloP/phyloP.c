@@ -178,20 +178,29 @@ int main(int argc, char *argv[]) {
     die("ERROR: F84 Model requires -x with .infoX file!\n");
   if(p->mod->subst_mod == F84E && !p->extended)
     die("ERROR: F84E Model requires -x with .infoX file!\n");
+  if(p->mod->subst_mod == HKY85G && !p->extended)
+    die("ERROR: HKY85+Gap Model requires -x with .infoX file!\n");
 
-  if(p->extended && p->mod->subst_mod != F84 && p->mod->subst_mod != F84E)
+
+  if(p->extended && p->mod->subst_mod != F84 &&
+     p->mod->subst_mod != F84E && p->mod->subst_mod != HKY85G)
     die("ERROR:-x can only be used with F84 or F84E\n");
 
-  /*Set this before we setExtendedMod, we need to make sure don't include the
-    scaling values. */
+  if(p->originalF84E && p->mod->subst_mod != F84E)
+    die("ERROR: --originalF84e can only be used with F84E\n");
+
+  /*Set this before we call setExtendedMod. We need to make sure don't include the scaling
+    values. */
   if(p->originalF84E)
     p->mod->originalF84E = 1;
 
   /*Extended Likelihood algorithm requires the TreeModel all_params->data
    and the mod->rateMatrix_idx to be set as it is used, we simulate that
    here.*/
-  if(p->extended)
+  if(p->extended && p->mod->subst_mod == F84E)
     setExtendedMod(p->mod, p->infoXFileName);
+  if(p->extended && p->mod->subst_mod == HKY85G)
+    getIndelCountsHkyg(p->mod, p->infoXFileName);
 
   if (cats_to_do_str != NULL) {
     if (p->cm == NULL) die("ERROR: --cats-to-do requires --catmap option\n");
@@ -355,6 +364,43 @@ void setExtendedMod(TreeModel* mod, char* fileName){
     else
       mod->indelRatio = 1.0;
   }
+  phast_fclose(fin);
+  return;
+}
+
+void getIndelCountsHkyg(TreeModel* mod, char* fileName){
+  FILE* fin = phast_fopen(fileName, "r");
+  char* line = NULL;
+  size_t length = 0;
+  int i;
+
+  /*Read in insertion and deletion counts*/
+  getline(&line, &length, fin);
+  free(line);
+  line = NULL;
+  length = 0;
+  getline(&line, &length, fin);
+  sscanf(line, "%lf", &(mod->insertionsCount));
+  free(line);
+  line = NULL;
+  length = 0;
+
+  /*Now do deletions...*/
+  getline(&line, &length, fin);
+  free(line);
+  line = NULL;
+  length = 0;
+  getline(&line, &length, fin);
+  sscanf(line, "%lf", &(mod->deletionsCount));
+  free(line);
+  line = NULL;
+  length = 0;
+
+  if(mod->insertionsCount == 0.0)
+    fprintf(stderr, "Warning! Insertion count = 0.0, using 1.0 as our indelRatio...\n");
+  else
+    mod->indelRatio = mod->deletionsCount / mod->insertionsCount;
+
   phast_fclose(fin);
   return;
 }
