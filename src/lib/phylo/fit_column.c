@@ -52,6 +52,7 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx, double **s
   double total_prob = 0;
   List *traversal = tr_postorder(mod->tree);
   double **pL = NULL;
+  printf("\n");
 
   if (msa->ss->tuple_size != 1)
     die("ERROR col_compute_likelihood: need tuple size 1, got %i\n",
@@ -105,6 +106,11 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx, double **s
           pL[i][n->id] = totl * totr;
         }
       }
+      /*Print values at nodes: */
+      double** lt = pL;
+      int id = n->id;
+      char* formatString = "Node %d: {%0.12f, %0.12f, %0.12f, %0.12f, %0.12f}\n";
+      printf(formatString, id, lt[0][id], lt[1][id], lt[2][id], lt[3][id], lt[4][id]);
     }
 
     /* termination (for each rate cat) */
@@ -117,7 +123,7 @@ double col_compute_likelihood(TreeModel *mod, MSA *msa, int tupleidx, double **s
     for (j = 0; j < nstates; j++) sfree(pL[j]);
     sfree(pL);
   }
-
+  printf("Total probability of column: %0.12f\n", total_prob);
   return(total_prob);
 }
 
@@ -818,6 +824,7 @@ void col_lrts(TreeModel *mod, MSA *msa, mode_type mode, double *tuple_pvals,
       this_scale = d->params->data[0];
 
       delta_lnl = alt_lnl - null_lnl;
+      printf("Scale: %f\n", this_scale);
 
       /*Save values as we will want to print them later in the printing function.*/
       msa->nullScores[i] = null_lnl;
@@ -1713,6 +1720,7 @@ double singleSiteLikelihoodRivas(TreeModel* mod, MSA* msa,int tupleidx, double**
   int alph_size = strlen(mod->rate_matrix->states);
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
+  printf("\n");
 
   /*Get traversal order so we iterate over nodes instead of recursing.*/
   traversal = tr_postorder(mod->tree);
@@ -1757,10 +1765,15 @@ double singleSiteLikelihoodRivas(TreeModel* mod, MSA* msa,int tupleidx, double**
       likelihoodTable[4][n->id] = probForNodeGap(likelihoodTable, lMatrix, rMatrix,
               lChild, rChild, msa, n, tupleidx, flag);
     }
+    /*Print values at nodes: */
+    double** lt = likelihoodTable;
+    int id = n->id;
+    char* formatString = "Node %d: {%0.12f, %0.12f, %0.12f, %0.12f, %0.12f}\n";
+    printf(formatString, id, lt[0][id], lt[1][id], lt[2][id], lt[3][id], lt[4][id]);
   }
 
   totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-
+  printf("Total probability of column: %0.12f\n", totalProb);
   return totalProb;
 }
 //==========================================================================================
@@ -1788,6 +1801,7 @@ double singleSiteLikelihoodModified(TreeModel* mod, MSA* msa,int tupleidx, doubl
   int alph_size = strlen(mod->rate_matrix->states);
   double p = mod->geometricParameter;
   int rootNodeId = mod->tree->id;
+  printf("\n");
 
   /*Get traversal order so we iterate over nodes instead of recursing.*/
   traversal = tr_postorder(mod->tree);
@@ -1834,10 +1848,14 @@ double singleSiteLikelihoodModified(TreeModel* mod, MSA* msa,int tupleidx, doubl
         likelihoodTable[i][n->id] = qSum * sSum;
       }
     }
+    double** lt = likelihoodTable;
+    int id = n->id;
+    char* formatString = "Node %d: {%0.12f, %0.12f, %0.12f, %0.12f, %0.12f}\n";
+    printf(formatString, id, lt[0][id], lt[1][id], lt[2][id], lt[3][id], lt[4][id]);
   }
 
   totalProb = totalProbOfSite(likelihoodTable, mod->backgd_freqs->data, rootNodeId, p);
-
+  printf("Total probability of column: %0.12f\n", totalProb);
   return totalProb;
 }
 /* =====================================================================================*/
