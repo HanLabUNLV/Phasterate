@@ -6,18 +6,18 @@ QUICK START - INSTALLING PHAST
 
 -Compiling from Source
     Part 1 - Installing Clapack - (If you already have Clapack installed, skip to Part 2)
-    1. Download Clapack from the following URL http://www.netlib.org/clapack/clapack.tgz
-    2. Unzip clapack.tgz with the command 'tar -xvzf clapack.tgz'
-    3. Go into the newly created Clapack directory (i.e. 'cd CLAPACK-3.2.1')
-	and type 'cp make.inc.example make.inc && make f2clib && make blaslib && make lib'
-       Note: Building Clapack can take several minutes depending on your system.
+    Go into the directory (i.e. 'cd CLAPACK-3.2.1')
+	and type 
+    'cp make.inc.example make.inc && make f2clib && make blaslib && make lib'
+    Note: Building Clapack can take several minutes depending on your system.
     There are several online resources for installing Clapack.
 
     Part 2 - Installing Phast
-    4. Change directory to 'phast/src/' and run 'make CLAPACKPATH=YOURPATH'
-	replacing 'YOURPATH' with the path of your
-	Clapack install (e.g., CLAPACKPATH=/home/username/CLAPACK-3.2.1)
-    5. The Phast binaries should be created in the '../bin/' directory
+    1. Change directory to 'phast-1.3/src/' and run 'make CLAPACKPATH=../../CLAPACK-3.2.1'
+    2. The Phast binaries should be created in the '../bin/' directory
+
+    Part 3 - Installing Phasterate
+    1. Change directory to Phasterate and run make
 
 
 The Phast package should compile cleanly in most standard linux or
