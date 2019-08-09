@@ -13,11 +13,16 @@ QUICK START - INSTALLING PHAST
     There are several online resources for installing Clapack.
 
     Part 2 - Installing Phast
-    1. Change directory to 'phast-1.3/src/' and run 'make CLAPACKPATH=../../CLAPACK-3.2.1'
-    2. The Phast binaries should be created in the '../bin/' directory
+    1. Change directory to 'phast-1.3/src/' and run 'make
+    CLAPACKPATH=yourpath', where yourpath is the absolute path to the CLAPACK
+    directory under Phasterate. (e.g. make CLAPACKPATH=/tmp/Phasterate/CLAPACK-3.2.1)
+    Note relative directory path will fail to compile.
+    2. The Phast binaries should be created in the 'Phasterate/phast-1.3/bin/' directory
 
     Part 3 - Installing Phasterate
-    1. Change directory to Phasterate and run make
+    1. Go to the top directory (Phasterate) and run make with the same CLAPACKPATH as Part 2.
+    (e.g. make CLAPACKPATH=/tmp/Phasterate/CLAPACK-3.2.1)
+    2. Phasterate binaries should be found in the 'Phasterate/bin' directory.
 
 
 The Phast package should compile cleanly in most standard linux or
